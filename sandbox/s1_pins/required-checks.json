@@ -1,0 +1,106 @@
+{
+  "check_receipt_invariant": {
+    "appender": "org-ledger-writer (Labs#3255)",
+    "invariant_id": "REQUIRED_CHECK_RECEIPTS_ARE_S1_VERIFIER_OUTPUTS_APPENDED_BY_ORG_WRITER",
+    "ledger_ref": "refs/stegverse/organization-ledger",
+    "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+    "receipt_schema": "schemas/sv-check-receipt.v1.schema.json",
+    "statements": [
+      "(1) Lane B's NWI-S1 verifier (SV-LLM/.github#46) runs each declared check offline at the exact head and emits a six-field, head-bound receipt (schemas/sv-check-receipt.v1.schema.json) carrying the supplied hb_epoch.",
+      "(2) That receipt becomes a LEDGER_RECEIPT only through the org-ledger writer transition (StegVerse-Labs/.github#3255, the writer-only workflow) under the shared lock.",
+      "(3) The check ids in this row are exactly the ids the verifier emits; no other minter exists. A receipt for any other check id is refused (CHECK_ID_UNDECLARED)."
+    ]
+  },
+  "checks": {
+    "mutation-negative-suite": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    },
+    "registry-generation-fence": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    },
+    "schema-validate": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    },
+    "supplied-epoch-binder-check": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    },
+    "unit-tests": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    },
+    "workflow-surface-registered": {
+      "appender": "org-ledger-writer (Labs#3255)",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+    }
+  },
+  "coverage_required_kinds": [
+    "workflow",
+    "transition",
+    "schema",
+    "ledger_writer",
+    "registry"
+  ],
+  "generation_fence": "data/task-coordination-policy.json#session_mutation_generation_fence",
+  "row_id": "SV-CHANGE-REQUIRED-CHECKS-001",
+  "row_status": {
+    "disposition": "FAIL_CLOSED",
+    "failed_predicate": "REQUIRED_CHECK_HAS_LEDGER_RECEIPT",
+    "failure_code": "CHECK_RECEIPT_ABSENT_FROM_LEDGER",
+    "holds_until": "an appended LEDGER_RECEIPT exists for every check id in this row (sv_work_items.row_receipt_status)",
+    "next_attempt": "after StegVerse-Labs/.github#3255 and SV-LLM/.github#46 land and JD-P4-3 settles the epoch",
+    "owning_existing_goal": "StegVerse-org/.github#163",
+    "required_evidence_or_repair": "NWI-S1 verifier emits the check id at the exact head and the org writer appends it",
+    "retry_entrypoint": "the merge-admission evaluation (resident-runtime/sv_work_items.py::evaluate_admission)"
+  },
+  "schema": "stegverse.sv-change-required-checks/v1",
+  "skipped_or_unreceipted": "FAIL_CLOSED CHECK_SKIPPED_OR_UNOBSERVED",
+  "supersedes_for_native_path": "StegVerse-Labs/repo-standards config/repository-protection-policy.json@ce3d413d#merge_admission (ST019-MERGE-ADMISSION-001; required_status_checks is GitHub-bound and stays the projection's row)",
+  "surface_kinds": {
+    "all": {
+      "checks": [
+        "schema-validate",
+        "unit-tests"
+      ],
+      "signoffs": []
+    },
+    "doc": {
+      "checks": [],
+      "signoffs": []
+    },
+    "ledger_writer": {
+      "checks": [
+        "supplied-epoch-binder-check",
+        "mutation-negative-suite"
+      ],
+      "signoffs": [
+        "ledger-component-owner"
+      ]
+    },
+    "registry": {
+      "checks": [
+        "registry-generation-fence"
+      ],
+      "signoffs": []
+    },
+    "schema": {
+      "checks": [],
+      "signoffs": []
+    },
+    "transition": {
+      "checks": [
+        "mutation-negative-suite"
+      ],
+      "signoffs": []
+    },
+    "workflow": {
+      "checks": [
+        "workflow-surface-registered"
+      ],
+      "signoffs": []
+    }
+  }
+}

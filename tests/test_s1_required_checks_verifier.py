@@ -60,7 +60,7 @@ class Fixture:
         self.head = subprocess.run(["git", "-C", str(self.repo), "rev-parse", "HEAD"], check=True, env=env,
                                    capture_output=True, text=True).stdout.strip()
         self.input = tmp / "input.json"
-        self.input.write_text(json.dumps({"schema": v.INPUT_SCHEMA, "type": "SV_CHANGE", "repository": "Fixture/repo",
+        self.input.write_text(json.dumps({"schema": v.INPUT_SCHEMA, "type": v.INPUT_TYPE, "repository": "Fixture/repo",
                                           "pull_request": 1, "head_sha": self.head}))
 
     def verify(self, dependencies=None):

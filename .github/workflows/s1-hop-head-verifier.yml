@@ -18,8 +18,10 @@ on:
       - 'sandbox/**'
       - 'evidence/s1-hop-head/**'
       - 'evidence/s1-required-checks/**'
+      - 'evidence/sv-check-receipts/**'
       - 'tests/test_s1_hop_head_verifier.py'
       - 'tests/test_s1_required_checks_verifier.py'
+      - 'tests/test_s1_sv_check_receipts.py'
       - '.github/workflows/s1-hop-head-verifier.yml'
   push:
     branches: [main]
@@ -27,8 +29,10 @@ on:
       - 'sandbox/**'
       - 'evidence/s1-hop-head/**'
       - 'evidence/s1-required-checks/**'
+      - 'evidence/sv-check-receipts/**'
       - 'tests/test_s1_hop_head_verifier.py'
       - 'tests/test_s1_required_checks_verifier.py'
+      - 'tests/test_s1_sv_check_receipts.py'
       - '.github/workflows/s1-hop-head-verifier.yml'
 
 permissions:
@@ -52,6 +56,34 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_required_checks_verifier.py
           python3 -B tests/test_s1_required_checks_verifier.py -v
+      - name: SV_CHANGE sv-check-receipt minter unit tests (pins, six ids, schema, negatives)
+        run: |
+          python3 -m py_compile sandbox/s1_sv_check_receipts.py
+          python3 -B tests/test_s1_sv_check_receipts.py -v
+      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at d2ba0957; vendored P1 segments are its bytes
+        run: |
+          set -euo pipefail
+          pin=d2ba0957c203f5b67cdec77d7ed41d1daf52cbb0
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = acbe80611369681c2a3af9dd13edf10c5cc2dca2
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = 070f13f468558ca08aa5162a8f34431608fc1404
+          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = acbe80611369681c2a3af9dd13edf10c5cc2dca2
+          test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = 070f13f468558ca08aa5162a8f34431608fc1404
+          git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
+          python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
+          import ast, hashlib, sys
+          sys.path.insert(0, "sandbox")
+          import s1_sv_check_receipts as m
+          src = open(sys.argv[1]).read(); lines = src.split("\n")
+          found = {}
+          for n in ast.parse(src).body:
+              name = getattr(n, "name", None) or (n.targets[0].id if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) else None)
+              if name in m.P1_SEGMENT_SHA256:
+                  found[name] = hashlib.sha256("\n".join(lines[n.lineno - 1:n.end_lineno]).encode()).hexdigest()
+          assert found == m.P1_SEGMENT_SHA256, found
+          print("P1 segments byte-identical at", m.PIN_COMMIT)
+          PY
 
   rederive:
     runs-on: ubuntu-latest
@@ -70,6 +102,7 @@ jobs:
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-ca7ca797}
           - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
           - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-7d2b7394}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,6 +149,7 @@ jobs:
           - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
           - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
           - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-7d2b7394}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,3 +197,52 @@ jobs:
           python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
           cmp "$committed" "$RUNNER_TEMP/receipt.json" || { diff <(python3 -m json.tool "$committed") <(python3 -m json.tool "$RUNNER_TEMP/receipt.json") || true; exit 1; }
           echo "re-derived receipt is byte-identical to $committed"
+
+  rederive-sv-check-receipts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3225-e6ba9601}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
+          # dd8bfd02 is not fetchable (no public ref): the committed receipts are HEAD_NOT_MATERIALIZED
+          - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the pinned row/schema/SV_CHANGE commit and the head read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          in="sandbox/s1-sv-check-inputs/$INPUT.json"
+          pin=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["required_checks_row"]["commit"])' "$in")
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "$in")
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
+          git init -q "$RUNNER_TEMP/head"
+          if [ -n "$REPOSITORY" ]; then
+            git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
+            test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+          fi
+      - name: Mint again and compare every receipt byte for byte
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          code=0
+          python3 -P sandbox/s1_sv_check_receipts.py mint --input "sandbox/s1-sv-check-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" --dependency "labs-row=$RUNNER_TEMP/labs" --out-dir "$RUNNER_TEMP/out" || code=$?
+          echo "minter exit $code (0 only when all six are ALLOW; the committed receipts decide)"
+          diff -r "evidence/sv-check-receipts/$INPUT" "$RUNNER_TEMP/out"
+          for f in "$RUNNER_TEMP"/out/*.json; do
+            python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(sys.argv[1].rsplit("/",1)[1], r.get("disposition"), r.get("failure_code"))' "$f"
+          done
+          echo "re-minted receipts are byte-identical to evidence/sv-check-receipts/$INPUT"

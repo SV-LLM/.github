@@ -1,1 +1,7 @@
-{"head_sha":"ca7ca797d6d8bde06fb1fddeb6c9350895dee333","pull_request":95,"repository":"Admissible-Existence/.github","schema":"stegverse.sv-change.s1-required-checks-input/v1","type":"SV_CHANGE"}
+{
+  "head_sha": "ca7ca797d6d8bde06fb1fddeb6c9350895dee333",
+  "pull_request": 95,
+  "repository": "Admissible-Existence/.github",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}

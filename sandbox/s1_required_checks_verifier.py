@@ -6,10 +6,11 @@ home #163. Generalizes sandbox/s1_hop_head_verifier.py (which runs only the
 `intr-destination-hop/hop` check, and is kept byte-unchanged so its receipts
 re-derive) to whatever checks the head declares.
 
-Where the checks are declared. P1's SV-CHANGE-REQUIRED-CHECKS-001 row is the
-source once published; until then the head's own interim declaration
-`.sv/required-checks.json` is read, and the receipt says so
-(`declaration_basis`). Each declared check is an id, an offline command and its
+Where the checks are declared. This verifier serves non-SV_CHANGE heads only:
+the head's own interim declaration `.sv/required-checks.json` is read, and
+the receipt says so (`declaration_basis`). SV_CHANGE heads take their check
+ids from P1's SV-CHANGE-REQUIRED-CHECKS-001 row (sandbox/s1_sv_check_receipts.py,
+one stegverse.sv_check_receipt.v1 per id). Each declared check is an id, an offline command and its
 expected outcome:
 
   {"id": ..., "kind": "python-unittest", "target": "tests/test_x.py", "expected_outcome": "PASS"}
@@ -58,14 +59,15 @@ HERE = Path(__file__).resolve().parent
 PROBE = HERE / "s1_probe"
 RUNNER = PROBE / "s1_unittest_runner.py"
 RECEIPT_SCHEMA = "stegverse.sv-llm.s1-required-checks-verification-receipt/v1"
-INPUT_SCHEMA = "stegverse.sv-change.s1-required-checks-input/v1"
-INPUT_TYPE = "SV_CHANGE"
-INPUT_TYPE_DEFINITION = "PENDING_P1_S0_SV_CHANGE (StegVerse-org/.github#163)"
+INPUT_SCHEMA = "stegverse.sv-llm.s1-required-checks-input/v2"
+INPUT_TYPE = "PULL_REQUEST_HEAD"
+INPUT_TYPE_DEFINITION = ("NON_SV_CHANGE pull-request head; an SV_CHANGE head (StegVerse-Labs/.github#3264 sv-change.v1) "
+                         "is minted by sandbox/s1_sv_check_receipts.py from P1's row instead")
 DECLARATION_PATH = ".sv/required-checks.json"
 DECLARATION_SCHEMA = "stegverse.sv-change.required-checks-declaration/v0-interim"
 P1_ROW = "SV-CHANGE-REQUIRED-CHECKS-001"
-DECLARATION_BASIS = ("INTERIM_PER_REPOSITORY_DECLARATION (" + DECLARATION_PATH + " at the head) until P1's "
-                     + P1_ROW + " row is published")
+DECLARATION_BASIS = ("INTERIM_PER_REPOSITORY_DECLARATION (" + DECLARATION_PATH + " at the head) for a non-SV_CHANGE "
+                     "head; SV_CHANGE heads take their ids from P1's " + P1_ROW + " row")
 KINDS = ("python-unittest", "argv")
 CHECK_TIMEOUT_S = 900
 FIXED_GIT_DATE = "@0 +0000"
@@ -184,7 +186,7 @@ def read_declaration(head_root: Path) -> tuple[dict[str, Any], bytes]:
                       "P1's " + P1_ROW + " row for this repository, or (interim) " + DECLARATION_PATH
                       + " at the head listing each required check as an id, an offline command and its expected outcome",
                       "declare the required checks at a new head and re-run; nothing was run",
-                      "no " + DECLARATION_PATH + " at the head and no published " + P1_ROW + " row")
+                      "no " + DECLARATION_PATH + " at the head (non-SV_CHANGE head: no " + P1_ROW + " row applies)")
     raw = path.read_bytes()
     try:
         document = json.loads(raw.decode("utf-8"))

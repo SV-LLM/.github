@@ -1,1 +1,7 @@
-{"head_sha":"2a22541beda88c8d9c70bdb36d8d71429b42bea0","pull_request":39,"repository":"SV-LLM/sandbox","schema":"stegverse.sv-change.s1-required-checks-input/v1","type":"SV_CHANGE"}
+{
+  "head_sha": "2a22541beda88c8d9c70bdb36d8d71429b42bea0",
+  "pull_request": 39,
+  "repository": "SV-LLM/sandbox",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}

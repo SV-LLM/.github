@@ -1,1 +1,7 @@
-{"head_sha":"97c8e43cc3d4ce61757441d3ea1476be9ab73e0e","pull_request":41,"repository":"SV-LLM/.github","schema":"stegverse.sv-change.s1-required-checks-input/v1","type":"SV_CHANGE"}
+{
+  "head_sha": "97c8e43cc3d4ce61757441d3ea1476be9ab73e0e",
+  "pull_request": 41,
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}

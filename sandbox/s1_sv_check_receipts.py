@@ -1,0 +1,556 @@
+#!/usr/bin/env python3
+"""S1 sv-check-receipt minting for SV_CHANGE heads: one receipt per row check id.
+
+StegVerse-org/.github#162 (NWI-S1), S1 home #163. This is the only minter of
+required-check receipts (row invariant
+REQUIRED_CHECK_RECEIPTS_ARE_S1_VERIFIER_OUTPUTS_APPENDED_BY_ORG_WRITER); the
+organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
+heads keep sandbox/s1_required_checks_verifier.py and its interim
+per-repository list.
+
+Pins (StegVerse-Labs/.github#3264 head d2ba0957; tests fail on drift):
+data/sv-work-items/required-checks.json blob acbe8061 (row
+SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
+070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
+at that commit and blob; nothing is fetched.
+
+Which ids. Exactly the row's `checks` ids, one receipt each, for every SV_CHANGE
+head. The surface-required subset is P1's own required_for(touched_paths),
+vendored byte-identically from resident-runtime/sv_work_items.py and pinned by
+segment sha256; it is recorded in the bundle. The SV_CHANGE record is read from
+the same checkout by change_id, its change_digest is recomputed with P1's rule,
+and every content blob digest must be the head's bytes.
+
+How each id runs. The head's .sv/required-checks.json maps an id to an offline
+command (the s1_required_checks_verifier.py declaration). A declared id outside
+the row is FAIL_CLOSED CHECK_ID_UNDECLARED and is not run. A row id the head
+gives no offline entrypoint is FAIL_CLOSED CHECK_SKIPPED_OR_UNOBSERVED -- never
+a guessed ALLOW. Declared ids run twice offline under the clock/network probe:
+a clock or network read, output that differs, or a failure is DENY; clean is
+ALLOW.
+
+Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
+(== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
+(supplied ASCII digits >= 32; no clock), verifier_ref, and the six fields on
+any non-ALLOW. Every receipt is validated against the pinned schema before it
+is written. `check` re-verifies a receipt against its head: an id outside the
+row is CHECK_ID_UNDECLARED; a change_digest that is not the head's is
+CHECK_SKIPPED_OR_UNOBSERVED (RECEIPT_CHANGE_DIGEST_EQUALS_HEAD).
+
+Reads no clock, opens no network connection, passes no credential, appends no
+ledger. Exit code 0 only when every minted receipt is ALLOW.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import s1_required_checks_verifier as rc  # noqa: E402
+
+HERE = Path(__file__).resolve().parent
+RECEIPT_SCHEMA = "stegverse.sv_check_receipt.v1"
+RECEIPT_SCHEMA_FILE = "schemas/sv-check-receipt.v1.schema.json"
+BUNDLE_SCHEMA = "stegverse.sv-llm.s1-sv-check-receipt-bundle/v1"
+INPUT_SCHEMA = "stegverse.sv-change.s1-sv-check-input/v1"
+ROW_ID = "SV-CHANGE-REQUIRED-CHECKS-001"
+ROW_FILE = "data/sv-work-items/required-checks.json"
+ROW_REPOSITORY = "StegVerse-Labs/.github"
+ROW_DEPENDENCY = "labs-row"
+PIN_COMMIT = "d2ba0957c203f5b67cdec77d7ed41d1daf52cbb0"
+ROW_BLOB = "acbe80611369681c2a3af9dd13edf10c5cc2dca2"
+RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
+SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+              "owning_existing_goal", "next_attempt")
+DISPOSITIONS = ("ALLOW", "DENY", "FAIL_CLOSED")
+OWNING_EXISTING_GOAL = "StegVerse-org/.github#163 / SV-CHANGE-REQUIRED-CHECKS-001 (NWI-S1, #162)"
+RETRY_ENTRYPOINT = ("sandbox/s1_sv_check_receipts.py mint --input <input.json> --checkout <head checkout> "
+                    "--dependency labs-row=<StegVerse-Labs/.github checkout> --out-dir <dir>")
+HB_EPOCH_PREDICATE = "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"
+EXACT_HEAD_PREDICATE = "RECEIPT_CHANGE_DIGEST_EQUALS_HEAD"
+SHARED_RULE_SHA256 = "726248a585904b52cfe2eec1754e7ce582f67d6b501bd664bb7bee80bce9b7ef"
+P1_SOURCE = {"repository": ROW_REPOSITORY, "commit": PIN_COMMIT, "path": "resident-runtime/sv_work_items.py"}
+P1_SEGMENT_SHA256 = {"LEDGER_WRITER_PATHS": "2a854d7b2ff1f0eeef7259befd2e0998a092d4610eab685412b3ee7556fe49db",
+                     "surface_kind": "ad28dd85120a90740b2f85556658d61a774dafe1e4f28a39349bcd3a88b038d6",
+                     "required_for": "710f20a2078b2079ebdf7734913d8acb8f99726d8b6f3d7f57badbe1c9f2d180"}
+REQUIRED_CHECKS: Any = None  # P1's module-level default; the row is always passed explicitly here
+
+
+# ---- vendored byte-identically from P1_SOURCE (segment sha256 in P1_SEGMENT_SHA256) ----
+LEDGER_WRITER_PATHS = ("resident-runtime/aggregate_repo_transition.py", "resident-runtime/ledger_store.py",
+                       ".stegverse/transition-ledger/emit.py", "org-kernel/kernel.py", "org-kernel/organization-ledger/",
+                       "resident-runtime/propagate_repository_receipts.py", "resident-runtime/federation_cycle.py",
+                       ".github/workflows/organization-ledger-transition.yml")
+
+
+def surface_kind(path: str) -> str:
+    """Typed surface for coverage (Q-SCENARIO-GENERALIZATION rule S1)."""
+    if any(path == p or (p.endswith("/") and path.startswith(p)) for p in LEDGER_WRITER_PATHS):
+        return "ledger_writer"
+    if path.startswith(".github/workflows/"):
+        return "workflow"
+    if path.startswith("schemas/") or path.endswith(".schema.json"):
+        return "schema"
+    if path == "data/canonical-task-registry.json" or path.startswith("data/canonical-task-records/"):
+        return "registry"
+    if path.endswith(".py"):
+        return "transition"
+    return "doc"
+
+
+def required_for(paths: Iterable[str], row: Mapping[str, Any] = REQUIRED_CHECKS) -> tuple[list[str], list[str]]:
+    kinds = {surface_kind(p) for p in paths}
+    checks, signoffs = set(row["surface_kinds"]["all"]["checks"]), set()
+    for k in kinds:
+        checks |= set(row["surface_kinds"][k]["checks"])
+        signoffs |= set(row["surface_kinds"][k]["signoffs"])
+    return sorted(checks), sorted(signoffs)
+# ---- end of P1 segments ----
+
+
+# ---- vendored shared supplied-epoch rule (segment sha256 SHARED_RULE_SHA256) ----
+def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, str] | None:
+    """The shared supplied-epoch rule (SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH).
+
+    Byte-identical in StegVerse-org/.github#185 and StegVerse-Labs/.github#3212
+    and #3213. `hb_epoch` absent (None) is HB_EPOCH_NOT_SUPPLIED. Otherwise it
+    must be ASCII [0-9]+ only -- an int is read as its decimal text; a bool, a
+    float or anything coerced ('+33', ' 33', '3_3', '33.0') is refused -- with
+    integer value >= 32 (the HB32 anchor). `reference`, the carrier frame's
+    heartbeat reference when there is one, must be an object, and a
+    `derived_from_clock` it carries must be exactly false. Any failure is
+    HB_EPOCH_INVALID. Returns (failure_code, detail), or None when the epoch is
+    supplied. No clock is read.
+    """
+    if reference is not None and not isinstance(reference, dict):
+        return "HB_EPOCH_INVALID", "the carrier's heartbeat reference is not an object"
+    if hb_epoch is None:
+        return "HB_EPOCH_NOT_SUPPLIED", "no hb_epoch was supplied and no clock is read"
+    if isinstance(hb_epoch, bool):
+        text = None
+    elif isinstance(hb_epoch, int):
+        text = str(hb_epoch)
+    elif isinstance(hb_epoch, str):
+        text = hb_epoch
+    else:
+        text = None
+    if text is None or not text.isascii() or not text.isdigit():
+        return "HB_EPOCH_INVALID", "hb_epoch " + repr(hb_epoch) + " is not ASCII [0-9]+"
+    if int(text) < 32:
+        return "HB_EPOCH_INVALID", "hb_epoch " + text + " is below the HB32 anchor (32)"
+    if reference is not None and "derived_from_clock" in reference \
+            and reference["derived_from_clock"] is not False:
+        return "HB_EPOCH_INVALID", ("the carrier's derived_from_clock is not exactly false; "
+                                    "a clock-derived epoch is not a supplied one")
+    return None
+# ---- end of shared rule ----
+
+
+def canon(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def change_identity_input(rec: Mapping[str, Any]) -> dict[str, Any]:
+    """P1's sv_work_items.change_identity_input: the hashed form of change_id and head.change_digest."""
+    content = []
+    for c in rec.get("content") or []:
+        if isinstance(c, Mapping):
+            deleted = c.get("deleted", False) is True
+            content.append({"path": c.get("path"), "blob_digest": None if deleted else c.get("blob_digest"),
+                            "deleted": deleted})
+    return {"target_repository": rec.get("target_repository"), "base_ref": dict(rec.get("base_ref") or {}),
+            "content": sorted(content, key=lambda c: str(c["path"]))}
+
+
+def change_digest(rec: Mapping[str, Any]) -> str:
+    return "sha256:" + sha256_hex(canon(change_identity_input(rec)))
+
+
+def verifier_files() -> dict[str, str]:
+    files = {"s1_sv_check_receipts.py": "sha256:" + sha256_hex((HERE / "s1_sv_check_receipts.py").read_bytes())}
+    files.update(rc.verifier_files())
+    return files
+
+
+def verifier_ref() -> str:
+    return "SV-LLM/.github:sandbox/s1_sv_check_receipts.py#sha256:" + sha256_hex(canon(verifier_files()))
+
+
+def row_ids(row: Mapping[str, Any]) -> list[str]:
+    """P1's declared_check_ids: the only ids a receipt may carry (row["checks"])."""
+    return sorted(row["checks"])
+
+
+SCHEMA_KEYWORDS = {"$id", "$schema", "title", "description", "type", "properties", "required", "additionalProperties",
+                   "enum", "const", "pattern", "minLength", "allOf", "if", "then"}
+
+
+def schema_errors(value: Any, schema: Mapping[str, Any], at: str = "$") -> list[str]:
+    """The JSON Schema subset the pinned receipt schema uses; any other keyword is an error (fail closed)."""
+    errors = [at + ": unsupported keyword " + k for k in schema if k not in SCHEMA_KEYWORDS]
+    kinds = {"object": dict, "string": str}
+    if "type" in schema:
+        if schema["type"] not in kinds:
+            return errors + [at + ": unsupported type " + repr(schema["type"])]
+        if not isinstance(value, kinds[schema["type"]]):
+            return errors + [at + ": type"]
+    if "const" in schema and value != schema["const"]:
+        errors.append(at + ": const")
+    if "enum" in schema and value not in schema["enum"]:
+        errors.append(at + ": enum")
+    if isinstance(value, str):
+        if "pattern" in schema and not re.search(schema["pattern"], value):
+            errors.append(at + ": pattern")
+        if len(value) < schema.get("minLength", 0):
+            errors.append(at + ": minLength")
+    if isinstance(value, dict):
+        errors += [at + ": required " + k for k in schema.get("required", []) if k not in value]
+        props = schema.get("properties", {})
+        for k, v in value.items():
+            if k in props:
+                errors += schema_errors(v, props[k], at + "." + k)
+            elif schema.get("additionalProperties") is False:
+                errors.append(at + ": additional " + k)
+    for sub in schema.get("allOf", []):
+        errors += schema_errors(value, sub, at)
+    if "if" in schema and not schema_errors(value, schema["if"], at):
+        errors += schema_errors(value, schema.get("then", {}), at)
+    return errors
+
+
+class Global(Exception):
+    def __init__(self, code: str, predicate: str, repair: str, next_attempt: str, detail: str,
+                 disposition: str = "FAIL_CLOSED") -> None:
+        super().__init__(code)
+        self.disposition, self.detail = disposition, detail
+        self.fields = six(code, predicate, repair, next_attempt)
+
+
+def six(code: str, predicate: str, repair: str, next_attempt: str) -> dict[str, str]:
+    return {"failure_code": code, "failed_predicate": predicate, "required_evidence_or_repair": repair,
+            "retry_entrypoint": RETRY_ENTRYPOINT, "owning_existing_goal": OWNING_EXISTING_GOAL,
+            "next_attempt": next_attempt}
+
+
+def receipt(check_id: str, disposition: str, change: str, head: str, epoch: str,
+            fields: dict[str, str] | None = None) -> dict[str, Any]:
+    body: dict[str, Any] = {"schema": RECEIPT_SCHEMA, "check_id": check_id, "disposition": disposition,
+                            "change_digest": change, "head_sha": head, "hb_epoch": epoch,
+                            "verifier_ref": verifier_ref()}
+    if disposition != "ALLOW":
+        body.update(fields or {})
+    return body
+
+
+def read_at(checkout: Path | None, commit: str, path: str) -> tuple[bytes, str] | None:
+    if checkout is None:
+        return None
+    blob = rc.git(checkout, "rev-parse", "--verify", "--quiet", commit + ":" + path)
+    shown = rc.git(checkout, "cat-file", "blob", commit + ":" + path)
+    if blob.returncode or shown.returncode:
+        return None
+    return shown.stdout, blob.stdout.decode().strip()
+
+
+def validate_input(document: Any) -> dict[str, Any]:
+    def bad(detail: str) -> Global:
+        return Global("S1_INPUT_NOT_A_DECLARED_SV_CHANGE", "S1_INPUT_DECLARES_ONE_SV_CHANGE_HEAD",
+                      "an input with schema " + INPUT_SCHEMA + ", type SV_CHANGE, repository, head_sha, hb_epoch, "
+                      "required_checks_row {repository, commit, file, blob_sha, receipt_schema_blob_sha, row_id} and "
+                      "sv_change {repository, commit, file, change_id}", "re-run with the corrected input", detail)
+    if not isinstance(document, dict) or document.get("schema") != INPUT_SCHEMA or document.get("type") != "SV_CHANGE":
+        raise bad("schema/type")
+    if not isinstance(document.get("repository"), str) or not rc.REPOSITORY.match(document["repository"]):
+        raise bad("repository")
+    if not isinstance(document.get("head_sha"), str) or not rc.HEX40.match(document["head_sha"]):
+        raise bad("head_sha")
+    row, source = document.get("required_checks_row"), document.get("sv_change")
+    if not isinstance(row, dict) or row.get("repository") != ROW_REPOSITORY or row.get("file") != ROW_FILE \
+            or row.get("row_id") != ROW_ID or not all(isinstance(row.get(k), str) and rc.HEX40.match(row[k])
+                                                      for k in ("commit", "blob_sha", "receipt_schema_blob_sha")):
+        raise bad("required_checks_row")
+    if not isinstance(source, dict) or source.get("repository") != ROW_REPOSITORY \
+            or not isinstance(source.get("commit"), str) or not rc.HEX40.match(source["commit"]) \
+            or not isinstance(source.get("file"), str) or not isinstance(source.get("change_id"), str):
+        raise bad("sv_change")
+    return document
+
+
+def load_row(spec: Mapping[str, Any], checkout: Path | None) -> tuple[dict[str, Any], str]:
+    def absent(detail: str) -> Global:
+        return Global("REQUIRED_CHECKS_ROW_ABSENT", "REQUIRED_CHECKS_ROW_RESOLVES",
+                      ROW_FILE + " row " + ROW_ID + " at blob " + ROW_BLOB + " (commit " + PIN_COMMIT + "), supplied as "
+                      "--dependency labs-row=<checkout>", "re-run with the pinned row supplied", detail)
+    if spec["blob_sha"] != ROW_BLOB:
+        raise absent("input pins blob " + spec["blob_sha"] + ", the verifier pins " + ROW_BLOB)
+    if not rc.head_present(checkout, spec["commit"]):
+        raise absent("row commit " + spec["commit"] + " not supplied")
+    found = read_at(checkout, spec["commit"], ROW_FILE)
+    if found is None or found[1] != ROW_BLOB:
+        raise absent("blob " + (found[1] if found else "absent"))
+    row = json.loads(found[0].decode("utf-8"))
+    union = {c for kind in (row.get("surface_kinds") or {}).values() for c in kind.get("checks", [])}
+    if row.get("row_id") != ROW_ID or not isinstance(row.get("checks"), dict) or set(row["checks"]) != union \
+            or "all" not in (row.get("surface_kinds") or {}):
+        raise absent("row shape")
+    return row, "sha256:" + sha256_hex(found[0])
+
+
+def load_schema(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any]:
+    found = read_at(checkout, spec["commit"], RECEIPT_SCHEMA_FILE)
+    if spec["receipt_schema_blob_sha"] != RECEIPT_SCHEMA_BLOB or found is None or found[1] != RECEIPT_SCHEMA_BLOB:
+        raise Global("CHECK_RECEIPT_SCHEMA_ABSENT", "RECEIPT_SCHEMA_RESOLVES_AT_ITS_PINNED_BLOB",
+                     RECEIPT_SCHEMA_FILE + " at blob " + RECEIPT_SCHEMA_BLOB, "re-run with the pinned schema supplied",
+                     "blob " + (found[1] if found else "absent"))
+    schema = json.loads(found[0].decode("utf-8"))
+    if ((schema.get("properties") or {}).get("schema") or {}).get("const") != RECEIPT_SCHEMA:
+        raise Global("CHECK_RECEIPT_SCHEMA_ABSENT", "RECEIPT_SCHEMA_RESOLVES_AT_ITS_PINNED_BLOB",
+                     "a schema whose schema const is " + RECEIPT_SCHEMA, "re-pin and re-run", "const")
+    return schema
+
+
+def load_change(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any]:
+    def bad(detail: str) -> Global:
+        return Global("SV_CHANGE_NOT_RESOLVED", "THE_SV_CHANGE_RECORD_RESOLVES_AT_ITS_PINNED_COMMIT",
+                      spec["file"] + " at " + spec["commit"] + " holding change_id " + spec["change_id"],
+                      "re-pin the SV_CHANGE source and re-run", detail)
+    if not rc.head_present(checkout, spec["commit"]):
+        raise bad("source commit not supplied")
+    found = read_at(checkout, spec["commit"], spec["file"])
+    if found is None:
+        raise bad("file absent")
+    text = found[0].decode("utf-8")
+    records = [json.loads(line) for line in text.splitlines() if line.strip()] if spec["file"].endswith(".jsonl") \
+        else [json.loads(text)]
+    matches = [r for r in records if isinstance(r, dict) and r.get("change_id") == spec["change_id"]]
+    if len(matches) != 1:
+        raise bad(str(len(matches)) + " records with that change_id")
+    return matches[0]
+
+
+def check_receipt(body: Any, change: Mapping[str, Any], row: Mapping[str, Any],
+                  schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Re-verify one receipt against its head: ALLOW, or a six-field FAIL_CLOSED."""
+    head_digest = (change.get("head") or {}).get("change_digest")
+    head_sha = (change.get("projection") or {}).get("head_sha")
+
+    def refuse(code: str, predicate: str, repair: str) -> dict[str, Any]:
+        return {"disposition": "FAIL_CLOSED", **six(code, predicate, repair, "re-mint the receipt at the exact head")}
+    if not isinstance(body, Mapping) or body.get("schema") != RECEIPT_SCHEMA:
+        return refuse("SV_CHECK_RECEIPT_SCHEMA_MISMATCH", "RECORD_SCHEMA_IS_" + RECEIPT_SCHEMA, "a " + RECEIPT_SCHEMA + " receipt")
+    if body.get("check_id") not in row_ids(row):
+        return refuse("CHECK_ID_UNDECLARED", "CHECK_ID_IS_DECLARED_IN_" + ROW_ID.replace("-", "_"),
+                      "a check id from " + ROW_ID + ": " + ", ".join(row_ids(row)))
+    if body.get("change_digest") != head_digest:
+        return refuse("CHECK_SKIPPED_OR_UNOBSERVED", EXACT_HEAD_PREDICATE,
+                      "a receipt whose change_digest is the head's " + str(head_digest))
+    if body.get("head_sha") != head_sha:
+        return refuse("CHECK_SKIPPED_OR_UNOBSERVED", EXACT_HEAD_PREDICATE, "a receipt at the exact head commit " + str(head_sha))
+    epoch = body.get("hb_epoch")
+    failure = supplied_epoch_failure(epoch) if isinstance(epoch, str) or epoch is None else ("HB_EPOCH_INVALID", "not text")
+    if failure is not None:
+        return refuse(failure[0], HB_EPOCH_PREDICATE, "hb_epoch as supplied ASCII digits >= 32")
+    errors = schema_errors(body, schema)
+    if errors:
+        return refuse("SV_CHECK_RECEIPT_INVALID", "RECEIPT_VALIDATES_AGAINST_THE_PINNED_SCHEMA", "; ".join(errors))
+    return {"disposition": "ALLOW"}
+
+
+def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path]) -> tuple[dict[str, Any], dict[str, dict]]:
+    bundle: dict[str, Any] = {
+        "schema": BUNDLE_SCHEMA, "stage": "S1", "receipt_schema": RECEIPT_SCHEMA,
+        "receipt_schema_file": RECEIPT_SCHEMA_FILE, "receipt_schema_blob_sha": RECEIPT_SCHEMA_BLOB,
+        "declaration_basis": "P1_ROW " + ROW_ID + " (ids); the head's " + rc.DECLARATION_PATH + " (offline entrypoints)",
+        "evidence_role": "ADMISSION_INPUT_EVIDENCE_ONLY", "appended_by": "StegVerse-Labs/.github#3255 (not here)",
+        "authentic_ledger_receipt": False, "authority_effect": "NONE", "verifier_clock_read": False,
+        "verifier_network_read": False, "credentials_passed": False, "verifier_ref": verifier_ref(),
+        "verifier": {"paths_sha256": verifier_files()}, "input_sha256": None, "row": None,
+        "required_check_ids": [], "touched_surface_kinds": [], "checks": [], "receipts": {},
+    }
+    receipts: dict[str, dict] = {}
+    work = Path(tempfile.mkdtemp(prefix="sv-llm-s1svc-"))
+    receipt_schema: dict[str, Any] = {}
+    emit: list[str] = []
+    change_d = head = epoch = None
+    try:
+        try:
+            raw = input_path.read_bytes()
+            document = json.loads(raw.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise Global("S1_INPUT_NOT_READABLE", "S1_INPUT_IS_A_READABLE_JSON_SV_CHANGE", "a UTF-8 JSON input",
+                         "re-run with a readable input", type(exc).__name__) from None
+        bundle["input_sha256"] = "sha256:" + sha256_hex(raw)
+        document = validate_input(document)
+        head, epoch = document["head_sha"], document.get("hb_epoch")
+        bundle.update(repository=document["repository"], head_sha=head, hb_epoch=epoch)
+        labs = dependencies.get(ROW_DEPENDENCY)
+        row, row_digest = load_row(document["required_checks_row"], labs)
+        bundle["row"] = {**document["required_checks_row"], "sha256": row_digest, "row_check_ids": row_ids(row)}
+        receipt_schema = load_schema(document["required_checks_row"], labs)
+        change = load_change(document["sv_change"], labs)
+        bundle["sv_change"] = {**document["sv_change"], "record_mode": change.get("record_mode")}
+        surface_required, _signoffs = required_for(change.get("touched_paths") or [], row)
+        bundle["required_check_ids"] = surface_required
+        bundle["touched_surface_kinds"] = sorted({surface_kind(p) for p in change.get("touched_paths") or []})
+        failure = supplied_epoch_failure(epoch) if isinstance(epoch, str) or epoch is None \
+            else ("HB_EPOCH_INVALID", "hb_epoch is not supplied text")
+        if failure is not None:  # no schema-valid receipt carries an unsupplied epoch: the bundle is the refusal
+            raise Global(failure[0], HB_EPOCH_PREDICATE, "hb_epoch in the input as ASCII digits >= 32; no clock is read",
+                         "re-run with the supplied epoch", failure[1])
+        change_d = (change.get("head") or {}).get("change_digest")
+        recomputed = change_digest(change)
+        bundle["change_digest"] = recomputed
+        if change_d != recomputed or str(change.get("change_id")) != "svc:" + recomputed[7:]:
+            raise Global("SV_CHANGE_DIGEST_MISMATCH", "HEAD_CHANGE_DIGEST_EQUALS_CHANGE_ID",
+                         "head.change_digest == sha256(canon(change_identity_input)) == change_id hex",
+                         "reseal the SV_CHANGE", "recomputed " + recomputed)
+        emit = row_ids(row)  # from here every row id gets a receipt
+        if (change.get("projection") or {}).get("head_sha") != head \
+                or change.get("target_repository") != document["repository"]:
+            raise Global("SV_CHANGE_HEAD_MISMATCH", "THE_INPUT_HEAD_IS_THE_SV_CHANGE_HEAD",
+                         "input head_sha/repository equal to the record's projection.head_sha/target_repository",
+                         "correct the input", "record names " + str((change.get("projection") or {}).get("head_sha")))
+        if not rc.head_present(checkout, head):
+            raise Global("HEAD_NOT_MATERIALIZED", "THE_DECLARED_HEAD_IS_PRESENT_IN_THE_CHECKOUT",
+                         "--checkout holding commit " + head + " (the verifier never fetches)",
+                         "re-run once the checkout holds the head", "commit not present")
+        root = work / "declared"
+        bundle["head_tree"] = rc.materialize(checkout, head, root)
+        for c in change.get("content") or []:
+            path = root / str(c.get("path"))
+            ok = (not path.exists()) if c.get("deleted") is True else \
+                (path.is_file() and "sha256:" + sha256_hex(path.read_bytes()) == c.get("blob_digest"))
+            if not ok:
+                raise Global("SV_CHANGE_CONTENT_NOT_AT_HEAD", "SV_CHANGE_CONTENT_IS_THE_HEAD_TREE",
+                             "every content blob_digest equal to the head's bytes", "re-derive the SV_CHANGE at the head",
+                             str(c.get("path")))
+        try:
+            declaration, declaration_raw = rc.read_declaration(root)
+        except rc.Refused as refusal:
+            if refusal.fields["failure_code"] != "REQUIRED_CHECKS_NOT_DECLARED":
+                raise Global(refusal.fields["failure_code"], refusal.fields["failed_predicate"],
+                             refusal.fields["required_evidence_or_repair"], refusal.fields["next_attempt"],
+                             refusal.detail) from None
+            declaration, declaration_raw = {"checks": [], "dependencies": []}, None
+        bundle["declaration_sha256"] = "sha256:" + sha256_hex(declaration_raw) if declaration_raw else None
+        allowed = set(emit)
+        bundle["undeclared_check_ids"] = sorted(c["id"] for c in declaration["checks"] if c["id"] not in allowed)
+        runnable = [c for c in declaration["checks"] if c["id"] in allowed]
+        for dependency in declaration.get("dependencies", []):
+            if not rc.head_present(dependencies.get(dependency["id"]), dependency["commit"]):
+                raise Global("REQUIRED_CHECK_DEPENDENCY_NOT_SUPPLIED", "EVERY_DECLARED_DEPENDENCY_IS_SUPPLIED_AT_ITS_COMMIT",
+                             "--dependency " + dependency["id"] + "=<checkout holding " + dependency["commit"] + ">",
+                             "re-run with the dependency supplied", dependency["id"])
+        results: dict[str, dict] = {}
+        if runnable:
+            plan = {**declaration, "checks": runnable}
+            first = rc.run_set(checkout, head, plan, dependencies, work / "run")
+            second = rc.run_set(checkout, head, plan, dependencies, work / "run")
+            for a, b, bound in zip(first, second, rc.bind(first, second)):
+                results[a["id"]] = {"first": a, "second": b, "bound": bound}
+            bundle["checks"] = [r["bound"] for r in results.values()]
+        for check_id in emit:
+            if check_id not in results:
+                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
+                    "CHECK_SKIPPED_OR_UNOBSERVED", "REQUIRED_CHECK_HAS_AN_OFFLINE_ENTRYPOINT_AT_HEAD",
+                    "an entry for " + check_id + " in " + rc.DECLARATION_PATH + " at the head (id, kind, offline "
+                    "command, expected_outcome PASS)", "declare the entrypoint at a new head and re-mint"))
+                continue
+            a, b = results[check_id]["first"], results[check_id]["second"]
+            if "DID_NOT_COMPLETE" in (a["outcome"], b["outcome"]):
+                disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_DID_NOT_COMPLETE", "EVERY_DECLARED_CHECK_COMPLETES_OFFLINE")
+            elif a["clock_reads"] or b["clock_reads"]:
+                disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_CLOCK", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+            elif a["network_reads"] or b["network_reads"]:
+                disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_NETWORK", "EVERY_DECLARED_CHECK_RUNS_OFFLINE")
+            elif a != b:
+                disp, f = "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS",
+                                   "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+            elif a["outcome"] != "PASS":
+                disp, f = "DENY", ("REQUIRED_CHECK_FAILED_AT_HEAD", "EVERY_DECLARED_CHECK_PASSES_AT_THE_HEAD")
+            else:
+                disp, f = "ALLOW", None
+            receipts[check_id] = receipt(check_id, disp, change_d, head, epoch, None if f is None else six(
+                f[0], f[1], "repair " + check_id + " at a new head (see the bundle's checks entry)",
+                "repair at a new head and re-mint"))
+        values = list(receipts.values())
+        bundle["disposition"] = "ALLOW" if values and all(r["disposition"] == "ALLOW" for r in values) \
+            else ("DENY" if any(r["disposition"] == "DENY" for r in values) else "FAIL_CLOSED")
+        if bundle["disposition"] != "ALLOW":
+            bundle.update(six("REQUIRED_CHECK_RECEIPTS_NOT_ALL_ALLOW", "EVERY_ROW_CHECK_IS_ALLOW_AT_THE_HEAD",
+                              "an ALLOW receipt for each of " + ", ".join(emit) + " (see each receipt's six fields)",
+                              "repair the non-ALLOW checks at a new head and re-mint"))
+    except Global as refusal:
+        bundle["disposition"], bundle["detail"] = refusal.disposition, refusal.detail
+        bundle.update(refusal.fields)
+        for check_id in emit:
+            receipts[check_id] = receipt(check_id, refusal.disposition, change_d, head, epoch, refusal.fields)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    if receipts:
+        invalid = {k: e for k, e in ((k, schema_errors(v, receipt_schema)) for k, v in receipts.items()) if e}
+        if invalid:  # never write a receipt the pinned schema refuses
+            receipts = {}
+            bundle.update(disposition="FAIL_CLOSED", detail="schema errors: " + json.dumps(invalid, sort_keys=True),
+                          **six("SV_CHECK_RECEIPT_INVALID", "RECEIPT_VALIDATES_AGAINST_THE_PINNED_SCHEMA",
+                                "receipts valid against " + RECEIPT_SCHEMA_FILE + " blob " + RECEIPT_SCHEMA_BLOB,
+                                "repair the minter and re-mint"))
+        else:
+            bundle["receipts_validated_against"] = {"file": RECEIPT_SCHEMA_FILE, "blob_sha": RECEIPT_SCHEMA_BLOB}
+    bundle["receipts"] = {k: "sha256:" + sha256_hex(render(v)) for k, v in sorted(receipts.items())}
+    return {**bundle, "bundle_sha256": "sha256:" + sha256_hex(canon(bundle))}, receipts
+
+
+def render(value: Mapping[str, Any]) -> bytes:
+    return canon(value) + b"\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    m = sub.add_parser("mint")
+    m.add_argument("--input", type=Path, required=True)
+    m.add_argument("--checkout", type=Path)
+    m.add_argument("--dependency", action="append", default=[], metavar="ID=CHECKOUT")
+    m.add_argument("--out-dir", type=Path, required=True)
+    c = sub.add_parser("check")
+    c.add_argument("--receipt", type=Path, required=True)
+    c.add_argument("--input", type=Path, required=True)
+    c.add_argument("--dependency", action="append", default=[], metavar="ID=CHECKOUT")
+    args = parser.parse_args(argv)
+    dependencies = {k: Path(v) for k, _, v in (d.partition("=") for d in args.dependency)}
+    if args.command == "check":
+        try:
+            document = validate_input(json.loads(args.input.read_text()))
+            labs = dependencies.get(ROW_DEPENDENCY)
+            row, _ = load_row(document["required_checks_row"], labs)
+            schema = load_schema(document["required_checks_row"], labs)
+            change = load_change(document["sv_change"], labs)
+            result = check_receipt(json.loads(args.receipt.read_text()), change, row, schema)
+        except Global as refusal:
+            result = {"disposition": refusal.disposition, **refusal.fields}
+        sys.stdout.buffer.write(render(result))
+        return 0 if result["disposition"] == "ALLOW" else 1
+    bundle, receipts = mint(args.input, args.checkout, dependencies)
+    if args.out_dir.exists():
+        shutil.rmtree(args.out_dir)
+    args.out_dir.mkdir(parents=True)
+    (args.out_dir / "bundle.json").write_bytes(render(bundle))
+    for check_id, body in receipts.items():
+        (args.out_dir / (check_id + ".json")).write_bytes(render(body))
+    return 0 if bundle["disposition"] == "ALLOW" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
