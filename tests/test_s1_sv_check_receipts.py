@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SANDBOX = ROOT / "sandbox"
@@ -25,8 +26,8 @@ INPUTS = SANDBOX / "s1-sv-check-inputs"
 EVIDENCE = ROOT / "evidence" / "sv-check-receipts"
 SIX_IDS = ["mutation-negative-suite", "registry-generation-fence", "schema-validate", "supplied-epoch-binder-check",
            "unit-tests", "workflow-surface-registered"]
-PASSING = "import unittest\nclass T(unittest.TestCase):\n    def test_ok(self):\n        self.assertEqual(1 + 1, 2)\n"
-CLOCK = PASSING.replace("self.assertEqual(1 + 1, 2)", "import time; self.assertGreater(time.time(), 0)")
+PASSING = "import sys\nsys.exit(0 if 1 + 1 == 2 else 1)\n"
+CLOCK = "import sys, time\nsys.exit(0 if time.time() > 0 else 1)\n"
 SCHEMA = json.loads((PINS / "sv-check-receipt.v1.schema.json").read_text())
 ROW = json.loads((PINS / "required-checks.json").read_text())
 
@@ -48,8 +49,24 @@ def repo(path: Path, files: dict[str, bytes]) -> str:
 
 
 def declaration(*ids: str, target: str = "tests/test_a.py") -> bytes:
+    """A per-head .sv/required-checks.json -- which an SV_CHANGE head may carry but the minter must not read."""
     checks = [{"id": i, "kind": "python-unittest", "target": target, "expected_outcome": "PASS"} for i in ids]
     return (json.dumps({"schema": rc.DECLARATION_SCHEMA, "checks": checks}, indent=2) + "\n").encode()
+
+
+UNITTEST = {"offline_command": ["python", "-B", "tests/test_a.py"], "expected": {"exit_code": 0},
+            "command_paths": ["tests/test_a.py"]}
+EPOCH_CHECK = b"import json, sys\nprint(json.dumps({'disposition': 'ALLOW' if sys.argv[1:] == ['4000'] else 'DENY'}))\n"
+EPOCH_CMD = {"offline_command": ["python", "-B", "check.py", "{hb_epoch}"],
+             "expected": {"exit_code": 0, "stdout_disposition": "ALLOW"}, "command_paths": ["check.py"]}
+
+
+def commands_row(entries: dict) -> bytes:
+    """A fixture row of the shape P1 announced (pending its blob): the pinned row plus per-id commands."""
+    row = json.loads((PINS / "required-checks.json").read_text())
+    for check_id, entry in entries.items():
+        row["checks"][check_id] = {**row["checks"][check_id], **entry}
+    return (json.dumps(row, indent=2, sort_keys=True) + "\n").encode()
 
 
 class Fixture:
@@ -129,9 +146,11 @@ class Pins(unittest.TestCase):
 
 
 class Minting(unittest.TestCase):
-    def minted(self, files, **kw):
-        with tempfile.TemporaryDirectory() as tmp:
-            fixture = Fixture(Path(tmp), files, **kw)
+    def minted(self, files, commands=None, **kw):
+        row = commands_row(commands) if commands is not None else kw.pop("row", None)
+        pin = git_blob(row) if commands is not None else m.ROW_BLOB
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(m, "ROW_BLOB", pin):
+            fixture = Fixture(Path(tmp), files, row=row, **kw)
             first, receipts = fixture.mint()
             second, again = fixture.mint()
         self.assertEqual(m.render(first), m.render(second))
@@ -140,45 +159,77 @@ class Minting(unittest.TestCase):
             self.assertEqual(m.schema_errors(body, SCHEMA), [], body)
             self.assertEqual(body["change_digest"], fixture.record["head"]["change_digest"])
             self.assertEqual(body["head_sha"], fixture.head)
+            if body["disposition"] != "ALLOW":
+                for field in m.SIX_FIELDS:
+                    self.assertTrue(body[field], field)
         return first, receipts, fixture
 
-    def test_every_row_id_declared_and_passing_is_six_allow(self):
-        bundle, receipts, _ = self.minted({".sv/required-checks.json": declaration(*SIX_IDS),
-                                           "tests/test_a.py": PASSING.encode()})
+    def codes(self, receipts):
+        return {k: (v["disposition"], v.get("failure_code")) for k, v in receipts.items()}
+
+    def test_every_row_command_present_and_as_expected_is_six_allow(self):
+        bundle, receipts, _ = self.minted({"tests/test_a.py": PASSING.encode()}, {i: UNITTEST for i in SIX_IDS})
         self.assertEqual(sorted(receipts), SIX_IDS)
         self.assertEqual({r["disposition"] for r in receipts.values()}, {"ALLOW"})
         self.assertEqual(bundle["disposition"], "ALLOW")
+        self.assertEqual([c["command"] for c in bundle["checks"]], [UNITTEST["offline_command"]] * 6)
 
-    def test_a_row_id_with_no_offline_entrypoint_is_fail_closed_never_allow(self):
-        bundle, receipts, _ = self.minted({".sv/required-checks.json": declaration("unit-tests"),
-                                           "tests/test_a.py": PASSING.encode()})
-        self.assertEqual(sorted(receipts), SIX_IDS)
-        self.assertEqual(receipts["unit-tests"]["disposition"], "ALLOW")
-        for check_id in set(SIX_IDS) - {"unit-tests"}:
-            self.assertEqual((receipts[check_id]["disposition"], receipts[check_id]["failure_code"]),
-                             ("FAIL_CLOSED", "CHECK_SKIPPED_OR_UNOBSERVED"))
+    def test_the_pinned_row_carries_no_commands_so_every_id_is_check_command_undeclared(self):
+        bundle, receipts, _ = self.minted({"tests/test_a.py": PASSING.encode()})
+        self.assertEqual(self.codes(receipts), {i: ("FAIL_CLOSED", "CHECK_COMMAND_UNDECLARED") for i in SIX_IDS})
+        self.assertTrue(bundle["row_command_pin"].startswith("PENDING"))
+
+    def test_unknown_not_authentically_observed_is_check_command_undeclared(self):
+        unknown = {**UNITTEST, "offline_command": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"}
+        _, receipts, _ = self.minted({"tests/test_a.py": PASSING.encode()},
+                                     {**{i: UNITTEST for i in SIX_IDS}, "schema-validate": unknown})
+        self.assertEqual(receipts["schema-validate"]["disposition"], "FAIL_CLOSED")
+        self.assertEqual(receipts["schema-validate"]["failure_code"], "CHECK_COMMAND_UNDECLARED")
+        self.assertEqual({receipts[i]["disposition"] for i in SIX_IDS if i != "schema-validate"}, {"ALLOW"})
+
+    def test_a_command_path_absent_at_the_head_is_check_command_absent_at_head(self):
+        absent = {**UNITTEST, "command_paths": ["tests/test_a.py", "scripts/not-at-head.py"]}
+        bundle, receipts, _ = self.minted({"tests/test_a.py": PASSING.encode()},
+                                          {**{i: UNITTEST for i in SIX_IDS}, "unit-tests": absent})
+        self.assertEqual(self.codes(receipts)["unit-tests"], ("FAIL_CLOSED", "CHECK_COMMAND_ABSENT_AT_HEAD"))
+        entry = next(c for c in bundle["checks"] if c["id"] == "unit-tests")
+        self.assertEqual(entry["absent_command_paths"], ["scripts/not-at-head.py"])  # and it was not run
         self.assertEqual(bundle["disposition"], "FAIL_CLOSED")
-        _, none_declared, _ = self.minted({"README": b"x\n"})
-        self.assertEqual({r["failure_code"] for r in none_declared.values()}, {"CHECK_SKIPPED_OR_UNOBSERVED"})
+
+    def test_per_head_pass_criteria_are_not_accepted(self):
+        source = (SANDBOX / "s1_sv_check_receipts.py").read_text()
+        self.assertNotIn("read_declaration", source)
+        self.assertNotIn("run_set", source)
+        _, receipts, _ = self.minted({".sv/required-checks.json": declaration(*SIX_IDS),
+                                      "tests/test_a.py": PASSING.encode()})
+        self.assertEqual({v["failure_code"] for v in receipts.values()}, {"CHECK_COMMAND_UNDECLARED"})
+
+    def test_the_epoch_reaches_the_command_as_an_argument_and_stdout_is_checked(self):
+        files = {"check.py": EPOCH_CHECK, "tests/test_a.py": PASSING.encode()}
+        _, receipts, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS}, "supplied-epoch-binder-check": EPOCH_CMD})
+        self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
+        _, wrong, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS},
+                                          "supplied-epoch-binder-check": EPOCH_CMD}, epoch="4001")
+        self.assertEqual(self.codes(wrong)["supplied-epoch-binder-check"], ("DENY", "REQUIRED_CHECK_FAILED_AT_HEAD"))
+
+    def test_an_exit_code_other_than_expected_is_deny(self):
+        failing = PASSING.replace("1 + 1 == 2", "1 + 1 == 3").encode()
+        _, receipts, _ = self.minted({"tests/test_a.py": failing}, {i: UNITTEST for i in SIX_IDS})
+        self.assertEqual(set(self.codes(receipts).values()), {("DENY", "REQUIRED_CHECK_FAILED_AT_HEAD")})
 
     def test_a_clock_reading_check_is_deny(self):
-        _, receipts, _ = self.minted({".sv/required-checks.json": declaration("unit-tests"),
-                                      "tests/test_a.py": CLOCK.encode()})
-        self.assertEqual((receipts["unit-tests"]["disposition"], receipts["unit-tests"]["failure_code"]),
-                         ("DENY", "REQUIRED_CHECK_READS_THE_CLOCK"))
+        _, receipts, _ = self.minted({"tests/test_a.py": CLOCK.encode()}, {"unit-tests": UNITTEST})
+        self.assertEqual(self.codes(receipts)["unit-tests"], ("DENY", "REQUIRED_CHECK_READS_THE_CLOCK"))
 
     def test_an_id_outside_the_row_is_check_id_undeclared(self):
-        bundle, receipts, fixture = self.minted({".sv/required-checks.json": declaration("unit-tests", "lint"),
-                                                 "tests/test_a.py": PASSING.encode()})
+        _, receipts, fixture = self.minted({"tests/test_a.py": PASSING.encode()}, {i: UNITTEST for i in SIX_IDS})
         self.assertNotIn("lint", receipts)
-        self.assertEqual(bundle["undeclared_check_ids"], ["lint"])
         forged = {**receipts["unit-tests"], "check_id": "lint"}
         result = m.check_receipt(forged, fixture.record, ROW, SCHEMA)
         self.assertEqual((result["disposition"], result["failure_code"]), ("FAIL_CLOSED", "CHECK_ID_UNDECLARED"))
 
     def test_a_receipt_not_at_the_heads_change_digest_is_skipped_or_unobserved(self):
-        _, receipts, fixture = self.minted({".sv/required-checks.json": declaration("unit-tests"),
-                                            "tests/test_a.py": PASSING.encode()})
+        _, receipts, fixture = self.minted({"tests/test_a.py": PASSING.encode()}, {i: UNITTEST for i in SIX_IDS})
         self.assertEqual(m.check_receipt(receipts["unit-tests"], fixture.record, ROW, SCHEMA), {"disposition": "ALLOW"})
         stale = {**receipts["unit-tests"], "change_digest": "sha256:" + "f" * 64}
         result = m.check_receipt(stale, fixture.record, ROW, SCHEMA)

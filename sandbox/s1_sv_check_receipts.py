@@ -21,13 +21,20 @@ segment sha256; it is recorded in the bundle. The SV_CHANGE record is read from
 the same checkout by change_id, its change_digest is recomputed with P1's rule,
 and every content blob digest must be the head's bytes.
 
-How each id runs. The head's .sv/required-checks.json maps an id to an offline
-command (the s1_required_checks_verifier.py declaration). A declared id outside
-the row is FAIL_CLOSED CHECK_ID_UNDECLARED and is not run. A row id the head
-gives no offline entrypoint is FAIL_CLOSED CHECK_SKIPPED_OR_UNOBSERVED -- never
-a guessed ALLOW. Declared ids run twice offline under the clock/network probe:
-a clock or network read, output that differs, or a failure is DENY; clean is
-ALLOW.
+How each id runs. The row carries the commands; the head never does. For each
+row id the minter reads checks.<id> verbatim: offline_command (an argv list run
+from the repository root at the exact head, no network; an argv element equal to
+"{hb_epoch}" is the supplied epoch), expected {exit_code[, stdout_disposition]}
+and command_paths. No per-head pass criteria are accepted: the head's
+.sv/required-checks.json is not read for an SV_CHANGE head. An entry without a
+command, or with offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED, is
+FAIL_CLOSED CHECK_COMMAND_UNDECLARED; a command_path absent at the head is
+FAIL_CLOSED CHECK_COMMAND_ABSENT_AT_HEAD -- never a guessed ALLOW. Declared
+commands run twice offline under the clock/network probe: a clock or network
+read, output that differs, a result other than `expected`, or a failure to
+complete is DENY/FAIL_CLOSED; clean and as expected is ALLOW. The pinned row
+blob (acbe8061) carries no commands yet; the blob P1 sends with commands is a
+pending pin (ROW_COMMAND_PIN).
 
 Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
 (== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
@@ -47,6 +54,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -367,11 +375,86 @@ def check_receipt(body: Any, change: Mapping[str, Any], row: Mapping[str, Any],
     return {"disposition": "ALLOW"}
 
 
+UNDECLARED_COMMAND = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+EPOCH_ARGUMENT = "{hb_epoch}"  # an argv element equal to this is replaced by the supplied epoch
+ROW_COMMAND_PIN = ("PENDING: StegVerse-Labs/.github#3264 row blob carrying offline_command/expected/command_paths "
+                   "not yet sent; the pinned blob " + ROW_BLOB + " carries none, so every id is CHECK_COMMAND_UNDECLARED")
+SAFE_PATH = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\0]+$")
+
+
+def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str]] | str:
+    """The row's own command for one check id, read verbatim; a string says why it is undeclared."""
+    if not isinstance(entry, Mapping) or "offline_command" not in entry:
+        return "no offline_command in the row entry"
+    argv, expected, paths = entry.get("offline_command"), entry.get("expected"), entry.get("command_paths")
+    if argv == UNDECLARED_COMMAND:
+        return "offline_command is " + UNDECLARED_COMMAND
+    if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
+        return "offline_command is not a non-empty argv list"
+    if not isinstance(expected, Mapping) or type(expected.get("exit_code")) is not int \
+            or not set(expected) <= {"exit_code", "stdout_disposition"} \
+            or ("stdout_disposition" in expected and expected["stdout_disposition"] not in DISPOSITIONS):
+        return "expected is not {exit_code[, stdout_disposition]}"
+    if not isinstance(paths, list) or not paths or not all(isinstance(q, str) and SAFE_PATH.match(q) for q in paths):
+        return "command_paths is not a non-empty list of repository-relative paths"
+    return list(argv), dict(expected), list(paths)
+
+
+def stdout_disposition(stdout: bytes) -> str | None:
+    try:
+        text = stdout.decode("utf-8")
+    except UnicodeError:
+        return None
+    for candidate in [text] + [line for line in reversed(text.splitlines()) if line.strip()]:
+        try:
+            value = json.loads(candidate)
+        except ValueError:
+            continue
+        return value.get("disposition") if isinstance(value, dict) and isinstance(value.get("disposition"), str) else None
+    return None
+
+
+def run_row_commands(head_checkout: Path, head: str, planned: list[tuple[str, list[str], dict[str, Any]]],
+                     base: Path) -> list[dict[str, Any]]:
+    """One run of each row command from a fresh materialization of the head; offline, clock/network probed."""
+    if base.exists():
+        shutil.rmtree(base)
+    root = base / "head"
+    rc.materialize(head_checkout, head, root)
+    env = rc.base_env(base / "home")
+    (base / "home").mkdir()
+    env["PYTHONPATH"] = str(rc.PROBE)
+    results = []
+    for check_id, argv, expected in planned:
+        log = base / ("probe-" + check_id + ".log")
+        log.write_text("")
+        run = [sys.executable if a == "python" else a for a in argv]
+        try:
+            completed = subprocess.run(run, cwd=root, env={**env, "S1_PROBE_LOG": str(log)},
+                                       capture_output=True, timeout=rc.CHECK_TIMEOUT_S)
+            code, stdout, stderr = completed.returncode, completed.stdout, completed.stderr
+        except (subprocess.TimeoutExpired, OSError):
+            code, stdout, stderr = None, b"", b""
+        reads = sorted(set(log.read_text().split("\n")) - {""})
+        seen = stdout_disposition(stdout) if "stdout_disposition" in expected else None
+        met = code is not None and code == expected["exit_code"] and \
+            ("stdout_disposition" not in expected or seen == expected["stdout_disposition"])
+        results.append({"id": check_id, "kind": "row-offline-command", "command": argv, "expected": expected,
+                        "exit_code": code, "stdout_disposition": seen,
+                        "stdout_sha256": "sha256:" + sha256_hex(stdout), "stderr_sha256": "sha256:" + sha256_hex(stderr),
+                        "outcome": "DID_NOT_COMPLETE" if code is None else ("AS_EXPECTED" if met else "NOT_AS_EXPECTED"),
+                        "clock_reads": [r.split(" ", 1)[1] for r in reads if r.startswith("CLOCK ")],
+                        "network_reads": [r.split(" ", 1)[1] for r in reads if r.startswith("NETWORK ")]})
+    return results
+
+
 def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path]) -> tuple[dict[str, Any], dict[str, dict]]:
     bundle: dict[str, Any] = {
         "schema": BUNDLE_SCHEMA, "stage": "S1", "receipt_schema": RECEIPT_SCHEMA,
         "receipt_schema_file": RECEIPT_SCHEMA_FILE, "receipt_schema_blob_sha": RECEIPT_SCHEMA_BLOB,
-        "declaration_basis": "P1_ROW " + ROW_ID + " (ids); the head's " + rc.DECLARATION_PATH + " (offline entrypoints)",
+        "declaration_basis": "P1_ROW " + ROW_ID + " (ids and, per id, offline_command, expected, command_paths, read "
+                             "verbatim); no per-head pass criteria: the head's " + rc.DECLARATION_PATH + " is not read",
+        "row_command_pin": ROW_COMMAND_PIN,
         "evidence_role": "ADMISSION_INPUT_EVIDENCE_ONLY", "appended_by": "StegVerse-Labs/.github#3255 (not here)",
         "authentic_ledger_receipt": False, "authority_effect": "NONE", "verifier_clock_read": False,
         "verifier_network_read": False, "credentials_passed": False, "verifier_ref": verifier_ref(),
@@ -435,55 +518,52 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                 raise Global("SV_CHANGE_CONTENT_NOT_AT_HEAD", "SV_CHANGE_CONTENT_IS_THE_HEAD_TREE",
                              "every content blob_digest equal to the head's bytes", "re-derive the SV_CHANGE at the head",
                              str(c.get("path")))
-        try:
-            declaration, declaration_raw = rc.read_declaration(root)
-        except rc.Refused as refusal:
-            if refusal.fields["failure_code"] != "REQUIRED_CHECKS_NOT_DECLARED":
-                raise Global(refusal.fields["failure_code"], refusal.fields["failed_predicate"],
-                             refusal.fields["required_evidence_or_repair"], refusal.fields["next_attempt"],
-                             refusal.detail) from None
-            declaration, declaration_raw = {"checks": [], "dependencies": []}, None
-        bundle["declaration_sha256"] = "sha256:" + sha256_hex(declaration_raw) if declaration_raw else None
-        allowed = set(emit)
-        bundle["undeclared_check_ids"] = sorted(c["id"] for c in declaration["checks"] if c["id"] not in allowed)
-        runnable = [c for c in declaration["checks"] if c["id"] in allowed]
-        for dependency in declaration.get("dependencies", []):
-            if not rc.head_present(dependencies.get(dependency["id"]), dependency["commit"]):
-                raise Global("REQUIRED_CHECK_DEPENDENCY_NOT_SUPPLIED", "EVERY_DECLARED_DEPENDENCY_IS_SUPPLIED_AT_ITS_COMMIT",
-                             "--dependency " + dependency["id"] + "=<checkout holding " + dependency["commit"] + ">",
-                             "re-run with the dependency supplied", dependency["id"])
-        results: dict[str, dict] = {}
-        if runnable:
-            plan = {**declaration, "checks": runnable}
-            first = rc.run_set(checkout, head, plan, dependencies, work / "run")
-            second = rc.run_set(checkout, head, plan, dependencies, work / "run")
-            for a, b, bound in zip(first, second, rc.bind(first, second)):
-                results[a["id"]] = {"first": a, "second": b, "bound": bound}
-            bundle["checks"] = [r["bound"] for r in results.values()]
+        bundle["row_commands_sha256"] = "sha256:" + sha256_hex(canon({i: row["checks"][i] for i in emit}))
+        planned: list[tuple[str, list[str], dict[str, Any]]] = []
         for check_id in emit:
-            if check_id not in results:
+            entry = row["checks"].get(check_id)
+            declared = command_declaration(entry)
+            if isinstance(declared, str):
                 receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
-                    "CHECK_SKIPPED_OR_UNOBSERVED", "REQUIRED_CHECK_HAS_AN_OFFLINE_ENTRYPOINT_AT_HEAD",
-                    "an entry for " + check_id + " in " + rc.DECLARATION_PATH + " at the head (id, kind, offline "
-                    "command, expected_outcome PASS)", "declare the entrypoint at a new head and re-mint"))
+                    "CHECK_COMMAND_UNDECLARED", "THE_ROW_DECLARES_AN_OFFLINE_COMMAND_FOR_THE_CHECK",
+                    ROW_FILE + " " + ROW_ID + " checks." + check_id + " carrying offline_command (argv from the "
+                    "repository root, epoch as an argument), expected {exit_code[, stdout_disposition]} and "
+                    "command_paths", "declare the command in the row (P1) and re-mint at the same head"))
+                bundle["checks"].append({"id": check_id, "outcome": "CHECK_COMMAND_UNDECLARED", "detail": declared})
                 continue
-            a, b = results[check_id]["first"], results[check_id]["second"]
-            if "DID_NOT_COMPLETE" in (a["outcome"], b["outcome"]):
-                disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_DID_NOT_COMPLETE", "EVERY_DECLARED_CHECK_COMPLETES_OFFLINE")
-            elif a["clock_reads"] or b["clock_reads"]:
-                disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_CLOCK", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
-            elif a["network_reads"] or b["network_reads"]:
-                disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_NETWORK", "EVERY_DECLARED_CHECK_RUNS_OFFLINE")
-            elif a != b:
-                disp, f = "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS",
-                                   "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
-            elif a["outcome"] != "PASS":
-                disp, f = "DENY", ("REQUIRED_CHECK_FAILED_AT_HEAD", "EVERY_DECLARED_CHECK_PASSES_AT_THE_HEAD")
-            else:
-                disp, f = "ALLOW", None
-            receipts[check_id] = receipt(check_id, disp, change_d, head, epoch, None if f is None else six(
-                f[0], f[1], "repair " + check_id + " at a new head (see the bundle's checks entry)",
-                "repair at a new head and re-mint"))
+            argv, expected, paths = declared
+            missing = [q for q in paths if not (root / q).is_file()]
+            if missing:
+                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
+                    "CHECK_COMMAND_ABSENT_AT_HEAD", "EVERY_COMMAND_PATH_IS_PRESENT_AT_THE_EXACT_HEAD",
+                    "the head carrying " + ", ".join(missing) + " (command_paths of " + check_id + ")",
+                    "re-mint at a head that carries the command paths"))
+                bundle["checks"].append({"id": check_id, "outcome": "CHECK_COMMAND_ABSENT_AT_HEAD",
+                                         "absent_command_paths": missing})
+                continue
+            planned.append((check_id, [epoch if a == EPOCH_ARGUMENT else a for a in argv], expected))
+        if planned:
+            first = run_row_commands(checkout, head, planned, work / "run")
+            second = run_row_commands(checkout, head, planned, work / "run")
+            for (check_id, _argv, expected), a, b, bound in zip(planned, first, second, rc.bind(first, second)):
+                bundle["checks"].append(bound)
+                if "DID_NOT_COMPLETE" in (a["outcome"], b["outcome"]):
+                    disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_DID_NOT_COMPLETE", "EVERY_DECLARED_CHECK_COMPLETES_OFFLINE")
+                elif a["clock_reads"] or b["clock_reads"]:
+                    disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_CLOCK", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+                elif a["network_reads"] or b["network_reads"]:
+                    disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_NETWORK", "EVERY_DECLARED_CHECK_RUNS_OFFLINE")
+                elif a != b:
+                    disp, f = "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS",
+                                       "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+                elif a["outcome"] != "AS_EXPECTED":
+                    disp, f = "DENY", ("REQUIRED_CHECK_FAILED_AT_HEAD", "THE_COMMAND_GIVES_THE_ROWS_EXPECTED_RESULT")
+                else:
+                    disp, f = "ALLOW", None
+                receipts[check_id] = receipt(check_id, disp, change_d, head, epoch, None if f is None else six(
+                    f[0], f[1], "repair " + check_id + " at a new head (see the bundle's checks entry)",
+                    "repair at a new head and re-mint"))
+        receipts = {i: receipts[i] for i in emit}
         values = list(receipts.values())
         bundle["disposition"] = "ALLOW" if values and all(r["disposition"] == "ALLOW" for r in values) \
             else ("DENY" if any(r["disposition"] == "DENY" for r in values) else "FAIL_CLOSED")
