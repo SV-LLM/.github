@@ -7,19 +7,28 @@ name: S1 hop head verifier
 # requires the receipt bytes to equal the committed ones. The verifier itself
 # reads no clock, dispatches nothing and appends no ledger. Receipts are
 # admission-input evidence, not authentic organization-ledger receipts.
+# `rederive-required-checks` re-derives every public head's
+# sandbox/s1_required_checks_verifier.py receipt: it fetches the head and each
+# dependency commit the head's own .sv/required-checks.json declares (interim
+# basis until SV-CHANGE-REQUIRED-CHECKS-001 is published), runs the declared
+# checks offline twice, and requires byte equality with the committed receipt.
 on:
   pull_request:
     paths:
       - 'sandbox/**'
       - 'evidence/s1-hop-head/**'
+      - 'evidence/s1-required-checks/**'
       - 'tests/test_s1_hop_head_verifier.py'
+      - 'tests/test_s1_required_checks_verifier.py'
       - '.github/workflows/s1-hop-head-verifier.yml'
   push:
     branches: [main]
     paths:
       - 'sandbox/**'
       - 'evidence/s1-hop-head/**'
+      - 'evidence/s1-required-checks/**'
       - 'tests/test_s1_hop_head_verifier.py'
+      - 'tests/test_s1_required_checks_verifier.py'
       - '.github/workflows/s1-hop-head-verifier.yml'
 
 permissions:
@@ -36,6 +45,13 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_hop_head_verifier.py
           python3 -B tests/test_s1_hop_head_verifier.py -v
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Required-checks verifier unit tests (not declared, invalid, dependency, clock, network, two-run, failing, allow)
+        run: |
+          python3 -m py_compile sandbox/s1_required_checks_verifier.py
+          python3 -B tests/test_s1_required_checks_verifier.py -v
 
   rederive:
     runs-on: ubuntu-latest
@@ -51,6 +67,9 @@ jobs:
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
           - {repository: SV-LLM/.github, input: SV-LLM-47-4dcf3cd4}
           - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-ca7ca797}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,4 +97,69 @@ jobs:
           echo "verifier exit $code (0 only for ALLOW; the committed receipt decides the expected disposition)"
           python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
           cmp "$committed" "$RUNNER_TEMP/receipt.json"
+          echo "re-derived receipt is byte-identical to $committed"
+
+  rederive-required-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: SV-LLM/.github, input: SV-LLM-41-97c8e43c}
+          - {repository: StegVerse-org/.github, input: StegVerse-org-181-22b1ef4a}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3206-e07326f6}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3263-690d3ef1}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-fbf1fa46}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-ca7ca797}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-4dcf3cd4}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the head and its declared dependency commits read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "sandbox/s1-required-checks-inputs/$INPUT.json")
+          git init -q "$RUNNER_TEMP/head"
+          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
+          test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+          echo "fetched $REPOSITORY at $head"
+          : > "$RUNNER_TEMP/deps.args"
+          if git -C "$RUNNER_TEMP/head" cat-file -e "$head:.sv/required-checks.json" 2>/dev/null; then
+            git -C "$RUNNER_TEMP/head" show "$head:.sv/required-checks.json" > "$RUNNER_TEMP/declaration.json"
+            python3 -c 'import json,sys
+          d=json.load(open(sys.argv[1]))
+          for x in d.get("dependencies", []) if isinstance(d, dict) else []:
+              print(x["id"], x["repository"], x["commit"])' "$RUNNER_TEMP/declaration.json" 2>/dev/null |
+            while read -r id repo commit; do
+              git init -q "$RUNNER_TEMP/dep-$id"
+              git -C "$RUNNER_TEMP/dep-$id" fetch -q --no-tags --depth 1 "https://github.com/$repo.git" "$commit"
+              echo "--dependency $id=$RUNNER_TEMP/dep-$id" >> "$RUNNER_TEMP/deps.args"
+              echo "fetched dependency $id: $repo at $commit"
+            done
+          else
+            echo "head declares no .sv/required-checks.json"
+          fi
+      - name: Re-derive the required-checks receipt and compare bytes
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          committed="evidence/s1-required-checks/$INPUT.json"
+          code=0
+          python3 -P sandbox/s1_required_checks_verifier.py --input "sandbox/s1-required-checks-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" $(cat "$RUNNER_TEMP/deps.args") --out "$RUNNER_TEMP/receipt.json" || code=$?
+          echo "verifier exit $code (0 only for ALLOW; the committed receipt decides the expected disposition)"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
+          cmp "$committed" "$RUNNER_TEMP/receipt.json" || { diff <(python3 -m json.tool "$committed") <(python3 -m json.tool "$RUNNER_TEMP/receipt.json") || true; exit 1; }
           echo "re-derived receipt is byte-identical to $committed"
