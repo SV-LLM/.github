@@ -5,7 +5,7 @@
   "head_sha": "dd8bfd027ca11f8c2c48d505d901d153cb0c8601",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
+    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
     "file": "data/sv-work-items/required-checks.json",
     "blob_sha": "424050129f4ddfa7e14aac61c68c7037f075a709",
     "receipt_schema_blob_sha": "070f13f468558ca08aa5162a8f34431608fc1404",
@@ -13,7 +13,7 @@
   },
   "sv_change": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
+    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
     "file": "data/sv-work-items/migration/sv-changes.jsonl",
     "change_id": "svc:dd6acf613fd9001dd369cb3ef9428a9f216edec28cb05af0de9305c366281be0"
   },

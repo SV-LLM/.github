@@ -5,7 +5,7 @@
   "head_sha": "f82c0324aa4b6ac74adc44a3541ac98b33826447",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
+    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
     "file": "data/sv-work-items/required-checks.json",
     "blob_sha": "424050129f4ddfa7e14aac61c68c7037f075a709",
     "receipt_schema_blob_sha": "070f13f468558ca08aa5162a8f34431608fc1404",
@@ -13,7 +13,7 @@
   },
   "sv_change": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
+    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
     "file": "data/sv-work-items/migration/sv-changes.jsonl",
     "change_id": "svc:4c217bcf70d2761371703408ea2be8861b9d31e716dfa266f15f4068dcc1c912"
   },
@@ -23,6 +23,6 @@
   },
   "hb_epoch_readback": {
     "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json",
-    "sha256": "sha256:a9dd4248982dc8e4b979c6cc0f28ee8b257bc8668ce1899332bf88140e759b84"
+    "sha256": "sha256:036863cca947f86c2513dde81428dd074295279102361e06455b27c4c49f7993"
   }
 }

@@ -60,10 +60,10 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_sv_check_receipts.py
           python3 -B tests/test_s1_sv_check_receipts.py -v
-      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at ba038511; vendored P1 segments are its bytes
+      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at 7d940851; vendored P1 segments are its bytes
         run: |
           set -euo pipefail
-          pin=ba0385113f1fd0e155195269f72d5b91c835fa70
+          pin=7d940851034697c019684ec073ea676f27d7ac37
           git init -q "$RUNNER_TEMP/labs"
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
           test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 424050129f4ddfa7e14aac61c68c7037f075a709
@@ -84,13 +84,13 @@ jobs:
           assert found == m.P1_SEGMENT_SHA256, found
           print("P1 segments byte-identical at", m.PIN_COMMIT)
           PY
-      - name: Pinned readback equals StegVerse-Labs/.github#3266 at 78a0c78e; vendored canon/seal are its bytes
+      - name: Pinned readback equals StegVerse-Labs/.github#3266 at 641f4b03; vendored canon/seal are its bytes
         run: |
           set -euo pipefail
-          rb=78a0c78e1f1313bd11ff916b26a3ab467f2f54e2
+          rb=641f4b03e612d07047e15f2384d24780e2af86c0
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$rb"
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$rb:resident-runtime/sv_change_base_state_readback.py")" = 2c369c8e6db39c6ef1e6a55e953f16a66bd36c77
-          test "$(git hash-object sandbox/s1_pins/sv_change_base_state_readback.py)" = 2c369c8e6db39c6ef1e6a55e953f16a66bd36c77
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$rb:resident-runtime/sv_change_base_state_readback.py")" = fbd453e531fc8d8f62261d2a72bc7a596798a445
+          test "$(git hash-object sandbox/s1_pins/sv_change_base_state_readback.py)" = fbd453e531fc8d8f62261d2a72bc7a596798a445
           git -C "$RUNNER_TEMP/labs" show "$rb:resident-runtime/sv_change_base_state_readback.py" | cmp - sandbox/s1_pins/sv_change_base_state_readback.py
           python3 - <<'PY'
           import ast, hashlib, sys
@@ -109,7 +109,7 @@ jobs:
       - name: Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin
         run: |
           set -euo pipefail
-          pin=ba0385113f1fd0e155195269f72d5b91c835fa70
+          pin=7d940851034697c019684ec073ea676f27d7ac37
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > /dev/null
           rm -rf "$RUNNER_TEMP/p1" && mkdir -p "$RUNNER_TEMP/p1"
           git -C "$RUNNER_TEMP/labs" archive "$pin" | tar -x -C "$RUNNER_TEMP/p1"
@@ -273,8 +273,8 @@ jobs:
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3225-e6ba9601}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
-          # P1's row commit itself (#3264 head), with a verifier-derived SV_CHANGE record (sandbox/s1-sv-changes)
-          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-9338e3e7}
+          # P1's #3264 head itself; its SV_CHANGE record is P1's out-of-tree record, pinned by sha256 (not copied here)
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-7d940851}
           # dd8bfd02 is not fetchable (no public ref) and has no #3266 readback: HB_EPOCH_SOURCE_UNOBSERVED
           - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
     steps:
@@ -308,6 +308,24 @@ jobs:
           INPUT: ${{ matrix.input }}
         run: |
           set -euo pipefail
+          in="sandbox/s1-sv-check-inputs/$INPUT.json"
+          record=$(python3 -c 'import json,sys; s=json.load(open(sys.argv[1]))["sv_change"]; print(s["file"] if s["repository"] == "OUT_OF_TREE" else "")' "$in")
+          if [ -n "$record" ] && [ ! -f "$record" ]; then
+            # The record is out of tree (box-only): the bundle cannot be re-minted here. Re-derive its change_id from the
+            # fetched head instead and require it to be the committed one; the receipts are re-checked by the test job.
+            b="evidence/sv-check-receipts/$INPUT/bundle.json"
+            python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); sv=b["sv_change"]; json.dump({"target_repository": b["repository"], "base_ref": sv["base_ref"], "projection": {"base_sha": sv["base_sha"]}}, open(sys.argv[2], "w"))' "$b" "$RUNNER_TEMP/identity.json"
+            derived=$(python3 -P sandbox/s1_sv_check_receipts.py derive-change-id --checkout "$RUNNER_TEMP/head" \
+              --head "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "$in")" --record-identity "$RUNNER_TEMP/identity.json")
+            python3 - "$b" "$in" "$derived" <<'PY'
+          import json, sys
+          b, i = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+          assert b["sv_change"]["sha256"] == i["sv_change"]["sha256"], "bundle is not over the pinned record"
+          assert b["sv_change"]["change_id"] == b["sv_change"]["derived_change_id"] == sys.argv[3], (b["sv_change"], sys.argv[3])
+          print("record out of tree; change_id", sys.argv[3], "derived from the fetched head equals the committed bundle's")
+          PY
+            exit 0
+          fi
           code=0
           python3 -P sandbox/s1_sv_check_receipts.py mint --input "sandbox/s1-sv-check-inputs/$INPUT.json" \
             --checkout "$RUNNER_TEMP/head" --dependency "labs-row=$RUNNER_TEMP/labs" --out-dir "$RUNNER_TEMP/out" || code=$?

@@ -2,7 +2,7 @@
 """S1 supplied-epoch-binder-check: the verifier built-in for the P1 row's supplied-epoch-binder-check.
 
 StegVerse-org/.github#162 (NWI-S1), S1 home #163. The row (StegVerse-Labs/.github#3264
-ba038511, blob 42405012) declares offline_command {verifier_builtin:
+7d940851, blob 42405012) declares offline_command {verifier_builtin:
 supplied-epoch-binder-check, verifier_ref: SV-LLM/.github#46, predicate: the supplied
 hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at
 base_ref.ledger_head, and passes 726248a5 validation}, expected {disposition: ALLOW},
@@ -11,7 +11,7 @@ binder_check here. Invariant ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH.
 
 The source is one sealed stegverse.sv-change-base-state-readback/v1 receipt from Lane
 C's StegVerse-Labs/.github#3266 (resident-runtime/sv_change_base_state_readback.py at
-78a0c78e, blob 2c369c8e; canon/seal vendored, segment sha256 pinned). It mirrors P1's
+641f4b03, blob fbd453e5; canon/seal vendored, segment sha256 pinned). It mirrors P1's
 in-repo reference sv_work_items.verify_admission_hb_epoch:
   FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED: no readback, not that schema, broken seal,
     not ALLOW, fixture_only, bound to another ledger head, no hb_epoch_source
@@ -42,13 +42,13 @@ RESULT_SCHEMA = "stegverse.sv-llm.s1-supplied-epoch-binder-check/v1"
 READBACK_SCHEMA = "stegverse.sv-change-base-state-readback/v1"
 READBACK_REPOSITORY = "StegVerse-Labs/.github"
 READBACK_PR = "StegVerse-Labs/.github#3266"
-READBACK_PIN_COMMIT = "78a0c78e1f1313bd11ff916b26a3ab467f2f54e2"
+READBACK_PIN_COMMIT = "641f4b03e612d07047e15f2384d24780e2af86c0"
 READBACK_COMPONENT_FILE = "resident-runtime/sv_change_base_state_readback.py"
-READBACK_COMPONENT_BLOB = "2c369c8e6db39c6ef1e6a55e953f16a66bd36c77"
-# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 ba038511): the
+READBACK_COMPONENT_BLOB = "fbd453e531fc8d8f62261d2a72bc7a596798a445"
+# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 7d940851): the
 # readback's hb_epoch slot counts only with hb_epoch_source {ledger_head: base_ref.ledger_head, field:
-# HB_EPOCH_SOURCE_FIELD}. #3266 at 78a0c78e seals no hb_epoch_source (its hb_epoch is the caller's value, null when
-# none), so every readback at that head is HB_EPOCH_SOURCE_UNOBSERVED.
+# HB_EPOCH_SOURCE_FIELD}. #3266 at 641f4b03 seals hb_epoch with hb_epoch_source {ledger_head, receipt, field} (both
+# null on every FAIL_CLOSED); its 78a0c78e head sealed none (unobserved).
 HB_EPOCH_SOURCE_FIELD = "$.hb_reference.epoch"
 CHECK_ID = "supplied-epoch-binder-check"
 INVARIANT = "ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH"

@@ -8,7 +8,7 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head ba038511; tests fail on drift):
+Pins (StegVerse-Labs/.github#3264 head 7d940851; tests fail on drift):
 data/sv-work-items/required-checks.json blob 42405012 (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
 070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
@@ -47,7 +47,7 @@ expected stands), as is a run that does not complete; clean and as expected is A
 Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
 (== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
 (ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: the epoch Lane C's readback,
-StegVerse-Labs/.github#3266 78a0c78e, sealed at the record's base_ref.ledger_head,
+StegVerse-Labs/.github#3266 641f4b03, sealed at the record's base_ref.ledger_head,
 read from the input's hb_epoch_readback {file, sha256}; the input carries no
 hb_epoch, and an unobserved source is a bundle-level FAIL_CLOSED
 HB_EPOCH_SOURCE_UNOBSERVED with no receipts -- never a supplied constant or a
@@ -86,9 +86,9 @@ ROW_ID = "SV-CHANGE-REQUIRED-CHECKS-001"
 ROW_FILE = "data/sv-work-items/required-checks.json"
 ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
-LOCAL_REPOSITORY = "SV-LLM/.github"
+OUT_OF_TREE = "OUT_OF_TREE"  # a record outside any repository (e.g. P1's posted record), bound only by its sha256
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "ba0385113f1fd0e155195269f72d5b91c835fa70"
+PIN_COMMIT = "7d940851034697c019684ec073ea676f27d7ac37"
 ROW_BLOB = "424050129f4ddfa7e14aac61c68c7037f075a709"
 RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
@@ -313,11 +313,13 @@ def validate_input(document: Any) -> dict[str, Any]:
             or row.get("row_id") != ROW_ID or not all(isinstance(row.get(k), str) and rc.HEX40.match(row[k])
                                                       for k in ("commit", "blob_sha", "receipt_schema_blob_sha")):
         raise bad("required_checks_row")
-    local = isinstance(source, dict) and source.get("repository") == LOCAL_REPOSITORY
-    if not isinstance(source, dict) or source.get("repository") not in (ROW_REPOSITORY, LOCAL_REPOSITORY) \
-            or not isinstance(source.get("file"), str) or not isinstance(source.get("change_id"), str) \
-            or (local and not (isinstance(source.get("sha256"), str) and SHA256_REF.match(source["sha256"])
-                               and SAFE_PATH.match(source["file"]))) \
+    local = isinstance(source, dict) and source.get("repository") == OUT_OF_TREE
+    if not isinstance(source, dict) or source.get("repository") not in (ROW_REPOSITORY, OUT_OF_TREE) \
+            or not isinstance(source.get("file"), str) \
+            or (local and not (set(source) == {"repository", "file", "sha256", "derived_by"}
+                               and isinstance(source.get("sha256"), str) and SHA256_REF.match(source["sha256"])
+                               and Path(source["file"]).is_absolute() and isinstance(source.get("derived_by"), str))) \
+            or (not local and not isinstance(source.get("change_id"), str)) \
             or (not local and not (isinstance(source.get("commit"), str) and rc.HEX40.match(source["commit"]))):
         raise bad("sv_change")
     if "hb_epoch" in document:  # ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: never a supplied constant
@@ -372,12 +374,14 @@ def load_schema(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any
 def load_change(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any]:
     def bad(detail: str) -> Global:
         return Global("SV_CHANGE_NOT_RESOLVED", "THE_SV_CHANGE_RECORD_RESOLVES_AT_ITS_PINNED_COMMIT",
-                      spec["file"] + " at " + spec["commit"] + " holding change_id " + spec["change_id"],
+                      spec["file"] + " at " + str(spec.get("commit") or spec.get("sha256"))
+                      + (" holding change_id " + spec["change_id"] if "change_id" in spec else ""),
                       "re-pin the SV_CHANGE source and re-run", detail)
-    if spec["repository"] == LOCAL_REPOSITORY:
-        # A verifier-derived record committed in this repository, bound by the sha256 the input names.
+    if spec["repository"] == OUT_OF_TREE:
+        # One record outside any repository (P1's posted record), bound by the sha256 the input names. The input carries
+        # no change_id for it: the change_id is derived from the head and must equal the record's (derived_change_id).
         try:
-            data = (HERE.parent / spec["file"]).read_bytes()
+            data = Path(spec["file"]).read_bytes()
         except OSError:
             raise bad("file absent") from None
         if "sha256:" + sha256_hex(data) != spec["sha256"]:
@@ -392,10 +396,39 @@ def load_change(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any
     text = found[0].decode("utf-8")
     records = [json.loads(line) for line in text.splitlines() if line.strip()] if spec["file"].endswith(".jsonl") \
         else [json.loads(text)]
-    matches = [r for r in records if isinstance(r, dict) and r.get("change_id") == spec["change_id"]]
+    matches = [r for r in records if isinstance(r, dict)
+               and ("change_id" not in spec or r.get("change_id") == spec["change_id"])]
     if len(matches) != 1:
         raise bad(str(len(matches)) + " records with that change_id")
     return matches[0]
+
+
+def derived_change_id(checkout: Path, change: Mapping[str, Any], head: str) -> str:
+    """The change_id derived from the head, never cached: P1's identity over target_repository, base_ref and the content of
+    `git diff --no-renames --name-status <projection.base_sha> <head>` (bytes at the head; deletions as deleted). The
+    record's projection.base_sha must be an ancestor of the head in the clone; it is never fetched."""
+    base = (change.get("projection") or {}).get("base_sha") if isinstance(change.get("projection"), Mapping) else None
+    def refuse(detail: str) -> Global:
+        return Global("SV_CHANGE_ID_NOT_DERIVED_FROM_HEAD", "THE_SV_CHANGE_ID_IS_DERIVED_FROM_THE_EXACT_HEAD",
+                      "a record whose change_id equals the identity of git diff projection.base_sha..head at the head",
+                      "re-derive the SV_CHANGE at the head", detail)
+    if not isinstance(base, str) or not rc.HEX40.match(base) or not rc.head_present(checkout, base) \
+            or rc.git(checkout, "merge-base", "--is-ancestor", base, head).returncode:
+        raise refuse("projection.base_sha " + str(base) + " is not an ancestor of the head in the clone")
+    listed = rc.git(checkout, "diff", "--no-renames", "--name-status", base, head)
+    if listed.returncode:
+        raise refuse("git diff failed")
+    content = []
+    for line in listed.stdout.decode("utf-8").splitlines():
+        status, _, path = line.partition("\t")
+        deleted = status == "D"
+        blob = None if deleted else rc.git(checkout, "cat-file", "blob", head + ":" + path)
+        if blob is not None and blob.returncode:
+            raise refuse("cannot read " + path + " at the head")
+        content.append({"path": path, "deleted": deleted,
+                        "blob_digest": None if deleted else "sha256:" + sha256_hex(blob.stdout)})
+    return "svc:" + change_digest({"target_repository": change.get("target_repository"),
+                                   "base_ref": change.get("base_ref"), "content": content})[7:]
 
 
 def load_readback(spec: Mapping[str, Any] | None) -> Any:
@@ -627,7 +660,11 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         bundle["row"] = {**document["required_checks_row"], "sha256": row_digest, "row_check_ids": row_ids(row)}
         receipt_schema = load_schema(document["required_checks_row"], labs)
         change = load_change(document["sv_change"], labs)
-        bundle["sv_change"] = {**document["sv_change"], "record_mode": change.get("record_mode")}
+        bundle["sv_change"] = {**document["sv_change"], "record_mode": change.get("record_mode"),
+                               "change_id": change.get("change_id"), "base_ref": change.get("base_ref"),
+                               "base_sha": (change.get("projection") or {}).get("base_sha")
+                               if isinstance(change.get("projection"), Mapping) else None,
+                               "derived_change_id": None}
         surface_required, _signoffs = required_for(change.get("touched_paths") or [], row)
         bundle["required_check_ids"] = surface_required
         bundle["touched_surface_kinds"] = sorted({surface_kind(p) for p in change.get("touched_paths") or []})
@@ -667,6 +704,12 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                 raise Global("SV_CHANGE_CONTENT_NOT_AT_HEAD", "SV_CHANGE_CONTENT_IS_THE_HEAD_TREE",
                              "every content blob_digest equal to the head's bytes", "re-derive the SV_CHANGE at the head",
                              str(c.get("path")))
+        derived = derived_change_id(checkout, change, head)
+        bundle["sv_change"]["derived_change_id"] = derived
+        if derived != change.get("change_id"):
+            raise Global("SV_CHANGE_ID_NOT_DERIVED_FROM_HEAD", "THE_SV_CHANGE_ID_IS_DERIVED_FROM_THE_EXACT_HEAD",
+                         "a record whose change_id equals the identity of git diff projection.base_sha..head at the head",
+                         "re-derive the SV_CHANGE at the head", "derived " + derived + ", record " + str(change.get("change_id")))
         base = None
         spec = document.get("base_commit")
         if spec is not None:
@@ -789,7 +832,20 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--receipt", type=Path, required=True)
     c.add_argument("--input", type=Path, required=True)
     c.add_argument("--dependency", action="append", default=[], metavar="ID=CHECKOUT")
+    d = sub.add_parser("derive-change-id", help="the change_id derived from a head for a record's target and base_ref")
+    d.add_argument("--checkout", type=Path, required=True)
+    d.add_argument("--head", required=True)
+    d.add_argument("--record-identity", type=Path, required=True,
+                   help="JSON {target_repository, base_ref, projection: {base_sha}} (e.g. a bundle's sv_change)")
     args = parser.parse_args(argv)
+    if args.command == "derive-change-id":
+        identity = json.loads(args.record_identity.read_text())
+        try:
+            print(derived_change_id(args.checkout, identity, args.head))
+            return 0
+        except Global as refusal:
+            sys.stdout.buffer.write(render({"disposition": refusal.disposition, **refusal.fields}))
+            return 1
     dependencies = {k: Path(v) for k, _, v in (d.partition("=") for d in args.dependency)}
     if args.command == "check":
         try:

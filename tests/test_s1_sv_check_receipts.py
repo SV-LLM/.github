@@ -24,6 +24,8 @@ rc = m.rc
 eb = m.eb
 READBACKS = SANDBOX / "s1-base-state-readbacks"
 LEDGER_HEAD = "a" * 40
+# P1's out-of-tree #3264 record (not copied here; pinned by sha256)
+P1_RECORD_SHA256 = "sha256:cda39b6dc187c72afa52eac35eed47a8023b17822d76bbf75ac39709ec51c85e"
 PINS = SANDBOX / "s1_pins"
 INPUTS = SANDBOX / "s1-sv-check-inputs"
 EVIDENCE = ROOT / "evidence" / "sv-check-receipts"
@@ -90,8 +92,16 @@ class Fixture:
 
     def __init__(self, tmp: Path, head_files: dict[str, bytes], *, supplied="4000", readback: object = "sealed",
                  row: bytes | None = None, tamper_content: bool = False, base: bool = False,
-                 extra_input: dict | None = None) -> None:
+                 extra_input: dict | None = None, forge_change_id: bool = False) -> None:
         self.head_repo = tmp / "head"
+        env = rc.base_env(tmp)
+        subprocess.run(["git", "init", "-q", str(self.head_repo)], check=True, env=env)
+        subprocess.run(["git", "-C", str(self.head_repo), "commit", "-q", "--allow-empty", "-m", "root"], check=True, env=env)
+        self.root = subprocess.run(["git", "-C", str(self.head_repo), "rev-parse", "HEAD"], check=True, env=env,
+                                   capture_output=True, text=True).stdout.strip()  # projection.base_sha
+        listed = dict(head_files)
+        if forge_change_id:  # a file at the head the record omits: its content checks, its change_id is not the head's
+            head_files = {**head_files, "UNLISTED": b"u\n"}
         self.head = repo(self.head_repo, head_files)
         self.base = None
         if base:  # a second commit on top: the first is the supplied base
@@ -105,12 +115,13 @@ class Fixture:
                                        capture_output=True, text=True).stdout.strip()
         content = [{"path": p, "blob_digest": "sha256:" + hashlib.sha256(d).hexdigest(),
                     "writer_session": {"evidence_class": "DECLARED", "session": "Lane B (91117956)"}}
-                   for p, d in sorted(head_files.items())]
+                   for p, d in sorted({**listed, **({"SECOND": b"2\n"} if base else {})}.items())]
         if tamper_content:
             content[0]["blob_digest"] = "sha256:" + "0" * 64
         record = {"schema": "stegverse.sv_change.v1", "record_mode": "NATIVE", "target_repository": "Fixture/repo",
                   "base_ref": {"ledger_head": LEDGER_HEAD, "registry_generation": 1}, "content": content,
-                  "touched_paths": sorted(head_files), "projection": {"repo": "Fixture/repo", "head_sha": self.head}}
+                  "touched_paths": sorted(c["path"] for c in content),
+                  "projection": {"repo": "Fixture/repo", "head_sha": self.head, "base_sha": self.root}}
         if supplied is not ...:
             record["hb_epoch"] = supplied  # the SV_CHANGE's supplied epoch, which the binder check tests
         digest = m.change_digest(record)
@@ -144,7 +155,7 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "ba0385113f1fd0e155195269f72d5b91c835fa70")
+        self.assertEqual(m.PIN_COMMIT, "7d940851034697c019684ec073ea676f27d7ac37")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
         self.assertTrue(m.ROW_BLOB.startswith("42405012"))
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
@@ -155,10 +166,10 @@ class Pins(unittest.TestCase):
                              (m.PIN_COMMIT, m.ROW_BLOB, m.RECEIPT_SCHEMA_BLOB), path.name)
 
     def test_the_3266_readback_pins_have_not_drifted(self):
-        self.assertEqual(eb.READBACK_PIN_COMMIT, "78a0c78e1f1313bd11ff916b26a3ab467f2f54e2")
+        self.assertEqual(eb.READBACK_PIN_COMMIT, "641f4b03e612d07047e15f2384d24780e2af86c0")
         vendored = (PINS / "sv_change_base_state_readback.py").read_bytes()
         self.assertEqual(git_blob(vendored), eb.READBACK_COMPONENT_BLOB)
-        self.assertTrue(eb.READBACK_COMPONENT_BLOB.startswith("2c369c8e"))
+        self.assertTrue(eb.READBACK_COMPONENT_BLOB.startswith("fbd453e5"))
         self.assertIn(('RESULT_SCHEMA = "' + eb.READBACK_SCHEMA + '"').encode(), vendored)
         def segments(source):
             return {n.name: hashlib.sha256(ast.get_source_segment(source, n).encode()).hexdigest()
@@ -173,6 +184,9 @@ class Pins(unittest.TestCase):
             body = json.loads(path.read_text())
             self.assertEqual(body["schema"], eb.READBACK_SCHEMA, path.name)
             self.assertEqual(eb.seal(body)["result_sha256"], body["result_sha256"], path.name)
+        p1 = json.loads((INPUTS / "StegVerse-Labs-3264-7d940851.json").read_text())["sv_change"]
+        self.assertEqual(p1, {"repository": "OUT_OF_TREE", "file": "/workspace/p1/posted/SV_CHANGE_3264_7d940851.json",
+                              "sha256": P1_RECORD_SHA256, "derived_by": "/workspace/p1/redo6/derive_3264.py (P1)"})
         for path in sorted(INPUTS.glob("*.json")):  # no supplied epoch in any input; a readback bound by sha256
             document = json.loads(path.read_text())
             self.assertNotIn("hb_epoch", document, path.name)
@@ -239,7 +253,7 @@ class Minting(unittest.TestCase):
 
     def test_the_pinned_row_is_read_verbatim(self):
         cmds = {i: m.command_declaration(ROW["checks"][i]) for i in SIX_IDS}
-        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at ba038511 as a verifier built-in
+        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at 7d940851 as a verifier built-in
         self.assertEqual(m.verifier_builtin("supplied-epoch-binder-check", binder), "supplied-epoch-binder-check")
         self.assertEqual(binder["offline_command"]["verifier_ref"], "SV-LLM/.github#46")
         self.assertEqual(binder["expected"], {"disposition": "ALLOW"})
@@ -353,7 +367,7 @@ class Minting(unittest.TestCase):
         cases = {
             "no readback": None,
             "readback file not its sha256": b"{}\n",
-            "#3266 at 78a0c78e: hb_epoch null, no hb_epoch_source": sealed_readback(None, hb_epoch_source=...),
+            "#3266 at 78a0c78e shape: hb_epoch null, no hb_epoch_source": sealed_readback(None, hb_epoch_source=...),
             "caller-supplied hb_epoch without hb_epoch_source": sealed_readback("4000", hb_epoch_source=...),
             "absent sealed epoch": sealed_readback(None),
             "clock-derived": sealed_readback(hb_epoch_source={"ledger_head": LEDGER_HEAD, "field": eb.HB_EPOCH_SOURCE_FIELD,
@@ -374,12 +388,34 @@ class Minting(unittest.TestCase):
         for name, readback in cases.items():
             with self.subTest(name):
                 self.assert_source_unobserved(readback=readback)
-        with self.subTest("the committed #3266 readback (hb_epoch null)"):
-            real = (READBACKS / "StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json").read_bytes()
-            body = json.loads(real)
-            self.assertIsNone(body["hb_epoch"])
-            self.assertNotIn("hb_epoch_source", body)
-            self.assert_source_unobserved(readback=real)
+        with self.subTest("#3266 641f4b03 FAIL_CLOSED shape: hb_epoch and hb_epoch_source null"):
+            self.assert_source_unobserved(readback=sealed_readback(None, hb_epoch_source=None))
+
+    def test_the_committed_3266_readbacks_seal_the_known_answer(self):
+        for path in sorted(READBACKS.glob("*.json")):
+            body = json.loads(path.read_text())
+            self.assertEqual(body["hb_epoch"], "469411750", path.name)
+            self.assertEqual(body["hb_epoch_source"], {
+                "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1", "field": "$.hb_reference.epoch",
+                "receipt": "receipts/35810b6598e99cef32d9a0f1f97d07394d9f21c540ed7d3a395d9d78b753db3d.json"}, path.name)
+            self.assertEqual(eb.readback_epoch(body, "a5bb54d81893b392a3ce28182986fc39857807e1"), ("469411750", None))
+
+    def test_the_comparison_is_numeric_after_726248a5(self):
+        rb = sealed_readback("1024")
+        self.assertEqual(eb.binder_check("01024", rb, LEDGER_HEAD)["disposition"], "ALLOW")
+        self.assertEqual(eb.binder_check("1024", rb, LEDGER_HEAD)["disposition"], "ALLOW")
+        for bad in ("+1024", " 1024", "1024.0", "1_024", "1025", None):
+            self.assertEqual(eb.binder_check(bad, rb, LEDGER_HEAD)["failure_code"], "HB_EPOCH_MISMATCH", bad)
+        _, receipts, _ = self.minted({"README": b"x\n"}, supplied="01024", readback=rb)
+        self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
+        self.assertEqual(receipts["supplied-epoch-binder-check"]["hb_epoch"], "1024")
+
+    def test_a_change_id_that_is_not_derived_from_the_head_is_refused(self):
+        bundle, receipts, fixture = self.minted({"README": b"x\n"}, forge_change_id=True)
+        self.assertEqual({r["failure_code"] for r in receipts.values()}, {"SV_CHANGE_ID_NOT_DERIVED_FROM_HEAD"})
+        self.assertNotEqual(bundle["sv_change"]["derived_change_id"], bundle["sv_change"]["change_id"])
+        good, _, _ = self.minted({"README": b"x\n"})
+        self.assertEqual(good["sv_change"]["derived_change_id"], good["sv_change"]["change_id"])
 
     def test_a_supplied_epoch_in_the_input_is_refused(self):
         bundle, receipts, _ = self.minted({"README": b"x\n"}, extra_input={"hb_epoch": "4000"})
