@@ -88,7 +88,7 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:33542bfacf802e80fa2fdd2ffb5310e108d5fada207e947a6053b061c10cafbc",
+      "local_sha256": "sha256:b4512f88dab90d7670a418743cd6f22a7dce9d57be2e97f666bf9ac06850c072",
       "substitutions": [
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
@@ -107,6 +107,18 @@
           "local": "(boundary()[\"egress\"].get(\"capability_destination_bindings\") or [])",
           "count": 1,
           "why": "SV-LLM declares no outbound destination binding (tests/test_intr_destination_capability.py); without one the reference raised KeyError after the refusal was recorded, so a NON-ALLOW now stays the six-field receipt with disposition_delivery NON_ALLOW_DISPOSITION_BINDING_ABSENT, the reference's own outcome for an absent binding"
+        },
+        {
+          "reference": "    request: dict[str, Any] | None = None\n    submitted_epoch = hb_epoch\n",
+          "local": "    request: dict[str, Any] | None = None\n    # SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n    # this organization's kernel reads no clock (NWI-S1), so a receive without a\n    # supplied epoch is refused six-field before anything is read or recorded.\n    epoch_refusal = repository_ledger.kernel.hb_epoch_refusal(hb_epoch)\n    if epoch_refusal is not None:\n        return {**epoch_refusal, \"receiving_operation_id\": OPERATION_ID, \"consequence_committed\": False,\n                \"retry_entrypoint\": \"resident-runtime/organization_manifest_ingress.py --hb-epoch <supplied>\"}\n    hb_epoch = int(str(hb_epoch))\n    submitted_epoch = hb_epoch\n",
+          "count": 1,
+          "why": "org-kernel/kernel.py reads no clock (NWI-S1, StegVerse-org/.github#162): the reference let an epoch-less receive fall through to a host-clock heartbeat; here it is the six-field FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED / HB_EPOCH_INVALID from the vendored supplied_epoch_failure (726248a5) before anything is recorded, and a supplied epoch is read as its decimal text"
+        },
+        {
+          "reference": "    parser.add_argument(\"--hb-epoch\", type=int, default=None,\n                        help=\"heartbeat epoch; derived from the host clock, and marked as \"\n                             \"derived, when absent\")\n",
+          "local": "    # SV-LLM declared substitution: the epoch is supplied; absent is refused, not derived.\n    parser.add_argument(\"--hb-epoch\", type=str, default=None,\n                        help=\"supplied heartbeat epoch (ASCII [0-9]+, >= 32); absent or malformed is \"\n                             \"FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED / HB_EPOCH_INVALID, and no clock is read\")\n",
+          "count": 1,
+          "why": "the CLI epoch is supplied text checked by the shared rule rather than an argparse int that accepts '+33'; the reference help described the clock fallback this organization removed"
         }
       ]
     }
@@ -160,7 +172,8 @@
         "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
-        "identity checks name SV-LLM/.github"
+        "identity checks name SV-LLM/.github",
+        "no host-clock epoch (NWI-S1): a committed request is received at the supplied epoch -- the dispatch's hb_epoch, else the successor of the highest epoch already recorded on this organization's verified ledger; with neither, the receive is FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED and nothing is recorded"
       ]
     }
   }

@@ -252,12 +252,43 @@ jobs:
                 "$recorded" "$canonical" "$out/ingress.json"
               continue
             fi
+            # No clock is read (NWI-S1). The epoch is supplied: the dispatch's
+            # hb_epoch, else the successor of the highest epoch already recorded
+            # on this organization's verified ledger. With neither, the receive
+            # is FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED and nothing is recorded.
+            epoch="$HB_EPOCH"
+            if [ -z "$epoch" ]; then
+              epoch=$(python - <<'PY'
+          import importlib.util, os, sys
+          sys.path.insert(0, "resident-runtime")
+          spec = importlib.util.spec_from_file_location("readback", "resident-runtime/organization_ledger_readback.py")
+          rb = importlib.util.module_from_spec(spec); spec.loader.exec_module(rb)
+          location = os.environ["STEGVERSE_ORG_LEDGER_ROOT"]
+          try:
+              chain = rb.readback(location)["chain"]
+          except rb.ReadbackRefused as exc:
+              if exc.failed_predicate != "ORGANIZATION_LEDGER_HEAD_PRESENT":
+                  raise
+              chain = []
+          store = rb.open_store(rb.parse_locator(location))
+          epochs = []
+          for r in chain:
+              receipt = store.get(rb.receipt_key(r["receipt_sha256"]))
+              source = store.get(rb.source_key(receipt["source_transition_sha256"]))
+              epochs.append(source["hb_reference"]["epoch"])
+          print(max(epochs) + 1 if epochs else "")
+          PY
+              )
+            fi
+            echo "supplied hb_epoch for $name: ${epoch:-<none>}"
+            epoch_args=()
+            [ -z "$epoch" ] || epoch_args=(--hb-epoch "$epoch")
             # A refusal is recorded too; the publish step carries it, and the
             # readback step fails the run on a receipt it cannot find.
             python resident-runtime/organization_manifest_ingress.py \
               --registry org-boundary/registry/services.json \
               --manifest "$out/manifest.json" --standing "$out/standing.json" \
-              --packet-id "$name" --out "$out/ingress.json" || true
+              --packet-id "$name" "${epoch_args[@]}" --out "$out/ingress.json" || true
             test -f "$out/ingress.json"
             python -c 'import json,sys; x=json.load(open(sys.argv[1])); print("ingress disposition:", x["disposition"], x.get("failed_predicate"), x.get("organization_receipt_sha256"))' "$out/ingress.json"
           done < "$RUNNER_TEMP/requests.txt"
