@@ -82,7 +82,7 @@ def sealed_readback(epoch="4000", ledger_head=LEDGER_HEAD, **override):
     body = {"schema": eb.READBACK_SCHEMA, "component_id": "RTC-SV-CHANGE-BASE-STATE-READBACK-014",
             "disposition": "ALLOW", "base_ref": {"ledger_head": ledger_head, "registry_generation": 1},
             "hb_epoch": epoch, "hb_epoch_source": {"ledger_head": ledger_head, "field": eb.HB_EPOCH_SOURCE_FIELD,
-                                                   "derived_from_clock": False}}
+                                                   "receipt": "receipts/" + "c" * 64 + ".json"}}
     body.update(override)
     return eb.seal({k: v for k, v in body.items() if v is not ...})
 
@@ -155,9 +155,11 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "7d940851034697c019684ec073ea676f27d7ac37")
+        self.assertEqual(m.PIN_COMMIT, "ae8b105d7504565665bf6918367517ffdcb481fd")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
-        self.assertTrue(m.ROW_BLOB.startswith("42405012"))
+        self.assertTrue(m.ROW_BLOB.startswith("9c75778f"))
+        self.assertEqual(eb.P1_REFERENCE["commit"], m.PIN_COMMIT)  # the agreement test's canonical rule
+        self.assertTrue(eb.P1_REFERENCE["blob_sha"].startswith("446889c5"))
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
         self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("070f13f4"))
         for path in sorted(INPUTS.glob("*.json")):
@@ -253,7 +255,7 @@ class Minting(unittest.TestCase):
 
     def test_the_pinned_row_is_read_verbatim(self):
         cmds = {i: m.command_declaration(ROW["checks"][i]) for i in SIX_IDS}
-        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at 7d940851 as a verifier built-in
+        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at ae8b105d as a verifier built-in
         self.assertEqual(m.verifier_builtin("supplied-epoch-binder-check", binder), "supplied-epoch-binder-check")
         self.assertEqual(binder["offline_command"]["verifier_ref"], "SV-LLM/.github#46")
         self.assertEqual(binder["expected"], {"disposition": "ALLOW"})
@@ -371,7 +373,11 @@ class Minting(unittest.TestCase):
             "caller-supplied hb_epoch without hb_epoch_source": sealed_readback("4000", hb_epoch_source=...),
             "absent sealed epoch": sealed_readback(None),
             "clock-derived": sealed_readback(hb_epoch_source={"ledger_head": LEDGER_HEAD, "field": eb.HB_EPOCH_SOURCE_FIELD,
+                                                              "receipt": "receipts/" + "c" * 64 + ".json",
                                                               "derived_from_clock": True}),
+            "source receipt not a ledger path": sealed_readback(hb_epoch_source={
+                "ledger_head": LEDGER_HEAD, "field": eb.HB_EPOCH_SOURCE_FIELD, "receipt": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"}),
+            "readback DENY other than HB_EPOCH_MISMATCH": sealed_readback(disposition="DENY", failure_code="OTHER"),
             "non-integer": sealed_readback("4000.0"),
             "signed": sealed_readback("+4000"),
             "below the anchor": sealed_readback("31"),
@@ -404,7 +410,7 @@ class Minting(unittest.TestCase):
         rb = sealed_readback("1024")
         self.assertEqual(eb.binder_check("01024", rb, LEDGER_HEAD)["disposition"], "ALLOW")
         self.assertEqual(eb.binder_check("1024", rb, LEDGER_HEAD)["disposition"], "ALLOW")
-        for bad in ("+1024", " 1024", "1024.0", "1_024", "1025", None):
+        for bad in ("+1024", " 1024", "1024.0", "1_024", "1025"):
             self.assertEqual(eb.binder_check(bad, rb, LEDGER_HEAD)["failure_code"], "HB_EPOCH_MISMATCH", bad)
         _, receipts, _ = self.minted({"README": b"x\n"}, supplied="01024", readback=rb)
         self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
@@ -431,7 +437,7 @@ class Minting(unittest.TestCase):
         self.assertEqual(bundle["hb_epoch_source"]["readback_component"]["commit"], eb.READBACK_PIN_COMMIT)
 
     def test_a_supplied_epoch_that_contradicts_the_readback_is_deny_mismatch(self):
-        for supplied in ("4001", "31", "+4000", "4000.0", "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED", None, ...):
+        for supplied in ("4001", "31", "+4000", " 4000", "4000.0", "4_000", "NULL", "unknown", 4000, 4000.0, True):
             with self.subTest(supplied=supplied):
                 bundle, receipts, _ = self.minted({"README": b"x\n"}, supplied=supplied)
                 binder = receipts["supplied-epoch-binder-check"]
@@ -442,6 +448,33 @@ class Minting(unittest.TestCase):
                 self.assertEqual(bundle["disposition"], "DENY")
         _, receipts, _ = self.minted({"README": b"x\n"}, supplied="04000")  # equal by integer value
         self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
+
+    def test_an_absent_null_or_sentinel_supplied_epoch_is_fail_closed_unobserved(self):
+        for supplied in (..., None, "", "null", "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"):  # ... = no hb_epoch field
+            with self.subTest(supplied=supplied):
+                bundle, receipts, _ = self.minted({"README": b"x\n"}, supplied=supplied)
+                binder = receipts["supplied-epoch-binder-check"]
+                self.assertEqual((binder["disposition"], binder["failure_code"]),
+                                 ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED"))
+                self.assertEqual(binder["owning_existing_goal"], "StegVerse-org/.github#162")
+                for field in m.SIX_FIELDS:
+                    self.assertTrue(binder[field], field)
+                self.assertEqual(binder["hb_epoch"], "4000")  # the sealed epoch
+                self.assertEqual(bundle["disposition"], "FAIL_CLOSED")
+        rb = sealed_readback("1024")
+        for supplied, want in (("1024", ("ALLOW", None)), ("01024", ("ALLOW", None)),
+                               ("1025", ("DENY", "HB_EPOCH_MISMATCH")), ("+1024", ("DENY", "HB_EPOCH_MISMATCH")),
+                               ("31", ("DENY", "HB_EPOCH_MISMATCH")), (1024, ("DENY", "HB_EPOCH_MISMATCH")),
+                               ("", ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED")),
+                               ("null", ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED")),
+                               (eb.HB_EPOCH_NOT_CROSS_CHECKED, ("ALLOW", None)),
+                               (None, ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED")),
+                               ("UNKNOWN_NOT_AUTHENTICALLY_OBSERVED", ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED"))):
+            r = eb.binder_check(supplied, rb, LEDGER_HEAD)
+            self.assertEqual((r["disposition"], r.get("failure_code")), want, supplied)
+            self.assertEqual(r["cross_checked"], supplied is not eb.HB_EPOCH_NOT_CROSS_CHECKED)
+        observed_deny = sealed_readback("1024", disposition="DENY", failure_code="HB_EPOCH_MISMATCH")
+        self.assertEqual(eb.binder_check("1024", observed_deny, LEDGER_HEAD)["disposition"], "ALLOW")
 
     def test_the_binder_check_in_isolation(self):
         rb = sealed_readback("469411750")

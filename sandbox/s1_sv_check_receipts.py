@@ -8,8 +8,8 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head 7d940851; tests fail on drift):
-data/sv-work-items/required-checks.json blob 42405012 (row
+Pins (StegVerse-Labs/.github#3264 head ae8b105d; tests fail on drift):
+data/sv-work-items/required-checks.json blob 9c75778f (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
 070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
 at that commit and blob; nothing is fetched.
@@ -88,8 +88,8 @@ ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
 OUT_OF_TREE = "OUT_OF_TREE"  # a record outside any repository (e.g. P1's posted record), bound only by its sha256
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "7d940851034697c019684ec073ea676f27d7ac37"
-ROW_BLOB = "424050129f4ddfa7e14aac61c68c7037f075a709"
+PIN_COMMIT = "ae8b105d7504565665bf6918367517ffdcb481fd"
+ROW_BLOB = "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d"
 RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
@@ -734,7 +734,8 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                                          "disposition": result["disposition"],
                                          "failure_code": result.get("failure_code"),
                                          "supplied_hb_epoch": result.get("supplied_hb_epoch"),
-                                         "readback_hb_epoch": result.get("readback_hb_epoch")})
+                                         "readback_hb_epoch": result.get("readback_hb_epoch"),
+                                         "cross_checked": result.get("cross_checked")})
                 continue
             declared = command_declaration(entry)
             if isinstance(declared, str):

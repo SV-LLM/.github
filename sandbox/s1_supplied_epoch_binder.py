@@ -2,7 +2,7 @@
 """S1 supplied-epoch-binder-check: the verifier built-in for the P1 row's supplied-epoch-binder-check.
 
 StegVerse-org/.github#162 (NWI-S1), S1 home #163. The row (StegVerse-Labs/.github#3264
-7d940851, blob 42405012) declares offline_command {verifier_builtin:
+ae8b105d, blob 9c75778f) declares offline_command {verifier_builtin:
 supplied-epoch-binder-check, verifier_ref: SV-LLM/.github#46, predicate: the supplied
 hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at
 base_ref.ledger_head, and passes 726248a5 validation}, expected {disposition: ALLOW},
@@ -18,8 +18,13 @@ in-repo reference sv_work_items.verify_admission_hb_epoch:
     {ledger_head, field: $.hb_reference.epoch} at that head, or a sealed hb_epoch the
     shared rule 726248a5 refuses (absent, non-integer, < 32, derived_from_clock not
     exactly false);
-  DENY HB_EPOCH_MISMATCH: the supplied hb_epoch fails 726248a5 or is not ASCII digits
-    equal by integer value to the sealed epoch;
+  FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED (ruling 15:59Z/16:03Z; P1 ae8b105d): the
+    supplied hb_epoch, as the epoch source (the record's hb_epoch; absent reads as null), is
+    null, "", "null" or UNKNOWN_NOT_AUTHENTICALLY_OBSERVED -- checked before 726248a5;
+  ALLOW with cross_checked false: the optional cross-check is left out
+    (HB_EPOCH_NOT_CROSS_CHECKED; the CLI without --supplied-hb-epoch);
+  DENY HB_EPOCH_MISMATCH: any other supplied hb_epoch that fails 726248a5, or a valid
+    one not equal by integer value to the sealed epoch ('01024' equals 1024);
   ALLOW otherwise.
 Every non-ALLOW carries the six fields (owning_existing_goal StegVerse-org/.github#162).
 There is no fallback to a supplied constant or to a clock; no epoch is minted.
@@ -45,12 +50,30 @@ READBACK_PR = "StegVerse-Labs/.github#3266"
 READBACK_PIN_COMMIT = "641f4b03e612d07047e15f2384d24780e2af86c0"
 READBACK_COMPONENT_FILE = "resident-runtime/sv_change_base_state_readback.py"
 READBACK_COMPONENT_BLOB = "fbd453e531fc8d8f62261d2a72bc7a596798a445"
-# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 7d940851): the
+# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 ae8b105d): the
 # readback's hb_epoch slot counts only with hb_epoch_source {ledger_head: base_ref.ledger_head, field:
 # HB_EPOCH_SOURCE_FIELD}. #3266 at 641f4b03 seals hb_epoch with hb_epoch_source {ledger_head, receipt, field} (both
 # null on every FAIL_CLOSED); its 78a0c78e head sealed none (unobserved).
 HB_EPOCH_SOURCE_FIELD = "$.hb_reference.epoch"
 CHECK_ID = "supplied-epoch-binder-check"
+# The canonical rule: P1's sv_work_items.verify_admission_hb_epoch, in this blob at this commit (CI fetches and compares;
+# tests/s1_binder_parity.py runs every case against it).
+P1_REFERENCE = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "ae8b105d7504565665bf6918367517ffdcb481fd",
+                "file": "resident-runtime/sv_work_items.py", "function": "verify_admission_hb_epoch",
+                "blob_sha": "446889c5114c416f34ee4ceadd5c3492c821df50"}
+UNOBSERVED_SENTINEL = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+# P1 sv_work_items.SUPPLIED_EPOCH_UNOBSERVED_VALUES (Labs#3264 ae8b105d): checked before 726248a5.
+SUPPLIED_EPOCH_UNOBSERVED_VALUES = (None, "", "null", UNOBSERVED_SENTINEL)
+READBACK_RECEIPT_PATH = re.compile(r"^receipts/[0-9a-f]{64}\.json$")  # P1 READBACK_RECEIPT_PATH
+
+
+class _NotCrossChecked:
+    """P1's HB_EPOCH_NOT_CROSS_CHECKED: an optional cross-check left out (the sealed epoch stands)."""
+    def __repr__(self) -> str:
+        return "HB_EPOCH_NOT_CROSS_CHECKED"
+
+
+HB_EPOCH_NOT_CROSS_CHECKED = _NotCrossChecked()
 INVARIANT = "ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH"
 OWNING_EXISTING_GOAL = "StegVerse-org/.github#162"
 SOURCE_RETRY = (READBACK_PR + " " + READBACK_COMPONENT_FILE + "::evaluate (Lane C's sealed base-state readback of "
@@ -140,7 +163,10 @@ def readback_epoch(receipt: Any, ledger_head: Any) -> tuple[str | None, dict[str
         return None, unobserved("not a " + READBACK_SCHEMA + " receipt")
     if not isinstance(receipt.get("result_sha256"), str) or seal(receipt)["result_sha256"] != receipt["result_sha256"]:
         return None, unobserved("the readback receipt does not verify against its own body (result_sha256)")
-    if receipt.get("disposition") != "ALLOW":
+    # #3266 @641f4b03: the epoch is observed (and sealed) on ALLOW and on DENY HB_EPOCH_MISMATCH (only the producer's
+    # --hb-epoch cross-check disagreed); on every FAIL_CLOSED both slots are null.
+    if not (receipt.get("disposition") == "ALLOW"
+            or (receipt.get("disposition") == "DENY" and receipt.get("failure_code") == "HB_EPOCH_MISMATCH")):
         return None, unobserved("the readback receipt is %s %s, not ALLOW" % (receipt.get("disposition"),
                                                                               receipt.get("failure_code")))
     if receipt.get("fixture_only") is True:
@@ -154,6 +180,8 @@ def readback_epoch(receipt: Any, ledger_head: Any) -> tuple[str | None, dict[str
             or source.get("field") != HB_EPOCH_SOURCE_FIELD:
         return None, unobserved("no hb_epoch_source naming " + HB_EPOCH_SOURCE_FIELD + " at the bound head (the "
                                 "readback's hb_epoch slot is " + json.dumps(receipt.get("hb_epoch")) + ")")
+    if not (isinstance(source.get("receipt"), str) and READBACK_RECEIPT_PATH.match(source["receipt"])):
+        return None, unobserved("hb_epoch_source.receipt is not the head receipt's ledger path receipts/<hex>.json")
     failure = supplied_epoch_failure(receipt.get("hb_epoch"), source)
     if receipt.get("hb_epoch") is None or failure is not None:
         return None, unobserved("the sealed hb_epoch slot fails the shared supplied-epoch rule: "
@@ -164,12 +192,26 @@ def readback_epoch(receipt: Any, ledger_head: Any) -> tuple[str | None, dict[str
 def binder_check(supplied: Any, receipt: Any, ledger_head: Any) -> dict[str, Any]:
     """The supplied-epoch-binder-check built-in: ALLOW, FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED or DENY HB_EPOCH_MISMATCH."""
     result: dict[str, Any] = {"schema": RESULT_SCHEMA, "check_id": CHECK_ID, "invariant": INVARIANT,
-                              "ledger_head": ledger_head, "supplied_hb_epoch": supplied, "readback_hb_epoch": None,
+                              "ledger_head": ledger_head, "readback_hb_epoch": None,
+                              "supplied_hb_epoch": None if supplied is HB_EPOCH_NOT_CROSS_CHECKED else supplied,
+                              "cross_checked": supplied is not HB_EPOCH_NOT_CROSS_CHECKED,
                               "readback_result_sha256": receipt.get("result_sha256") if isinstance(receipt, dict) else None}
     epoch, refusal = readback_epoch(receipt, ledger_head)
     if refusal is not None:
         return {**result, **refusal}
     result["readback_hb_epoch"] = epoch
+    if supplied is HB_EPOCH_NOT_CROSS_CHECKED:  # the optional cross-check left out: the sealed epoch stands
+        return {**result, "disposition": "ALLOW"}
+    if any(supplied is v if v is None else (isinstance(supplied, str) and supplied == v)
+           for v in SUPPLIED_EPOCH_UNOBSERVED_VALUES):
+        # Ruling 15:59Z / 16:03Z (P1 ae8b105d): absent, null, "", "null" and the sentinel are unobserved, checked
+        # before 726248a5: FAIL_CLOSED, never DENY.
+        return {**result, "disposition": "FAIL_CLOSED", "detail": "supplied " + json.dumps(supplied), **six(
+            "HB_EPOCH_SOURCE_UNOBSERVED", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH",
+            "the SV_CHANGE carries a supplied hb_epoch (ASCII digits, 726248a5) equal to the sealed epoch " + epoch
+            + " at base_ref.ledger_head " + str(ledger_head) + "; absent, null, \"\", \"null\" and "
+            + UNOBSERVED_SENTINEL + " are unobserved",
+            "after the SV_CHANGE is re-derived carrying the observed epoch " + epoch + "; nothing was admitted")}
     failure = supplied_epoch_failure(supplied)
     if failure is not None or not (isinstance(supplied, str) and re.fullmatch(r"[0-9]+", supplied)
                                    and int(supplied) == int(epoch)):
@@ -188,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--readback", type=Path, required=True, help="sealed " + READBACK_SCHEMA + " receipt (JSON)")
     parser.add_argument("--ledger-head", required=True, help="the SV_CHANGE's base_ref.ledger_head")
-    parser.add_argument("--supplied-hb-epoch", default=None, help="omitted -> HB_EPOCH_NOT_SUPPLIED")
+    parser.add_argument("--supplied-hb-epoch", default=HB_EPOCH_NOT_CROSS_CHECKED,
+                        help="the cross-check; omitted -> ALLOW on the sealed epoch with cross_checked false")
     args = parser.parse_args(argv)
     try:
         receipt: Any = json.loads(args.readback.read_bytes().decode("utf-8"))

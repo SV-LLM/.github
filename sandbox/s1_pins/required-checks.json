@@ -126,7 +126,7 @@
       },
       "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
       "offline_command": {
-        "predicate": "the supplied hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at base_ref.ledger_head, and passes 726248a5 validation",
+        "predicate": "the readback receipt sealed by Labs#3266 at base_ref.ledger_head carries an observed epoch (else FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED); the SV_CHANGE's hb_epoch that is absent, null, \"\", \"null\" or UNKNOWN_NOT_AUTHENTICALLY_OBSERVED is FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED (checked before 726248a5); any other value must pass 726248a5 validation and equal the sealed epoch by integer value (else DENY HB_EPOCH_MISMATCH)",
         "verifier_builtin": "supplied-epoch-binder-check",
         "verifier_ref": "SV-LLM/.github#46"
       },
@@ -138,6 +138,7 @@
           "kind": "sha256 of a function source segment (not a git object)",
           "lines_at_fc19b532": "236-269",
           "path": "org-kernel/kernel.py",
+          "precedence": "UNKNOWN precedence (contract invariant, orchestrator 2026-10-18T15:59Z, narrowed 16:03Z): before 726248a5 is applied, a supplied hb_epoch that is the epoch source (an SV_CHANGE record's hb_epoch; an absent field reads as null) and is JSON null, \"\", \"null\" or the literal UNKNOWN_NOT_AUTHENTICALLY_OBSERVED is FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED (UNKNOWN is FAIL_CLOSED, never DENY). An optional cross-check that is left out (sv_work_items.HB_EPOCH_NOT_CROSS_CHECKED) is not a failure: the sealed epoch stands. Here the verifier deliberately diverges from kernel.py::supplied_epoch_failure, which alone would return HB_EPOCH_NOT_SUPPLIED for null and HB_EPOCH_INVALID (malformed, DENY here) for \"\", \"null\" and the sentinel. The pin is unchanged: it still describes the rule applied to every other supplied value and to the sealed slot.",
           "repository": "StegVerse-Labs/.github",
           "segment_rule": "sha256 of the text from 'def supplied_epoch_failure' to the next top-level 'def', trailing whitespace stripped (SV-LLM/.github#46 tests/test_s1_hop_head_verifier.py; Labs#3266 hashes the ast source segment, same digest)",
           "sha256": "726248a585904b52cfe2eec1754e7ce582f67d6b501bd664bb7bee80bce9b7ef"

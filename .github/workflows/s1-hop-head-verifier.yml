@@ -60,15 +60,17 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_sv_check_receipts.py
           python3 -B tests/test_s1_sv_check_receipts.py -v
-      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at 7d940851; vendored P1 segments are its bytes
+      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at ae8b105d; vendored P1 segments are its bytes
         run: |
           set -euo pipefail
-          pin=7d940851034697c019684ec073ea676f27d7ac37
+          pin=ae8b105d7504565665bf6918367517ffdcb481fd
           git init -q "$RUNNER_TEMP/labs"
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 424050129f4ddfa7e14aac61c68c7037f075a709
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
           test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = 070f13f468558ca08aa5162a8f34431608fc1404
-          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = 424050129f4ddfa7e14aac61c68c7037f075a709
+          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:resident-runtime/sv_work_items.py")" = 446889c5114c416f34ee4ceadd5c3492c821df50
+          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_supplied_epoch_binder as eb, s1_sv_check_receipts as m; assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"].startswith("446889c5")' 
           test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = 070f13f468558ca08aa5162a8f34431608fc1404
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
           python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
@@ -109,7 +111,7 @@ jobs:
       - name: Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin
         run: |
           set -euo pipefail
-          pin=7d940851034697c019684ec073ea676f27d7ac37
+          pin=ae8b105d7504565665bf6918367517ffdcb481fd
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > /dev/null
           rm -rf "$RUNNER_TEMP/p1" && mkdir -p "$RUNNER_TEMP/p1"
           git -C "$RUNNER_TEMP/labs" archive "$pin" | tar -x -C "$RUNNER_TEMP/p1"

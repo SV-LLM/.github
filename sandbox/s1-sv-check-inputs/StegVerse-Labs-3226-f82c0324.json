@@ -5,15 +5,15 @@
   "head_sha": "f82c0324aa4b6ac74adc44a3541ac98b33826447",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
+    "commit": "ae8b105d7504565665bf6918367517ffdcb481fd",
     "file": "data/sv-work-items/required-checks.json",
-    "blob_sha": "424050129f4ddfa7e14aac61c68c7037f075a709",
+    "blob_sha": "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d",
     "receipt_schema_blob_sha": "070f13f468558ca08aa5162a8f34431608fc1404",
     "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
   },
   "sv_change": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "7d940851034697c019684ec073ea676f27d7ac37",
+    "commit": "ae8b105d7504565665bf6918367517ffdcb481fd",
     "file": "data/sv-work-items/migration/sv-changes.jsonl",
     "change_id": "svc:4c217bcf70d2761371703408ea2be8861b9d31e716dfa266f15f4068dcc1c912"
   },
