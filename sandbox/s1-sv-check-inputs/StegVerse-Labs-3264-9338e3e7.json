@@ -3,12 +3,11 @@
   "type": "SV_CHANGE",
   "repository": "StegVerse-Labs/.github",
   "head_sha": "9338e3e7f84b22fb9ddc3f55bf50c28561db111e",
-  "hb_epoch": "4000",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "9338e3e7f84b22fb9ddc3f55bf50c28561db111e",
+    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
     "file": "data/sv-work-items/required-checks.json",
-    "blob_sha": "6a07ee8c7322814623508fb640d7f8aac9a0efba",
+    "blob_sha": "424050129f4ddfa7e14aac61c68c7037f075a709",
     "receipt_schema_blob_sha": "070f13f468558ca08aa5162a8f34431608fc1404",
     "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
   },
@@ -21,5 +20,9 @@
     "file": "sandbox/s1-sv-changes/StegVerse-Labs-3264-9338e3e7.json",
     "sha256": "sha256:90ea279764eaa8e18c4c1cd640dde181d4c9ea24aefbc747b02929c1807dae6f",
     "change_id": "svc:f5dccea8be984c915b8866bf978d672d9eb4556820c532aa0a0e3de1895db667"
+  },
+  "hb_epoch_readback": {
+    "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json",
+    "sha256": "sha256:e97a9996d2748fbeece910787ec2127d19463d1cbc06ef8f222dfe514ef89356"
   }
 }

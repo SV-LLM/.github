@@ -1,12 +1,13 @@
 {
   "check_command_rule": {
     "command_absent_at_head": "any command_path absent at the head being verified -> FAIL_CLOSED CHECK_COMMAND_ABSENT_AT_HEAD (CHECK_COMMAND_PATHS_PRESENT_AT_HEAD); the state of older heads such as StegVerse-Labs/.github#3225 (e6ba9601) and #3226 (f82c0324) for schema-validate, unit-tests and mutation-negative-suite",
-    "command_undeclared": "offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED -> FAIL_CLOSED CHECK_COMMAND_UNDECLARED (CHECK_HAS_OFFLINE_COMMAND); the check's receipt can never be minted",
+    "command_undeclared": "offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED (or anything that is neither a non-empty argv nor a verifier built-in) -> FAIL_CLOSED CHECK_COMMAND_UNDECLARED (CHECK_HAS_OFFLINE_COMMAND); the only acceptable receipt for such a check is the verifier's FAIL_CLOSED CHECK_COMMAND_UNDECLARED with the six fields (generic; no check in this row is in that state)",
     "evaluator": "resident-runtime/sv_work_items.py::check_command, check_outcome_matches (pure over supplied paths and outputs)",
-    "pass_criteria_live_in_the_row": "A head never declares its own pass criteria; it binds them through required_checks_ref.blob_sha. The NWI-S1 verifier runs offline_command from the repo root at the exact head with no network (argv; placeholders only from argument_bindings) and compares the outcome with expected (exit_code; stdout_json_subset keys must equal; stderr_last_line must equal)."
+    "pass_criteria_live_in_the_row": "A head never declares its own pass criteria; it binds them through required_checks_ref.blob_sha. The NWI-S1 verifier runs offline_command from the repo root at the exact head with no network (argv; placeholders only from argument_bindings) and compares the outcome with expected (exit_code; stdout_json_subset keys must equal; stderr_last_line must equal).",
+    "verifier_builtin": "offline_command {verifier_builtin, verifier_ref, predicate} (all non-empty strings; verifier_builtin = the check id) names a command built into the NWI-S1 verifier at verifier_ref, not a script in this repo. command_paths is [] and CHECK_COMMAND_ABSENT_AT_HEAD does not apply; expected is the verifier's own outcome ({disposition: ALLOW}). sv_work_items.verifier_builtin / command_declared / check_command."
   },
   "check_derived_issue_rule": {
-    "derivation": "resident-runtime/sv_work_items.py::derive_issue_from_check_receipt(receipt_bytes, ledger_ref, row, observed_base=...)",
+    "derivation": "resident-runtime/sv_work_items.py::derive_issue_from_check_receipt(ledger_objects, ledger_ref, row, observed_base=...)",
     "failed_predicate": "the check receipt's failed_predicate",
     "invariant_id": "CHECK_DERIVED_ISSUES_ARE_DERIVED_FROM_THE_LEDGERED_FAILING_RECEIPT",
     "not_ledgered": "FAIL_CLOSED SOURCE_RECEIPT_NOT_LEDGERED: before the org writer appends the receipt the issue cannot be NATIVE",
@@ -14,8 +15,8 @@
     "owning_goal": "this row's owning_goal",
     "resolution_class": "B",
     "resolution_class_rule": "a check-derived issue is resolved only through merge admission of an SV_CHANGE that cites it in resolves (class B, as in the P1 FAIL_CLOSED register)",
-    "source_receipt_ref": "the org-ledger ref of the appended receipt: refs/stegverse/organization-ledger@<commit>:receipts/<receipt_sha256 hex>.json @ receipt_sha256",
-    "surface": "the check's command surface (sv_work_items.check_command_surface: argv[1], the unittest module file, or this row file when the command is undeclared)",
+    "source_receipt_ref": "the org-ledger ref of the organization-transition receipt whose repo receipt carries the check receipt as $.evidence: refs/stegverse/organization-ledger@<commit>:receipts/<receipt_sha256 hex>.json @ receipt_sha256",
+    "surface": "the check's command surface (sv_work_items.check_command_surface: argv[1], the unittest module file, or this row file when the command is undeclared or a verifier built-in)",
     "violated_invariant": "{repository, file} = row_file, rule_id = row_id + '#checks.' + check_id"
   },
   "check_receipt_invariant": {
@@ -120,19 +121,28 @@
     "supplied-epoch-binder-check": {
       "appender": "org-ledger-writer (Labs#3255)",
       "command_paths": [],
-      "command_status": {
-        "disposition": "FAIL_CLOSED",
-        "failed_predicate": "CHECK_HAS_OFFLINE_COMMAND",
-        "failure_code": "CHECK_COMMAND_UNDECLARED",
-        "next_attempt": "after such a command exists in this repo and is declared in this row; until then every ledger_writer change fails closed on this check",
-        "owning_existing_goal": "StegVerse-org/.github#163",
-        "receipt_rule": "the verifier's only acceptable receipt for this check is FAIL_CLOSED CHECK_COMMAND_UNDECLARED with the six fields; validate_check_receipt refuses an ALLOW (or any other outcome) for it, and admission fails closed CHECK_COMMAND_UNDECLARED",
-        "required_evidence_or_repair": "an offline command in StegVerse-Labs/.github that performs the supplied-epoch binder check (the StegVerse-org/.github#189 189-binder-check rows), declared here with offline_command, expected and command_paths; nothing in this repo performs it at d2ba0957",
-        "retry_entrypoint": "data/sv-work-items/required-checks.json#checks.supplied-epoch-binder-check (resident-runtime/sv_work_items.py::check_command)"
+      "expected": {
+        "disposition": "ALLOW"
       },
-      "expected": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED",
       "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
-      "offline_command": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+      "offline_command": {
+        "predicate": "the supplied hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at base_ref.ledger_head, and passes 726248a5 validation",
+        "verifier_builtin": "supplied-epoch-binder-check",
+        "verifier_ref": "SV-LLM/.github#46"
+      },
+      "predicate_pins": {
+        "726248a5": {
+          "file_blob_at_fc19b532": "ffec5d648d7fa4aead1f44f76df936a2da21bb96",
+          "function": "supplied_epoch_failure",
+          "in_repo_reference": "resident-runtime/sv_work_items.py::verify_admission_hb_epoch (KERNEL_RULE_SHA256 must equal SUPPLIED_EPOCH_RULE_SHA256)",
+          "kind": "sha256 of a function source segment (not a git object)",
+          "lines_at_fc19b532": "236-269",
+          "path": "org-kernel/kernel.py",
+          "repository": "StegVerse-Labs/.github",
+          "segment_rule": "sha256 of the text from 'def supplied_epoch_failure' to the next top-level 'def', trailing whitespace stripped (SV-LLM/.github#46 tests/test_s1_hop_head_verifier.py; Labs#3266 hashes the ast source segment, same digest)",
+          "sha256": "726248a585904b52cfe2eec1754e7ce582f67d6b501bd664bb7bee80bce9b7ef"
+        }
+      }
     },
     "unit-tests": {
       "appender": "org-ledger-writer (Labs#3255)",
@@ -201,7 +211,7 @@
     "failed_predicate": "REQUIRED_CHECK_HAS_LEDGER_RECEIPT",
     "failure_code": "CHECK_RECEIPT_ABSENT_FROM_LEDGER",
     "holds_until": "an appended LEDGER_RECEIPT exists for every check id in this row (sv_work_items.row_receipt_status)",
-    "next_attempt": "after StegVerse-Labs/.github#3255 and SV-LLM/.github#46 land and JD-P4-3 settles the epoch",
+    "next_attempt": "after StegVerse-Labs/.github#3255, the Labs#3266 base-state readback epoch slot (JD-P4-3, part-decided: the epoch is read, never minted) and SV-LLM/.github#46 with the supplied-epoch-binder-check built in land",
     "owning_existing_goal": "StegVerse-org/.github#163",
     "required_evidence_or_repair": "NWI-S1 verifier emits the check id at the exact head and the org writer appends it",
     "retry_entrypoint": "the merge-admission evaluation (resident-runtime/sv_work_items.py::evaluate_admission)"
@@ -213,6 +223,7 @@
     "all": {
       "checks": [
         "schema-validate",
+        "supplied-epoch-binder-check",
         "unit-tests"
       ],
       "signoffs": []
@@ -223,7 +234,6 @@
     },
     "ledger_writer": {
       "checks": [
-        "supplied-epoch-binder-check",
         "mutation-negative-suite"
       ],
       "signoffs": [

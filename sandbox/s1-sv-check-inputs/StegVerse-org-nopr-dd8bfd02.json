@@ -3,19 +3,19 @@
   "type": "SV_CHANGE",
   "repository": "StegVerse-org/.github",
   "head_sha": "dd8bfd027ca11f8c2c48d505d901d153cb0c8601",
-  "hb_epoch": "4000",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "9338e3e7f84b22fb9ddc3f55bf50c28561db111e",
+    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
     "file": "data/sv-work-items/required-checks.json",
-    "blob_sha": "6a07ee8c7322814623508fb640d7f8aac9a0efba",
+    "blob_sha": "424050129f4ddfa7e14aac61c68c7037f075a709",
     "receipt_schema_blob_sha": "070f13f468558ca08aa5162a8f34431608fc1404",
     "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
   },
   "sv_change": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "9338e3e7f84b22fb9ddc3f55bf50c28561db111e",
+    "commit": "ba0385113f1fd0e155195269f72d5b91c835fa70",
     "file": "data/sv-work-items/migration/sv-changes.jsonl",
     "change_id": "svc:dd6acf613fd9001dd369cb3ef9428a9f216edec28cb05af0de9305c366281be0"
-  }
+  },
+  "hb_epoch_readback": null
 }

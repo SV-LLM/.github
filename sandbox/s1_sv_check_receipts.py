@@ -8,8 +8,8 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head 9338e3e7; tests fail on drift):
-data/sv-work-items/required-checks.json blob 6a07ee8c (row
+Pins (StegVerse-Labs/.github#3264 head ba038511; tests fail on drift):
+data/sv-work-items/required-checks.json blob 42405012 (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
 070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
 at that commit and blob; nothing is fetched.
@@ -29,7 +29,11 @@ check_outcome_matches, command_paths, and argument_bindings. The one binding the
 verifier supplies is {base_commit}: the input's base_commit.sha (the merge-base
 of the head with the target main, computed in the local clone; it must be an
 ancestor of the head there, never fetched) -- recorded in the bundle, because
-the pinned receipt schema has no field for it. No per-head pass criteria are
+the pinned receipt schema has no field for it. A row offline_command
+{verifier_builtin, verifier_ref SV-LLM/.github#46, predicate} with command_paths []
+is dispatched on verifier_builtin to this verifier's own implementation
+(supplied-epoch-binder-check: sandbox/s1_supplied_epoch_binder.py::binder_check;
+its disposition is the receipt's: ALLOW, or DENY HB_EPOCH_MISMATCH). No per-head pass criteria are
 accepted: the head's .sv/required-checks.json is not read for an SV_CHANGE head.
 offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED (or none) is a FAIL_CLOSED
 CHECK_COMMAND_UNDECLARED receipt carrying the row's command_status six fields --
@@ -42,7 +46,12 @@ expected stands), as is a run that does not complete; clean and as expected is A
 
 Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
 (== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
-(supplied ASCII digits >= 32; no clock), verifier_ref, and the six fields on
+(ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: the epoch Lane C's readback,
+StegVerse-Labs/.github#3266 78a0c78e, sealed at the record's base_ref.ledger_head,
+read from the input's hb_epoch_readback {file, sha256}; the input carries no
+hb_epoch, and an unobserved source is a bundle-level FAIL_CLOSED
+HB_EPOCH_SOURCE_UNOBSERVED with no receipts -- never a supplied constant or a
+clock), verifier_ref, and the six fields on
 any non-ALLOW. Every receipt is validated against the pinned schema before it
 is written. `check` re-verifies a receipt against its head: an id outside the
 row is CHECK_ID_UNDECLARED; a change_digest that is not the head's is
@@ -66,6 +75,7 @@ from typing import Any, Iterable, Mapping
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import s1_required_checks_verifier as rc  # noqa: E402
+import s1_supplied_epoch_binder as eb  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 RECEIPT_SCHEMA = "stegverse.sv_check_receipt.v1"
@@ -78,8 +88,8 @@ ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
 LOCAL_REPOSITORY = "SV-LLM/.github"
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "9338e3e7f84b22fb9ddc3f55bf50c28561db111e"
-ROW_BLOB = "6a07ee8c7322814623508fb640d7f8aac9a0efba"
+PIN_COMMIT = "ba0385113f1fd0e155195269f72d5b91c835fa70"
+ROW_BLOB = "424050129f4ddfa7e14aac61c68c7037f075a709"
 RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
@@ -192,7 +202,8 @@ def change_digest(rec: Mapping[str, Any]) -> str:
 
 
 def verifier_files() -> dict[str, str]:
-    files = {"s1_sv_check_receipts.py": "sha256:" + sha256_hex((HERE / "s1_sv_check_receipts.py").read_bytes())}
+    files = {name: "sha256:" + sha256_hex((HERE / name).read_bytes())
+             for name in ("s1_sv_check_receipts.py", "s1_supplied_epoch_binder.py")}
     files.update(rc.verifier_files())
     return files
 
@@ -250,6 +261,14 @@ class Global(Exception):
         self.disposition, self.detail = disposition, detail
         self.fields = six(code, predicate, repair, next_attempt)
 
+    @classmethod
+    def of(cls, refusal: Mapping[str, Any]) -> "Global":
+        """A refusal that already carries its own disposition and six fields (the binder's)."""
+        g = cls(refusal["failure_code"], refusal["failed_predicate"], "", "", str(refusal.get("detail")),
+                refusal["disposition"])
+        g.fields = {k: refusal[k] for k in SIX_FIELDS}
+        return g
+
 
 def six(code: str, predicate: str, repair: str, next_attempt: str) -> dict[str, str]:
     return {"failure_code": code, "failed_predicate": predicate, "required_evidence_or_repair": repair,
@@ -280,7 +299,7 @@ def read_at(checkout: Path | None, commit: str, path: str) -> tuple[bytes, str] 
 def validate_input(document: Any) -> dict[str, Any]:
     def bad(detail: str) -> Global:
         return Global("S1_INPUT_NOT_A_DECLARED_SV_CHANGE", "S1_INPUT_DECLARES_ONE_SV_CHANGE_HEAD",
-                      "an input with schema " + INPUT_SCHEMA + ", type SV_CHANGE, repository, head_sha, hb_epoch, "
+                      "an input with schema " + INPUT_SCHEMA + ", type SV_CHANGE, repository, head_sha, hb_epoch_readback, "
                       "required_checks_row {repository, commit, file, blob_sha, receipt_schema_blob_sha, row_id} and "
                       "sv_change {repository, commit, file, change_id}", "re-run with the corrected input", detail)
     if not isinstance(document, dict) or document.get("schema") != INPUT_SCHEMA or document.get("type") != "SV_CHANGE":
@@ -301,6 +320,14 @@ def validate_input(document: Any) -> dict[str, Any]:
                                and SAFE_PATH.match(source["file"]))) \
             or (not local and not (isinstance(source.get("commit"), str) and rc.HEX40.match(source["commit"]))):
         raise bad("sv_change")
+    if "hb_epoch" in document:  # ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: never a supplied constant
+        raise bad("hb_epoch is not an input: the receipt epoch is the one Labs#3266's readback sealed")
+    readback = document.get("hb_epoch_readback", "absent")
+    if readback is not None and not (isinstance(readback, dict) and set(readback) == {"file", "sha256"}
+                                     and isinstance(readback["file"], str)
+                                     and (SAFE_PATH.match(readback["file"]) or Path(readback["file"]).is_absolute())
+                                     and isinstance(readback["sha256"], str) and SHA256_REF.match(readback["sha256"])):
+        raise bad("hb_epoch_readback")
     base = document.get("base_commit")
     if base is not None and not (isinstance(base, dict) and set(base) == {"sha", "basis"}
                                  and isinstance(base["sha"], str) and rc.HEX40.match(base["sha"])
@@ -371,8 +398,35 @@ def load_change(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any
     return matches[0]
 
 
+def load_readback(spec: Mapping[str, Any] | None) -> Any:
+    """The sealed Labs#3266 base-state readback the input names (a file in this repository bound by sha256), or None."""
+    if spec is None:
+        return None
+    path = Path(spec["file"])
+    try:
+        data = (path if path.is_absolute() else HERE.parent / path).read_bytes()
+    except OSError:
+        return None
+    if "sha256:" + sha256_hex(data) != spec["sha256"]:
+        return None
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        return None
+
+
+def sealed_epoch(document: Mapping[str, Any], change: Mapping[str, Any]) -> tuple[str, Any, Any]:
+    """(epoch, readback, ledger_head): the receipt epoch, read from the sealed readback at base_ref.ledger_head."""
+    readback = load_readback(document.get("hb_epoch_readback"))
+    ledger_head = (change.get("base_ref") or {}).get("ledger_head") if isinstance(change.get("base_ref"), Mapping) else None
+    epoch, refusal = eb.readback_epoch(readback, ledger_head)
+    if refusal is not None:
+        raise Global.of(refusal)
+    return epoch, readback, ledger_head
+
+
 def check_receipt(body: Any, change: Mapping[str, Any], row: Mapping[str, Any],
-                  schema: Mapping[str, Any]) -> dict[str, Any]:
+                  schema: Mapping[str, Any], sealed: str | None = None) -> dict[str, Any]:
     """Re-verify one receipt against its head: ALLOW, or a six-field FAIL_CLOSED."""
     head_digest = (change.get("head") or {}).get("change_digest")
     head_sha = (change.get("projection") or {}).get("head_sha")
@@ -393,6 +447,10 @@ def check_receipt(body: Any, change: Mapping[str, Any], row: Mapping[str, Any],
     failure = supplied_epoch_failure(epoch) if isinstance(epoch, str) or epoch is None else ("HB_EPOCH_INVALID", "not text")
     if failure is not None:
         return refuse(failure[0], HB_EPOCH_PREDICATE, "hb_epoch as supplied ASCII digits >= 32")
+    if sealed is not None and epoch != sealed:
+        return {"disposition": "DENY", **six("HB_EPOCH_MISMATCH", eb.INVARIANT,
+                                             "a receipt whose hb_epoch is the sealed readback epoch " + sealed,
+                                             "re-mint the receipt at the exact head")}
     errors = schema_errors(body, schema)
     if errors:
         return refuse("SV_CHECK_RECEIPT_INVALID", "RECEIPT_VALIDATES_AGAINST_THE_PINNED_SCHEMA", "; ".join(errors))
@@ -404,6 +462,28 @@ BASE_COMMIT_ARGUMENT = "{base_commit}"  # the only verifier-supplied binding: in
 SAFE_PATH = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\0]+$")
 
 
+BUILTINS = {eb.CHECK_ID: lambda change, readback, ledger_head: eb.binder_check(change.get("hb_epoch"), readback,
+                                                                             ledger_head)}
+BUILTIN_REF = "SV-LLM/.github#46"
+
+
+def verifier_builtin(check_id: str, entry: Any) -> str | None:
+    """P1's verifier_builtin/command_declared: offline_command {verifier_builtin, verifier_ref, predicate} (non-empty
+    strings, the name is the check id), command_paths [], here also expected {disposition}, verifier_ref this PR and a
+    name this verifier implements; else None (and command_declaration says why it is undeclared)."""
+    if not isinstance(entry, Mapping):
+        return None
+    oc = entry.get("offline_command")
+    if isinstance(oc, Mapping) and all(isinstance(oc.get(k), str) and oc[k] for k in
+                                       ("verifier_builtin", "verifier_ref", "predicate")) \
+            and entry.get("command_paths") == [] and oc["verifier_builtin"] == check_id \
+            and oc["verifier_ref"] == BUILTIN_REF and check_id in BUILTINS \
+            and isinstance(entry.get("expected"), Mapping) and set(entry["expected"]) == {"disposition"} \
+            and entry["expected"]["disposition"] in DISPOSITIONS:
+        return check_id
+    return None
+
+
 def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str], dict[str, str]] | str:
     """The row's own command for one check id, read verbatim; a string says why it is undeclared."""
     if not isinstance(entry, Mapping) or "offline_command" not in entry:
@@ -412,6 +492,8 @@ def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str
     bindings = entry.get("argument_bindings") or {}
     if argv == UNDECLARED_COMMAND:
         return "offline_command is " + UNDECLARED_COMMAND
+    if isinstance(argv, Mapping):
+        return "offline_command is a verifier built-in this verifier does not implement as declared"
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
         return "offline_command is not a non-empty argv list"
     if not isinstance(expected, Mapping) or type(expected.get("exit_code")) is not int \
@@ -537,8 +619,9 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                          "re-run with a readable input", type(exc).__name__) from None
         bundle["input_sha256"] = "sha256:" + sha256_hex(raw)
         document = validate_input(document)
-        head, epoch = document["head_sha"], document.get("hb_epoch")
-        bundle.update(repository=document["repository"], head_sha=head, hb_epoch=epoch)
+        head = document["head_sha"]
+        bundle.update(repository=document["repository"], head_sha=head, hb_epoch=None,
+                      hb_epoch_readback=document.get("hb_epoch_readback"))
         labs = dependencies.get(ROW_DEPENDENCY)
         row, row_digest = load_row(document["required_checks_row"], labs)
         bundle["row"] = {**document["required_checks_row"], "sha256": row_digest, "row_check_ids": row_ids(row)}
@@ -548,11 +631,15 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         surface_required, _signoffs = required_for(change.get("touched_paths") or [], row)
         bundle["required_check_ids"] = surface_required
         bundle["touched_surface_kinds"] = sorted({surface_kind(p) for p in change.get("touched_paths") or []})
-        failure = supplied_epoch_failure(epoch) if isinstance(epoch, str) or epoch is None \
-            else ("HB_EPOCH_INVALID", "hb_epoch is not supplied text")
-        if failure is not None:  # no schema-valid receipt carries an unsupplied epoch: the bundle is the refusal
-            raise Global(failure[0], HB_EPOCH_PREDICATE, "hb_epoch in the input as ASCII digits >= 32; no clock is read",
-                         "re-run with the supplied epoch", failure[1])
+        # ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: the receipt epoch is the one Labs#3266's readback sealed at
+        # base_ref.ledger_head; unobserved -> FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED and no schema-valid receipt can
+        # carry an epoch, so the bundle is the refusal. No supplied constant, no clock.
+        epoch, readback, ledger_head = sealed_epoch(document, change)
+        bundle.update(hb_epoch=epoch, hb_epoch_source={
+            "ledger_head": ledger_head, "readback_result_sha256": readback.get("result_sha256"),
+            "field": eb.HB_EPOCH_SOURCE_FIELD, "readback_component": {
+                "repository": eb.READBACK_REPOSITORY, "pr": eb.READBACK_PR, "commit": eb.READBACK_PIN_COMMIT,
+                "file": eb.READBACK_COMPONENT_FILE, "blob_sha": eb.READBACK_COMPONENT_BLOB}})
         change_d = (change.get("head") or {}).get("change_digest")
         recomputed = change_digest(change)
         bundle["change_digest"] = recomputed
@@ -593,6 +680,19 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         planned: list[tuple[str, list[str], dict[str, Any]]] = []
         for check_id in emit:
             entry = row["checks"].get(check_id)
+            builtin = verifier_builtin(check_id, entry)
+            if builtin is not None:  # built into this verifier: dispatched on verifier_builtin, nothing at the head runs
+                result = BUILTINS[builtin](change, readback, ledger_head)
+                ok = result["disposition"] == entry["expected"]["disposition"]
+                receipts[check_id] = receipt(check_id, result["disposition"], change_d, head, epoch,
+                                             None if ok else {k: result[k] for k in SIX_FIELDS})
+                bundle["checks"].append({"id": check_id, "kind": "verifier-builtin", "verifier_builtin": builtin,
+                                         "outcome": "AS_EXPECTED" if ok else "NOT_AS_EXPECTED",
+                                         "disposition": result["disposition"],
+                                         "failure_code": result.get("failure_code"),
+                                         "supplied_hb_epoch": result.get("supplied_hb_epoch"),
+                                         "readback_hb_epoch": result.get("readback_hb_epoch")})
+                continue
             declared = command_declaration(entry)
             if isinstance(declared, str):
                 receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, undeclared_fields(row, check_id))
@@ -653,7 +753,8 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         bundle.update(refusal.fields)
         for check_id in emit:
             # A check the row gives no command is CHECK_COMMAND_UNDECLARED whatever else failed (row receipt_rule).
-            undeclared = isinstance(command_declaration(row["checks"].get(check_id)), str)
+            undeclared = verifier_builtin(check_id, row["checks"].get(check_id)) is None \
+                and isinstance(command_declaration(row["checks"].get(check_id)), str)
             receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, undeclared_fields(row, check_id)) \
                 if undeclared else receipt(check_id, refusal.disposition, change_d, head, epoch, refusal.fields)
     finally:
@@ -697,7 +798,8 @@ def main(argv: list[str] | None = None) -> int:
             row, _ = load_row(document["required_checks_row"], labs)
             schema = load_schema(document["required_checks_row"], labs)
             change = load_change(document["sv_change"], labs)
-            result = check_receipt(json.loads(args.receipt.read_text()), change, row, schema)
+            sealed, _readback, _head = sealed_epoch(document, change)
+            result = check_receipt(json.loads(args.receipt.read_text()), change, row, schema, sealed)
         except Global as refusal:
             result = {"disposition": refusal.disposition, **refusal.fields}
         sys.stdout.buffer.write(render(result))
