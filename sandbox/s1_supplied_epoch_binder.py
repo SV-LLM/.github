@@ -1,33 +1,32 @@
 #!/usr/bin/env python3
-"""S1 supplied-epoch binder check: the supplied hb_epoch is the bound ledger head's sealed epoch.
+"""S1 supplied-epoch-binder-check: the verifier built-in for the P1 row's supplied-epoch-binder-check.
 
-StegVerse-org/.github#162 (NWI-S1), S1 home #163. Invariant
-ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: for admission, hb_epoch is the
-epoch on the organization-ledger head receipt the base is bound to, as sealed in
-Lane C's base-state readback (StegVerse-Labs/.github#3266,
-resident-runtime/sv_change_base_state_readback.py, schema
-stegverse.sv-change-base-state-readback/v1).
+StegVerse-org/.github#162 (NWI-S1), S1 home #163. The row (StegVerse-Labs/.github#3264
+ba038511, blob 42405012) declares offline_command {verifier_builtin:
+supplied-epoch-binder-check, verifier_ref: SV-LLM/.github#46, predicate: the supplied
+hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at
+base_ref.ledger_head, and passes 726248a5 validation}, expected {disposition: ALLOW},
+command_paths []. sandbox/s1_sv_check_receipts.py dispatches on verifier_builtin to
+binder_check here. Invariant ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH.
 
-`readback_epoch` reads that epoch from one sealed readback receipt: the receipt
-must carry the readback schema, its result_sha256 seal must verify (canon/seal
-vendored from #3266, segment sha256 pinned), its disposition must be ALLOW, and
-its bound_main_commit must be the base. The epoch is the receipt's
-READBACK_EPOCH_FIELD. The readback's own `hb_epoch` slot is the caller's supplied
-value (null when none) and is never read as the source. A receipt that is
-missing, unsealed, not ALLOW, bound to another base, or that seals no epoch is
-FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED; a sealed epoch the shared rule (726248a5)
-refuses is that rule's code. There is no fallback to a supplied constant or to a
-clock.
+The source is one sealed stegverse.sv-change-base-state-readback/v1 receipt from Lane
+C's StegVerse-Labs/.github#3266 (resident-runtime/sv_change_base_state_readback.py at
+78a0c78e, blob 2c369c8e; canon/seal vendored, segment sha256 pinned). It mirrors P1's
+in-repo reference sv_work_items.verify_admission_hb_epoch:
+  FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED: no readback, not that schema, broken seal,
+    not ALLOW, fixture_only, bound to another ledger head, no hb_epoch_source
+    {ledger_head, field: $.hb_reference.epoch} at that head, or a sealed hb_epoch the
+    shared rule 726248a5 refuses (absent, non-integer, < 32, derived_from_clock not
+    exactly false);
+  DENY HB_EPOCH_MISMATCH: the supplied hb_epoch fails 726248a5 or is not ASCII digits
+    equal by integer value to the sealed epoch;
+  ALLOW otherwise.
+Every non-ALLOW carries the six fields (owning_existing_goal StegVerse-org/.github#162).
+There is no fallback to a supplied constant or to a clock; no epoch is minted.
 
-`binder_check` then requires the supplied hb_epoch to pass the shared rule
-(HB_EPOCH_NOT_SUPPLIED / HB_EPOCH_INVALID otherwise) and to equal the readback
-epoch (HB_EPOCH_MISMATCH otherwise). Every non-ALLOW carries the six fields.
-
-CLI (the argv proposed for the P1 row's supplied-epoch-binder-check):
-  python3 <this script> --readback {base_state_readback} --bound-main-commit {base_commit}
-      --supplied-hb-epoch {supplied_hb_epoch}
-prints one canonical JSON object and exits 0 only on ALLOW. Stdlib only; reads
-no clock, opens no network connection, writes nothing.
+CLI: python3 sandbox/s1_supplied_epoch_binder.py --readback <receipt.json>
+--ledger-head <base_ref.ledger_head> [--supplied-hb-epoch <epoch>] prints one canonical
+JSON object; exit 0 only on ALLOW. Stdlib only; no clock, no network, writes nothing.
 """
 from __future__ import annotations
 
@@ -46,15 +45,18 @@ READBACK_PR = "StegVerse-Labs/.github#3266"
 READBACK_PIN_COMMIT = "78a0c78e1f1313bd11ff916b26a3ab467f2f54e2"
 READBACK_COMPONENT_FILE = "resident-runtime/sv_change_base_state_readback.py"
 READBACK_COMPONENT_BLOB = "2c369c8e6db39c6ef1e6a55e953f16a66bd36c77"
-# The sealed field naming the ledger head receipt's epoch. #3266 at 78a0c78e seals no such field (its hb_epoch is
-# the caller's supplied value), so every readback at that head is HB_EPOCH_SOURCE_UNOBSERVED.
-READBACK_EPOCH_FIELD = "ledger_head_hb_epoch"
+# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 ba038511): the
+# readback's hb_epoch slot counts only with hb_epoch_source {ledger_head: base_ref.ledger_head, field:
+# HB_EPOCH_SOURCE_FIELD}. #3266 at 78a0c78e seals no hb_epoch_source (its hb_epoch is the caller's value, null when
+# none), so every readback at that head is HB_EPOCH_SOURCE_UNOBSERVED.
+HB_EPOCH_SOURCE_FIELD = "$.hb_reference.epoch"
+CHECK_ID = "supplied-epoch-binder-check"
 INVARIANT = "ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH"
 OWNING_EXISTING_GOAL = "StegVerse-org/.github#162"
-SOURCE_RETRY = (READBACK_PR + " " + READBACK_COMPONENT_FILE + "::evaluate (Lane C sealed base-state readback of the "
-                "bound base, sealing the ledger head receipt's epoch as " + READBACK_EPOCH_FIELD + ")")
-BINDER_RETRY = ("sandbox/s1_supplied_epoch_binder.py --readback <sealed readback> --bound-main-commit <base> "
-                "--supplied-hb-epoch <epoch>")
+SOURCE_RETRY = (READBACK_PR + " " + READBACK_COMPONENT_FILE + "::evaluate (Lane C's sealed base-state readback of "
+                "base_ref.ledger_head)")
+BINDER_RETRY = ("SV-LLM/.github#46 sandbox/s1_sv_check_receipts.py mint (verifier built-in "
+                "supplied-epoch-binder-check) at a successor SV_CHANGE head")
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
@@ -119,77 +121,80 @@ def six(code: str, predicate: str, repair: str, next_attempt: str, retry: str = 
             "retry_entrypoint": retry, "owning_existing_goal": OWNING_EXISTING_GOAL, "next_attempt": next_attempt}
 
 
-def unobserved(predicate: str, detail: str) -> dict[str, str]:
-    return {**six("HB_EPOCH_SOURCE_UNOBSERVED", predicate,
-                  "a sealed " + READBACK_SCHEMA + " ALLOW receipt from " + READBACK_PR + " for the bound base, sealing "
-                  "the organization-ledger head receipt's epoch as " + READBACK_EPOCH_FIELD + " (" + INVARIANT + "); "
-                  "no supplied constant and no clock stands in for it",
-                  "after Lane C's readback seals the bound ledger head epoch for this base; re-run unchanged",
-                  SOURCE_RETRY), "detail": detail}
+def unobserved(detail: str) -> dict[str, Any]:
+    return {"disposition": "FAIL_CLOSED", "detail": detail, **six(
+        "HB_EPOCH_SOURCE_UNOBSERVED", INVARIANT,
+        "a sealed ALLOW " + READBACK_SCHEMA + " receipt (" + READBACK_PR + ") for base_ref.ledger_head whose hb_epoch "
+        "slot was read from " + HB_EPOCH_SOURCE_FIELD + " of that ledger head receipt (hb_epoch_source {ledger_head, "
+        "field}) and passes the shared supplied-epoch rule (" + SHARED_RULE_SHA256[:8] + "); no supplied constant and no "
+        "clock stands in for it",
+        "after Lane C's readback seals an epoch read at that ledger head; re-run unchanged (no epoch is minted)",
+        SOURCE_RETRY)}
 
 
-def readback_epoch(receipt: Any, bound_main_commit: Any, repository: str | None = None
-                   ) -> tuple[str | None, dict[str, str] | None]:
-    """(epoch, None) from a sealed readback of the bound base, or (None, six fields + detail)."""
-    if not isinstance(receipt, dict) or receipt.get("schema") != READBACK_SCHEMA:
-        return None, unobserved("THE_BOUND_BASE_HAS_A_SEALED_BASE_STATE_READBACK", "no " + READBACK_SCHEMA + " receipt")
-    if seal(receipt).get("result_sha256") != receipt.get("result_sha256"):
-        return None, unobserved("THE_BASE_STATE_READBACK_SEAL_VERIFIES", "result_sha256 does not verify")
+def readback_epoch(receipt: Any, ledger_head: Any) -> tuple[str | None, dict[str, Any] | None]:
+    """(sealed epoch, None), or (None, a FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED refusal with the six fields)."""
+    if not isinstance(receipt, dict):
+        return None, unobserved("no base-state readback receipt")
+    if receipt.get("schema") != READBACK_SCHEMA:
+        return None, unobserved("not a " + READBACK_SCHEMA + " receipt")
+    if not isinstance(receipt.get("result_sha256"), str) or seal(receipt)["result_sha256"] != receipt["result_sha256"]:
+        return None, unobserved("the readback receipt does not verify against its own body (result_sha256)")
     if receipt.get("disposition") != "ALLOW":
-        return None, unobserved("THE_BASE_STATE_READBACK_IS_ALLOW",
-                                "readback " + str(receipt.get("disposition")) + " " + str(receipt.get("failure_code")))
-    if not isinstance(bound_main_commit, str) or not HEX40.match(bound_main_commit) \
-            or receipt.get("bound_main_commit") != bound_main_commit:
-        return None, unobserved("THE_BASE_STATE_READBACK_BINDS_THIS_BASE",
-                                "readback binds " + str(receipt.get("bound_main_commit")) + ", base " + str(bound_main_commit))
-    if repository is not None and receipt.get("repository") != repository:
-        return None, unobserved("THE_BASE_STATE_READBACK_BINDS_THIS_BASE",
-                                "readback repository " + str(receipt.get("repository")) + ", head " + repository)
-    sealed = receipt.get(READBACK_EPOCH_FIELD)
-    if sealed is None:
-        return None, unobserved("THE_BASE_STATE_READBACK_SEALS_THE_LEDGER_HEAD_EPOCH",
-                                "the sealed readback carries no " + READBACK_EPOCH_FIELD + " (its hb_epoch slot is the "
-                                "caller's supplied value, " + json.dumps(receipt.get("hb_epoch")) + ", never the source)")
-    failure = supplied_epoch_failure(sealed)
-    if failure is not None:
-        return None, {**six(failure[0], INVARIANT, "a sealed ledger head epoch of ASCII digits >= 32",
-                            "after the readback seals a valid ledger head epoch; re-run unchanged", SOURCE_RETRY),
-                      "detail": "readback " + failure[1]}
-    return str(sealed), None
+        return None, unobserved("the readback receipt is %s %s, not ALLOW" % (receipt.get("disposition"),
+                                                                              receipt.get("failure_code")))
+    if receipt.get("fixture_only") is True:
+        return None, unobserved("a fixture_only readback is not an observation")
+    if not (isinstance(ledger_head, str) and HEX40.match(ledger_head)) \
+            or (receipt.get("base_ref") or {}).get("ledger_head") != ledger_head:
+        return None, unobserved("the readback is bound to another ledger head (base_ref.ledger_head "
+                                + json.dumps(ledger_head) + ")")
+    source = receipt.get("hb_epoch_source")
+    if not isinstance(source, dict) or source.get("ledger_head") != ledger_head \
+            or source.get("field") != HB_EPOCH_SOURCE_FIELD:
+        return None, unobserved("no hb_epoch_source naming " + HB_EPOCH_SOURCE_FIELD + " at the bound head (the "
+                                "readback's hb_epoch slot is " + json.dumps(receipt.get("hb_epoch")) + ")")
+    failure = supplied_epoch_failure(receipt.get("hb_epoch"), source)
+    if receipt.get("hb_epoch") is None or failure is not None:
+        return None, unobserved("the sealed hb_epoch slot fails the shared supplied-epoch rule: "
+                                + (failure[0] + ": " + failure[1] if failure else "absent"))
+    return str(receipt["hb_epoch"]), None
 
 
-def binder_check(supplied: Any, receipt: Any, bound_main_commit: Any, repository: str | None = None) -> dict[str, Any]:
-    result: dict[str, Any] = {"schema": RESULT_SCHEMA, "invariant": INVARIANT, "bound_main_commit": bound_main_commit,
-                              "supplied_hb_epoch": supplied, "readback_hb_epoch": None,
+def binder_check(supplied: Any, receipt: Any, ledger_head: Any) -> dict[str, Any]:
+    """The supplied-epoch-binder-check built-in: ALLOW, FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED or DENY HB_EPOCH_MISMATCH."""
+    result: dict[str, Any] = {"schema": RESULT_SCHEMA, "check_id": CHECK_ID, "invariant": INVARIANT,
+                              "ledger_head": ledger_head, "supplied_hb_epoch": supplied, "readback_hb_epoch": None,
                               "readback_result_sha256": receipt.get("result_sha256") if isinstance(receipt, dict) else None}
-    epoch, refusal = readback_epoch(receipt, bound_main_commit, repository)
+    epoch, refusal = readback_epoch(receipt, ledger_head)
     if refusal is not None:
-        return {**result, "disposition": "FAIL_CLOSED", **refusal}
+        return {**result, **refusal}
     result["readback_hb_epoch"] = epoch
     failure = supplied_epoch_failure(supplied)
-    if failure is not None:
-        return {**result, "disposition": "FAIL_CLOSED", "detail": failure[1],
-                **six(failure[0], "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH", "a supplied hb_epoch of ASCII digits >= 32",
-                      "re-submit with the bound ledger head epoch " + epoch)}
-    if str(supplied) != epoch:
-        return {**result, "disposition": "FAIL_CLOSED", "detail": "supplied " + str(supplied) + ", sealed " + epoch,
-                **six("HB_EPOCH_MISMATCH", INVARIANT, "the supplied hb_epoch equal to the bound ledger head epoch " + epoch,
-                      "re-submit with hb_epoch " + epoch)}
+    if failure is not None or not (isinstance(supplied, str) and re.fullmatch(r"[0-9]+", supplied)
+                                   and int(supplied) == int(epoch)):
+        detail = "supplied " + json.dumps(supplied) + ", sealed " + epoch
+        if failure is not None:
+            detail += " (shared rule " + SHARED_RULE_SHA256[:8] + ": " + failure[0] + ")"
+        return {**result, "disposition": "DENY", "detail": detail, **six(
+            "HB_EPOCH_MISMATCH", INVARIANT,
+            "the SV_CHANGE's hb_epoch equals (ASCII digits, by integer value) the epoch " + epoch + " the base-state "
+            "readback sealed at base_ref.ledger_head " + str(ledger_head),
+            "propose a successor SV_CHANGE at the observed epoch " + epoch + "; nothing was admitted")}
     return {**result, "disposition": "ALLOW"}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--readback", type=Path, required=True, help="sealed " + READBACK_SCHEMA + " receipt (JSON)")
-    parser.add_argument("--bound-main-commit", required=True)
-    parser.add_argument("--repository", default=None)
+    parser.add_argument("--ledger-head", required=True, help="the SV_CHANGE's base_ref.ledger_head")
     parser.add_argument("--supplied-hb-epoch", default=None, help="omitted -> HB_EPOCH_NOT_SUPPLIED")
     args = parser.parse_args(argv)
     try:
         receipt: Any = json.loads(args.readback.read_bytes().decode("utf-8"))
     except (OSError, UnicodeError, ValueError):
         receipt = None
-    result = binder_check(args.supplied_hb_epoch, receipt, args.bound_main_commit, args.repository)
+    result = binder_check(args.supplied_hb_epoch, receipt, args.ledger_head)
     sys.stdout.buffer.write(canon(result) + b"\n")
     return 0 if result["disposition"] == "ALLOW" else 1
 
