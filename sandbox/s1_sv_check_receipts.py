@@ -8,8 +8,8 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head f4080202; tests fail on drift):
-data/sv-work-items/required-checks.json blob 11f02341 (row
+Pins (StegVerse-Labs/.github#3264 head 9338e3e7; tests fail on drift):
+data/sv-work-items/required-checks.json blob 6a07ee8c (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
 070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
 at that commit and blob; nothing is fetched.
@@ -78,8 +78,8 @@ ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
 LOCAL_REPOSITORY = "SV-LLM/.github"
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "f4080202d8fc3057516978f143cd23732681a9e0"
-ROW_BLOB = "11f023411624ce5daf26fc342d4af9a39fd0614e"
+PIN_COMMIT = "9338e3e7f84b22fb9ddc3f55bf50c28561db111e"
+ROW_BLOB = "6a07ee8c7322814623508fb640d7f8aac9a0efba"
 RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
@@ -426,6 +426,18 @@ def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str
     return list(argv), dict(expected), list(paths), dict(bindings)
 
 
+def undeclared_fields(row: Mapping[str, Any], check_id: str) -> dict[str, str]:
+    """The six fields of a FAIL_CLOSED CHECK_COMMAND_UNDECLARED receipt: the row's command_status, verbatim."""
+    entry = row["checks"].get(check_id)
+    status = entry.get("command_status") if isinstance(entry, Mapping) else None
+    fields = six("CHECK_COMMAND_UNDECLARED", "CHECK_HAS_OFFLINE_COMMAND",
+                 ROW_FILE + " " + ROW_ID + " checks." + check_id + " carrying offline_command, expected and "
+                 "command_paths", "after the row declares the command; re-mint at the same head")
+    if isinstance(status, Mapping) and status.get("failure_code") == "CHECK_COMMAND_UNDECLARED":
+        fields.update({k: status[k] for k in SIX_FIELDS if isinstance(status.get(k), str) and status[k]})
+    return fields
+
+
 def outcome_matches(expected: Mapping[str, Any], code: int | None, stdout: bytes, stderr: bytes) -> bool:
     """P1's check_outcome_matches (row check_command_rule): exit_code equal; every stdout_json_subset key equal
     in the JSON stdout; stderr_last_line equal to the last non-blank stderr line."""
@@ -583,13 +595,7 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
             entry = row["checks"].get(check_id)
             declared = command_declaration(entry)
             if isinstance(declared, str):
-                status = entry.get("command_status") if isinstance(entry, Mapping) else None
-                fields = six("CHECK_COMMAND_UNDECLARED", "CHECK_HAS_OFFLINE_COMMAND",
-                             ROW_FILE + " " + ROW_ID + " checks." + check_id + " carrying offline_command, expected "
-                             "and command_paths", "after the row declares the command; re-mint at the same head")
-                if isinstance(status, Mapping) and status.get("failure_code") == "CHECK_COMMAND_UNDECLARED":
-                    fields.update({k: status[k] for k in SIX_FIELDS if isinstance(status.get(k), str) and status[k]})
-                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, fields)
+                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, undeclared_fields(row, check_id))
                 bundle["checks"].append({"id": check_id, "outcome": "CHECK_COMMAND_UNDECLARED", "detail": declared})
                 continue
             argv, expected, paths, bindings = declared
@@ -646,7 +652,10 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         bundle["disposition"], bundle["detail"] = refusal.disposition, refusal.detail
         bundle.update(refusal.fields)
         for check_id in emit:
-            receipts[check_id] = receipt(check_id, refusal.disposition, change_d, head, epoch, refusal.fields)
+            # A check the row gives no command is CHECK_COMMAND_UNDECLARED whatever else failed (row receipt_rule).
+            undeclared = isinstance(command_declaration(row["checks"].get(check_id)), str)
+            receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, undeclared_fields(row, check_id)) \
+                if undeclared else receipt(check_id, refusal.disposition, change_d, head, epoch, refusal.fields)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if receipts:

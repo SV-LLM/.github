@@ -5,6 +5,19 @@
     "evaluator": "resident-runtime/sv_work_items.py::check_command, check_outcome_matches (pure over supplied paths and outputs)",
     "pass_criteria_live_in_the_row": "A head never declares its own pass criteria; it binds them through required_checks_ref.blob_sha. The NWI-S1 verifier runs offline_command from the repo root at the exact head with no network (argv; placeholders only from argument_bindings) and compares the outcome with expected (exit_code; stdout_json_subset keys must equal; stderr_last_line must equal)."
   },
+  "check_derived_issue_rule": {
+    "derivation": "resident-runtime/sv_work_items.py::derive_issue_from_check_receipt(receipt_bytes, ledger_ref, row, observed_base=...)",
+    "failed_predicate": "the check receipt's failed_predicate",
+    "invariant_id": "CHECK_DERIVED_ISSUES_ARE_DERIVED_FROM_THE_LEDGERED_FAILING_RECEIPT",
+    "not_ledgered": "FAIL_CLOSED SOURCE_RECEIPT_NOT_LEDGERED: before the org writer appends the receipt the issue cannot be NATIVE",
+    "opened_by_session": "derivation:sv_work_items.derive_issue_from_check_receipt (the id never depends on who runs it; no lane owns minting)",
+    "owning_goal": "this row's owning_goal",
+    "resolution_class": "B",
+    "resolution_class_rule": "a check-derived issue is resolved only through merge admission of an SV_CHANGE that cites it in resolves (class B, as in the P1 FAIL_CLOSED register)",
+    "source_receipt_ref": "the org-ledger ref of the appended receipt: refs/stegverse/organization-ledger@<commit>:receipts/<receipt_sha256 hex>.json @ receipt_sha256",
+    "surface": "the check's command surface (sv_work_items.check_command_surface: argv[1], the unittest module file, or this row file when the command is undeclared)",
+    "violated_invariant": "{repository, file} = row_file, rule_id = row_id + '#checks.' + check_id"
+  },
   "check_receipt_invariant": {
     "appender": "org-ledger-writer (Labs#3255)",
     "invariant_id": "REQUIRED_CHECK_RECEIPTS_ARE_S1_VERIFIER_OUTPUTS_APPENDED_BY_ORG_WRITER",
@@ -113,6 +126,7 @@
         "failure_code": "CHECK_COMMAND_UNDECLARED",
         "next_attempt": "after such a command exists in this repo and is declared in this row; until then every ledger_writer change fails closed on this check",
         "owning_existing_goal": "StegVerse-org/.github#163",
+        "receipt_rule": "the verifier's only acceptable receipt for this check is FAIL_CLOSED CHECK_COMMAND_UNDECLARED with the six fields; validate_check_receipt refuses an ALLOW (or any other outcome) for it, and admission fails closed CHECK_COMMAND_UNDECLARED",
         "required_evidence_or_repair": "an offline command in StegVerse-Labs/.github that performs the supplied-epoch binder check (the StegVerse-org/.github#189 189-binder-check rows), declared here with offline_command, expected and command_paths; nothing in this repo performs it at d2ba0957",
         "retry_entrypoint": "data/sv-work-items/required-checks.json#checks.supplied-epoch-binder-check (resident-runtime/sv_work_items.py::check_command)"
       },
@@ -176,6 +190,11 @@
     "registry"
   ],
   "generation_fence": "data/task-coordination-policy.json#session_mutation_generation_fence",
+  "owning_goal": "StegVerse-org/.github#163",
+  "row_file": {
+    "file": "data/sv-work-items/required-checks.json",
+    "repository": "StegVerse-Labs/.github"
+  },
   "row_id": "SV-CHANGE-REQUIRED-CHECKS-001",
   "row_status": {
     "disposition": "FAIL_CLOSED",

@@ -122,9 +122,9 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "f4080202d8fc3057516978f143cd23732681a9e0")
+        self.assertEqual(m.PIN_COMMIT, "9338e3e7f84b22fb9ddc3f55bf50c28561db111e")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
-        self.assertTrue(m.ROW_BLOB.startswith("11f02341"))
+        self.assertTrue(m.ROW_BLOB.startswith("6a07ee8c"))
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
         self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("070f13f4"))
         for path in sorted(INPUTS.glob("*.json")):
@@ -302,7 +302,10 @@ class Minting(unittest.TestCase):
     def test_content_that_is_not_the_head_is_fail_closed_for_every_id(self):
         bundle, receipts, _ = self.minted({"README": b"x\n"}, tamper_content=True)
         self.assertEqual(sorted(receipts), SIX_IDS)
-        self.assertEqual({r["failure_code"] for r in receipts.values()}, {"SV_CHANGE_CONTENT_NOT_AT_HEAD"})
+        codes = {k: r["failure_code"] for k, r in receipts.items()}
+        # the row gives the binder check no command: its only receipt is CHECK_COMMAND_UNDECLARED (row receipt_rule)
+        self.assertEqual(codes.pop("supplied-epoch-binder-check"), "CHECK_COMMAND_UNDECLARED")
+        self.assertEqual(set(codes.values()), {"SV_CHANGE_CONTENT_NOT_AT_HEAD"})
 
 
 class CommittedEvidence(unittest.TestCase):
