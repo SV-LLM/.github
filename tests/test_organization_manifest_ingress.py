@@ -580,11 +580,11 @@ class EndToEndDryRun(unittest.TestCase):
         tip_before = space.published()
         self.assertTrue(tip_before)
 
-        ingress_result, readback, stdout = self.run_request(space, "workflow_dispatch", INPUT_REQUEST=REQUEST,
-                                                            BEFORE="")
+        ingress_result, readback, stdout = self.run_request(space, "workflow_dispatch", {"HB_EPOCH": "41"},
+                                                            INPUT_REQUEST=REQUEST, BEFORE="")
         self.assertEqual(ingress_result["disposition"], "ALLOW", ingress_result)
         self.assertEqual(ingress_result["owner_repository"], "SV-LLM/.github")
-        # No clock: the epoch is the successor of the self-closure's recorded 40.
+        # No clock and no derivation: the epoch is the dispatch's supplied 41.
         self.assertIn("supplied hb_epoch for " + Path(REQUEST).stem + ": 41", stdout)
         self.assertEqual(readback["disposition"], "ALLOW", readback)
         self.assertEqual(readback["head_receipt_sha256"], ingress_result["organization_receipt_sha256"])
@@ -600,12 +600,40 @@ class EndToEndDryRun(unittest.TestCase):
 
         # The same request again is one transition: answered from the ledger.
         shutil.rmtree(space.temp / "results")
-        again, readback, stdout = self.run_request(space, "workflow_dispatch", INPUT_REQUEST=REQUEST, BEFORE="")
+        again, readback, stdout = self.run_request(space, "workflow_dispatch", {"HB_EPOCH": "42"},
+                                                   INPUT_REQUEST=REQUEST, BEFORE="")
         self.assertIn("already recorded as", stdout)
         self.assertEqual(again["disposition"], "ALREADY_RECORDED")
         self.assertEqual(again["organization_receipt_sha256"], ingress_result["organization_receipt_sha256"])
         self.assertEqual(readback["disposition"], "ALLOW", readback)
         self.assertEqual(space.published(), tip_after)
+
+    def test_a_ledger_holding_high_epochs_does_not_stand_in_for_a_missing_one(self):
+        space = Workspace(self)
+        closure_env = space.job("self-closure", GITHUB_EVENT_NAME="workflow_dispatch", HB_EPOCH="9000")
+        for name in (VALIDATE, BIND):
+            self.assertEqual(space.step(name, closure_env).returncode, 0, name)
+        closed = space.step(CLOSE, closure_env, INPUT_COMMUNICATION_ID="w04-high", INPUT_PACKET_ID="")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        self.assertEqual(space.step(PUBLISH, closure_env).returncode, 0)
+        tip = space.published()
+        self.assertTrue(tip)
+        env = space.job("request", GITHUB_EVENT_NAME="workflow_dispatch")  # HB_EPOCH not supplied
+        for name in (SDK_PATH, VALIDATE, BIND):
+            self.assertEqual(space.step(name, env).returncode, 0, name)
+        self.assertEqual(space.step(SELECT, env, INPUT_REQUEST=REQUEST, BEFORE="").returncode, 0)
+        received = space.step(RECEIVE, env)
+        self.assertEqual(received.returncode, 0, received.stdout + received.stderr)
+        self.assertIn("supplied hb_epoch for " + Path(REQUEST).stem + ": <none>", received.stdout)
+        self.assertNotIn("9001", received.stdout)
+        refusal = json.loads((space.temp / "results" / Path(REQUEST).stem / "ingress.json").read_text())
+        self.assertEqual((refusal["disposition"], refusal["failure_code"]), ("FAIL_CLOSED", "HB_EPOCH_NOT_SUPPLIED"))
+        for field in ("failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                      "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
+        self.assertIs(refusal["consequence_committed"], False)
+        self.assertEqual(space.published(), tip)
+        self.assertNotIn("successor of", WORKFLOW.read_text())
 
     def test_a_push_on_an_unopened_ledger_is_refused_and_a_supplied_epoch_opens_it(self):
         space = Workspace(self, with_request=False)

@@ -173,7 +173,7 @@
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
         "identity checks name SV-LLM/.github",
-        "no host-clock epoch (NWI-S1): a committed request is received at the supplied epoch -- the dispatch's hb_epoch, else the successor of the highest epoch already recorded on this organization's verified ledger; with neither, the receive is FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED and nothing is recorded"
+        "no host-clock or ledger-derived epoch (NWI-S1): a committed request is received only at the dispatch's supplied hb_epoch; without one (a push carries none) the receive is FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED with the six fields and nothing is recorded"
       ]
     }
   }
