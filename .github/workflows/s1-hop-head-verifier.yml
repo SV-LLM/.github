@@ -60,15 +60,15 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_sv_check_receipts.py
           python3 -B tests/test_s1_sv_check_receipts.py -v
-      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at d2ba0957; vendored P1 segments are its bytes
+      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at f4080202; vendored P1 segments are its bytes
         run: |
           set -euo pipefail
-          pin=d2ba0957c203f5b67cdec77d7ed41d1daf52cbb0
+          pin=f4080202d8fc3057516978f143cd23732681a9e0
           git init -q "$RUNNER_TEMP/labs"
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = acbe80611369681c2a3af9dd13edf10c5cc2dca2
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 11f023411624ce5daf26fc342d4af9a39fd0614e
           test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = 070f13f468558ca08aa5162a8f34431608fc1404
-          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = acbe80611369681c2a3af9dd13edf10c5cc2dca2
+          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = 11f023411624ce5daf26fc342d4af9a39fd0614e
           test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = 070f13f468558ca08aa5162a8f34431608fc1404
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
           python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
@@ -207,6 +207,8 @@ jobs:
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3225-e6ba9601}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
+          # P1's row commit itself, with a verifier-derived SV_CHANGE record (sandbox/s1-sv-changes)
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-f4080202}
           # dd8bfd02 is not fetchable (no public ref): the committed receipts are HEAD_NOT_MATERIALIZED
           - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
     steps:
@@ -229,8 +231,11 @@ jobs:
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
           git init -q "$RUNNER_TEMP/head"
           if [ -n "$REPOSITORY" ]; then
-            git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
+            # full history: the row's {base_commit} binding must be an ancestor present in the clone
+            git -C "$RUNNER_TEMP/head" fetch -q --no-tags "https://github.com/$REPOSITORY.git" "$head"
             test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+            base=$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])).get("base_commit") or {}).get("sha",""))' "$in")
+            if [ -n "$base" ]; then git -C "$RUNNER_TEMP/head" merge-base --is-ancestor "$base" "$head"; echo "base_commit $base is an ancestor of $head"; fi
           fi
       - name: Mint again and compare every receipt byte for byte
         env:

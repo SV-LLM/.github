@@ -1,4 +1,10 @@
 {
+  "check_command_rule": {
+    "command_absent_at_head": "any command_path absent at the head being verified -> FAIL_CLOSED CHECK_COMMAND_ABSENT_AT_HEAD (CHECK_COMMAND_PATHS_PRESENT_AT_HEAD); the state of older heads such as StegVerse-Labs/.github#3225 (e6ba9601) and #3226 (f82c0324) for schema-validate, unit-tests and mutation-negative-suite",
+    "command_undeclared": "offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED -> FAIL_CLOSED CHECK_COMMAND_UNDECLARED (CHECK_HAS_OFFLINE_COMMAND); the check's receipt can never be minted",
+    "evaluator": "resident-runtime/sv_work_items.py::check_command, check_outcome_matches (pure over supplied paths and outputs)",
+    "pass_criteria_live_in_the_row": "A head never declares its own pass criteria; it binds them through required_checks_ref.blob_sha. The NWI-S1 verifier runs offline_command from the repo root at the exact head with no network (argv; placeholders only from argument_bindings) and compares the outcome with expected (exit_code; stdout_json_subset keys must equal; stderr_last_line must equal)."
+  },
   "check_receipt_invariant": {
     "appender": "org-ledger-writer (Labs#3255)",
     "invariant_id": "REQUIRED_CHECK_RECEIPTS_ARE_S1_VERIFIER_OUTPUTS_APPENDED_BY_ORG_WRITER",
@@ -14,27 +20,152 @@
   "checks": {
     "mutation-negative-suite": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "command_paths": [
+        "data/admission-scenarios/classes.jsonl",
+        "data/admission-scenarios/corpus.jsonl",
+        "resident-runtime/admission_learning.py",
+        "resident-runtime/sv_migration.py",
+        "resident-runtime/sv_work_items.py",
+        "scripts/build_sv_native_fixtures.py",
+        "tests/__init__.py",
+        "tests/test_sv_feedback_fb_tvc.py",
+        "tests/test_sv_native_work_items.py",
+        "tests/test_sv_record_modes.py"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stderr_last_line": "OK"
+      },
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_sv_native_work_items.IssueNegativeTests",
+        "tests.test_sv_native_work_items.ChangeNegativeTests",
+        "tests.test_sv_native_work_items.CorpusTests",
+        "tests.test_sv_feedback_fb_tvc.TVCReplayTests"
+      ]
     },
     "registry-generation-fence": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "argument_bindings": {
+        "{base_commit}": "supplied by the verifier: the 40-hex commit the head is verified against, already present in the local clone (no fetch); never inferred. An unresolvable base makes the script itself FAIL_CLOSED REGISTRY_GENERATION_UNREADABLE (exit 1)."
+      },
+      "command_paths": [
+        "data/canonical-task-registry.json",
+        "data/task-coordination-policy.json",
+        "scripts/check_registry_generation_fence.py",
+        "scripts/evaluate_task_registry_collision_checkin.py"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout_json_subset": {
+          "disposition": "ALLOW"
+        }
+      },
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": [
+        "python3",
+        "scripts/check_registry_generation_fence.py",
+        "--mode",
+        "pull_request",
+        "--repo",
+        ".",
+        "--base-ref",
+        "{base_commit}",
+        "--head-ref",
+        "HEAD"
+      ]
     },
     "schema-validate": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "command_paths": [
+        "data/sv-work-items/required-checks.json",
+        "resident-runtime/admission_learning.py",
+        "resident-runtime/schema_subset.py",
+        "resident-runtime/sv_migration.py",
+        "resident-runtime/sv_work_items.py",
+        "schemas/sv-change.v1.schema.json",
+        "schemas/sv-issue.v1.schema.json",
+        "scripts/build_sv_native_fixtures.py"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout_json_subset": {
+          "disposition": "ALLOW",
+          "stale": []
+        }
+      },
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": [
+        "python3",
+        "scripts/build_sv_native_fixtures.py",
+        "--check"
+      ]
     },
     "supplied-epoch-binder-check": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "command_paths": [],
+      "command_status": {
+        "disposition": "FAIL_CLOSED",
+        "failed_predicate": "CHECK_HAS_OFFLINE_COMMAND",
+        "failure_code": "CHECK_COMMAND_UNDECLARED",
+        "next_attempt": "after such a command exists in this repo and is declared in this row; until then every ledger_writer change fails closed on this check",
+        "owning_existing_goal": "StegVerse-org/.github#163",
+        "required_evidence_or_repair": "an offline command in StegVerse-Labs/.github that performs the supplied-epoch binder check (the StegVerse-org/.github#189 189-binder-check rows), declared here with offline_command, expected and command_paths; nothing in this repo performs it at d2ba0957",
+        "retry_entrypoint": "data/sv-work-items/required-checks.json#checks.supplied-epoch-binder-check (resident-runtime/sv_work_items.py::check_command)"
+      },
+      "expected": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED",
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
     },
     "unit-tests": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "command_paths": [
+        "resident-runtime/admission_learning.py",
+        "resident-runtime/stage_gate.py",
+        "resident-runtime/sv_migration.py",
+        "resident-runtime/sv_work_items.py",
+        "scripts/build_sv_native_fixtures.py",
+        "tests/__init__.py",
+        "tests/test_nwi_stage_gate.py",
+        "tests/test_sv_feedback_fb_tvc.py",
+        "tests/test_sv_native_work_items.py",
+        "tests/test_sv_record_modes.py"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stderr_last_line": "OK"
+      },
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_sv_native_work_items",
+        "tests.test_sv_record_modes",
+        "tests.test_nwi_stage_gate",
+        "tests.test_sv_feedback_fb_tvc"
+      ]
     },
     "workflow-surface-registered": {
       "appender": "org-ledger-writer (Labs#3255)",
-      "minter": "NWI-S1-verifier (SV-LLM/.github#46)"
+      "command_paths": [
+        "control/workflow-surface-registry.json",
+        "scripts/validate_workflow_surface_hygiene.py"
+      ],
+      "expected": {
+        "exit_code": 0,
+        "stdout_json_subset": {
+          "status": "PASS_REGISTERED_SURFACES"
+        }
+      },
+      "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+      "offline_command": [
+        "python3",
+        "scripts/validate_workflow_surface_hygiene.py"
+      ]
     }
   },
   "coverage_required_kinds": [

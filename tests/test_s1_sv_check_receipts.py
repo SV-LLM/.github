@@ -56,9 +56,12 @@ def declaration(*ids: str, target: str = "tests/test_a.py") -> bytes:
 
 UNITTEST = {"offline_command": ["python", "-B", "tests/test_a.py"], "expected": {"exit_code": 0},
             "command_paths": ["tests/test_a.py"]}
-EPOCH_CHECK = b"import json, sys\nprint(json.dumps({'disposition': 'ALLOW' if sys.argv[1:] == ['4000'] else 'DENY'}))\n"
-EPOCH_CMD = {"offline_command": ["python", "-B", "check.py", "{hb_epoch}"],
-             "expected": {"exit_code": 0, "stdout_disposition": "ALLOW"}, "command_paths": ["check.py"]}
+BASE_CHECK = (b"import json, subprocess, sys\nbase = sys.argv[sys.argv.index('--base-ref') + 1]\n"
+              b"ok = subprocess.run(['git', 'merge-base', '--is-ancestor', base, 'HEAD']).returncode == 0\n"
+              b"print(json.dumps({'disposition': 'ALLOW' if ok and len(base) == 40 else 'FAIL_CLOSED'}))\n")
+BASE_CMD = {"offline_command": ["python3", "check.py", "--base-ref", "{base_commit}", "--head-ref", "HEAD"],
+            "argument_bindings": {"{base_commit}": "supplied by the verifier"},
+            "expected": {"exit_code": 0, "stdout_json_subset": {"disposition": "ALLOW"}}, "command_paths": ["check.py"]}
 
 
 def commands_row(entries: dict) -> bytes:
@@ -73,9 +76,19 @@ class Fixture:
     """A head repository, its SV_CHANGE record, and a Labs-shaped checkout holding the pinned row and schema."""
 
     def __init__(self, tmp: Path, head_files: dict[str, bytes], *, epoch="4000", row: bytes | None = None,
-                 tamper_content: bool = False) -> None:
+                 tamper_content: bool = False, base: bool = False) -> None:
         self.head_repo = tmp / "head"
         self.head = repo(self.head_repo, head_files)
+        self.base = None
+        if base:  # a second commit on top: the first is the supplied base
+            self.base = self.head
+            (self.head_repo / "SECOND").write_bytes(b"2\n")
+            head_files = {**head_files, "SECOND": b"2\n"}
+            env = rc.base_env(tmp)
+            subprocess.run(["git", "-C", str(self.head_repo), "add", "-A"], check=True, env=env)
+            subprocess.run(["git", "-C", str(self.head_repo), "commit", "-q", "-m", "second"], check=True, env=env)
+            self.head = subprocess.run(["git", "-C", str(self.head_repo), "rev-parse", "HEAD"], check=True, env=env,
+                                       capture_output=True, text=True).stdout.strip()
         content = [{"path": p, "blob_digest": "sha256:" + hashlib.sha256(d).hexdigest(),
                     "writer_session": {"evidence_class": "DECLARED", "session": "Lane B (91117956)"}}
                    for p, d in sorted(head_files.items())]
@@ -100,7 +113,8 @@ class Fixture:
                                     "blob_sha": m.ROW_BLOB, "receipt_schema_blob_sha": m.RECEIPT_SCHEMA_BLOB,
                                     "row_id": m.ROW_ID},
             "sv_change": {"repository": m.ROW_REPOSITORY, "commit": self.labs, "file": "changes.jsonl",
-                          "change_id": record["change_id"]}}))
+                          "change_id": record["change_id"]},
+            **({"base_commit": {"sha": self.base, "basis": "fixture parent"}} if self.base else {})}))
 
     def mint(self):
         return m.mint(self.input, self.head_repo, {m.ROW_DEPENDENCY: self.labs_repo})
@@ -108,9 +122,9 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "d2ba0957c203f5b67cdec77d7ed41d1daf52cbb0")
+        self.assertEqual(m.PIN_COMMIT, "f4080202d8fc3057516978f143cd23732681a9e0")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
-        self.assertTrue(m.ROW_BLOB.startswith("acbe8061"))
+        self.assertTrue(m.ROW_BLOB.startswith("11f02341"))
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
         self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("070f13f4"))
         for path in sorted(INPUTS.glob("*.json")):
@@ -174,10 +188,25 @@ class Minting(unittest.TestCase):
         self.assertEqual(bundle["disposition"], "ALLOW")
         self.assertEqual([c["command"] for c in bundle["checks"]], [UNITTEST["offline_command"]] * 6)
 
-    def test_the_pinned_row_carries_no_commands_so_every_id_is_check_command_undeclared(self):
+    def test_the_pinned_row_is_read_verbatim(self):
+        cmds = {i: m.command_declaration(ROW["checks"][i]) for i in SIX_IDS}
+        self.assertIsInstance(cmds["supplied-epoch-binder-check"], str)  # UNKNOWN_NOT_AUTHENTICALLY_OBSERVED
+        for i in set(SIX_IDS) - {"supplied-epoch-binder-check"}:
+            self.assertEqual(cmds[i][0], ROW["checks"][i]["offline_command"], i)
+            self.assertEqual(cmds[i][1], ROW["checks"][i]["expected"], i)
+        self.assertIn("{base_commit}", cmds["registry-generation-fence"][0])
+        self.assertEqual(cmds["workflow-surface-registered"][1]["exit_code"], 0)  # the row's expectation stands
+
+    def test_at_a_head_without_the_rows_command_paths_every_command_is_absent_or_undeclared(self):
         bundle, receipts, _ = self.minted({"tests/test_a.py": PASSING.encode()})
-        self.assertEqual(self.codes(receipts), {i: ("FAIL_CLOSED", "CHECK_COMMAND_UNDECLARED") for i in SIX_IDS})
-        self.assertTrue(bundle["row_command_pin"].startswith("PENDING"))
+        want = {i: ("FAIL_CLOSED", "CHECK_COMMAND_ABSENT_AT_HEAD") for i in SIX_IDS}
+        want["supplied-epoch-binder-check"] = ("FAIL_CLOSED", "CHECK_COMMAND_UNDECLARED")
+        self.assertEqual(self.codes(receipts), want)
+        status = ROW["checks"]["supplied-epoch-binder-check"]["command_status"]
+        undeclared = receipts["supplied-epoch-binder-check"]  # an explicit refusal, never silence
+        for field in m.SIX_FIELDS:
+            self.assertEqual(undeclared[field], status[field], field)
+        self.assertEqual(bundle["disposition"], "FAIL_CLOSED")
 
     def test_unknown_not_authentically_observed_is_check_command_undeclared(self):
         unknown = {**UNITTEST, "offline_command": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"}
@@ -202,20 +231,39 @@ class Minting(unittest.TestCase):
         self.assertNotIn("run_set", source)
         _, receipts, _ = self.minted({".sv/required-checks.json": declaration(*SIX_IDS),
                                       "tests/test_a.py": PASSING.encode()})
-        self.assertEqual({v["failure_code"] for v in receipts.values()}, {"CHECK_COMMAND_UNDECLARED"})
+        # a head declaring all six as passing changes nothing: the row's commands decide
+        self.assertEqual({v["failure_code"] for v in receipts.values()},
+                         {"CHECK_COMMAND_ABSENT_AT_HEAD", "CHECK_COMMAND_UNDECLARED"})
 
-    def test_the_epoch_reaches_the_command_as_an_argument_and_stdout_is_checked(self):
-        files = {"check.py": EPOCH_CHECK, "tests/test_a.py": PASSING.encode()}
-        _, receipts, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS}, "supplied-epoch-binder-check": EPOCH_CMD})
-        self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
-        _, wrong, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS},
-                                          "supplied-epoch-binder-check": EPOCH_CMD}, epoch="4001")
-        self.assertEqual(self.codes(wrong)["supplied-epoch-binder-check"], ("DENY", "REQUIRED_CHECK_FAILED_AT_HEAD"))
+    def test_the_supplied_base_commit_binds_base_commit_and_is_recorded(self):
+        files = {"check.py": BASE_CHECK, "tests/test_a.py": PASSING.encode()}
+        rows = {**{i: UNITTEST for i in SIX_IDS}, "registry-generation-fence": BASE_CMD}
+        bundle, receipts, fixture = self.minted(files, rows, base=True)
+        self.assertEqual(receipts["registry-generation-fence"]["disposition"], "ALLOW")
+        self.assertEqual(bundle["base_commit"]["sha"], fixture.base)
+        fence = next(c for c in bundle["checks"] if c["id"] == "registry-generation-fence")
+        self.assertEqual(fence["command"][3], fixture.base)
 
-    def test_an_exit_code_other_than_expected_is_deny(self):
+    def test_an_unsupplied_binding_is_check_argument_not_supplied_and_nothing_runs(self):
+        files = {"check.py": BASE_CHECK, "tests/test_a.py": PASSING.encode()}
+        bundle, receipts, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS}, "registry-generation-fence": BASE_CMD})
+        self.assertEqual(self.codes(receipts)["registry-generation-fence"], ("FAIL_CLOSED", "CHECK_ARGUMENT_NOT_SUPPLIED"))
+        self.assertIsNone(bundle["base_commit"])
+
+    def test_stdout_json_subset_and_stderr_last_line_are_compared(self):
+        files = {"tests/test_a.py": PASSING.encode()}
+        wrong_line = {**UNITTEST, "expected": {"exit_code": 0, "stderr_last_line": "OK"}}  # the script prints nothing
+        _, receipts, _ = self.minted(files, {**{i: UNITTEST for i in SIX_IDS}, "unit-tests": wrong_line})
+        self.assertEqual(self.codes(receipts)["unit-tests"], ("FAIL_CLOSED", "REQUIRED_CHECK_FAILED_AT_HEAD"))
+        self.assertTrue(m.outcome_matches({"exit_code": 0, "stdout_json_subset": {"d": 1}}, 0, b'{"d": 1, "x": 2}', b""))
+        self.assertFalse(m.outcome_matches({"exit_code": 0, "stdout_json_subset": {"d": 1}}, 0, b'{"d": 2}', b""))
+        self.assertTrue(m.outcome_matches({"exit_code": 0, "stderr_last_line": "OK"}, 0, b"", b"Ran 3 tests\n\nOK\n"))
+        self.assertFalse(m.outcome_matches({"exit_code": 0}, 1, b"", b""))
+
+    def test_an_exit_code_other_than_expected_is_fail_closed(self):
         failing = PASSING.replace("1 + 1 == 2", "1 + 1 == 3").encode()
         _, receipts, _ = self.minted({"tests/test_a.py": failing}, {i: UNITTEST for i in SIX_IDS})
-        self.assertEqual(set(self.codes(receipts).values()), {("DENY", "REQUIRED_CHECK_FAILED_AT_HEAD")})
+        self.assertEqual(set(self.codes(receipts).values()), {("FAIL_CLOSED", "REQUIRED_CHECK_FAILED_AT_HEAD")})
 
     def test_a_clock_reading_check_is_deny(self):
         _, receipts, _ = self.minted({"tests/test_a.py": CLOCK.encode()}, {"unit-tests": UNITTEST})

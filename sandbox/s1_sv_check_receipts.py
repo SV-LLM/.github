@@ -8,8 +8,8 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head d2ba0957; tests fail on drift):
-data/sv-work-items/required-checks.json blob acbe8061 (row
+Pins (StegVerse-Labs/.github#3264 head f4080202; tests fail on drift):
+data/sv-work-items/required-checks.json blob 11f02341 (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
 070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
 at that commit and blob; nothing is fetched.
@@ -23,18 +23,22 @@ and every content blob digest must be the head's bytes.
 
 How each id runs. The row carries the commands; the head never does. For each
 row id the minter reads checks.<id> verbatim: offline_command (an argv list run
-from the repository root at the exact head, no network; an argv element equal to
-"{hb_epoch}" is the supplied epoch), expected {exit_code[, stdout_disposition]}
-and command_paths. No per-head pass criteria are accepted: the head's
-.sv/required-checks.json is not read for an SV_CHANGE head. An entry without a
-command, or with offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED, is
-FAIL_CLOSED CHECK_COMMAND_UNDECLARED; a command_path absent at the head is
-FAIL_CLOSED CHECK_COMMAND_ABSENT_AT_HEAD -- never a guessed ALLOW. Declared
-commands run twice offline under the clock/network probe: a clock or network
-read, output that differs, a result other than `expected`, or a failure to
-complete is DENY/FAIL_CLOSED; clean and as expected is ALLOW. The pinned row
-blob (acbe8061) carries no commands yet; the blob P1 sends with commands is a
-pending pin (ROW_COMMAND_PIN).
+from the repository root at the exact head, no network), expected
+{exit_code[, stdout_json_subset][, stderr_last_line]} compared as P1's
+check_outcome_matches, command_paths, and argument_bindings. The one binding the
+verifier supplies is {base_commit}: the input's base_commit.sha (the merge-base
+of the head with the target main, computed in the local clone; it must be an
+ancestor of the head there, never fetched) -- recorded in the bundle, because
+the pinned receipt schema has no field for it. No per-head pass criteria are
+accepted: the head's .sv/required-checks.json is not read for an SV_CHANGE head.
+offline_command UNKNOWN_NOT_AUTHENTICALLY_OBSERVED (or none) is a FAIL_CLOSED
+CHECK_COMMAND_UNDECLARED receipt carrying the row's command_status six fields --
+an explicit refusal, never an ALLOW and never silence; a command_path absent at
+the head is FAIL_CLOSED CHECK_COMMAND_ABSENT_AT_HEAD and nothing is run.
+Declared commands run twice offline under the clock/network probe: a clock or
+network read or output that differs is DENY; a result other than `expected` is
+FAIL_CLOSED REQUIRED_CHECK_FAILED_AT_HEAD (no check is special-cased: the row's
+expected stands), as is a run that does not complete; clean and as expected is ALLOW.
 
 Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
 (== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
@@ -72,8 +76,10 @@ ROW_ID = "SV-CHANGE-REQUIRED-CHECKS-001"
 ROW_FILE = "data/sv-work-items/required-checks.json"
 ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
-PIN_COMMIT = "d2ba0957c203f5b67cdec77d7ed41d1daf52cbb0"
-ROW_BLOB = "acbe80611369681c2a3af9dd13edf10c5cc2dca2"
+LOCAL_REPOSITORY = "SV-LLM/.github"
+SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
+PIN_COMMIT = "f4080202d8fc3057516978f143cd23732681a9e0"
+ROW_BLOB = "11f023411624ce5daf26fc342d4af9a39fd0614e"
 RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
@@ -288,10 +294,18 @@ def validate_input(document: Any) -> dict[str, Any]:
             or row.get("row_id") != ROW_ID or not all(isinstance(row.get(k), str) and rc.HEX40.match(row[k])
                                                       for k in ("commit", "blob_sha", "receipt_schema_blob_sha")):
         raise bad("required_checks_row")
-    if not isinstance(source, dict) or source.get("repository") != ROW_REPOSITORY \
-            or not isinstance(source.get("commit"), str) or not rc.HEX40.match(source["commit"]) \
-            or not isinstance(source.get("file"), str) or not isinstance(source.get("change_id"), str):
+    local = isinstance(source, dict) and source.get("repository") == LOCAL_REPOSITORY
+    if not isinstance(source, dict) or source.get("repository") not in (ROW_REPOSITORY, LOCAL_REPOSITORY) \
+            or not isinstance(source.get("file"), str) or not isinstance(source.get("change_id"), str) \
+            or (local and not (isinstance(source.get("sha256"), str) and SHA256_REF.match(source["sha256"])
+                               and SAFE_PATH.match(source["file"]))) \
+            or (not local and not (isinstance(source.get("commit"), str) and rc.HEX40.match(source["commit"]))):
         raise bad("sv_change")
+    base = document.get("base_commit")
+    if base is not None and not (isinstance(base, dict) and set(base) == {"sha", "basis"}
+                                 and isinstance(base["sha"], str) and rc.HEX40.match(base["sha"])
+                                 and isinstance(base["basis"], str) and base["basis"]):
+        raise bad("base_commit")
     return document
 
 
@@ -333,9 +347,19 @@ def load_change(spec: Mapping[str, Any], checkout: Path | None) -> dict[str, Any
         return Global("SV_CHANGE_NOT_RESOLVED", "THE_SV_CHANGE_RECORD_RESOLVES_AT_ITS_PINNED_COMMIT",
                       spec["file"] + " at " + spec["commit"] + " holding change_id " + spec["change_id"],
                       "re-pin the SV_CHANGE source and re-run", detail)
-    if not rc.head_present(checkout, spec["commit"]):
+    if spec["repository"] == LOCAL_REPOSITORY:
+        # A verifier-derived record committed in this repository, bound by the sha256 the input names.
+        try:
+            data = (HERE.parent / spec["file"]).read_bytes()
+        except OSError:
+            raise bad("file absent") from None
+        if "sha256:" + sha256_hex(data) != spec["sha256"]:
+            raise bad("file sha256 is not the input's")
+        found = (data, None)
+    elif not rc.head_present(checkout, spec["commit"]):
         raise bad("source commit not supplied")
-    found = read_at(checkout, spec["commit"], spec["file"])
+    else:
+        found = read_at(checkout, spec["commit"], spec["file"])
     if found is None:
         raise bad("file absent")
     text = found[0].decode("utf-8")
@@ -376,42 +400,62 @@ def check_receipt(body: Any, change: Mapping[str, Any], row: Mapping[str, Any],
 
 
 UNDECLARED_COMMAND = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
-EPOCH_ARGUMENT = "{hb_epoch}"  # an argv element equal to this is replaced by the supplied epoch
-ROW_COMMAND_PIN = ("PENDING: StegVerse-Labs/.github#3264 row blob carrying offline_command/expected/command_paths "
-                   "not yet sent; the pinned blob " + ROW_BLOB + " carries none, so every id is CHECK_COMMAND_UNDECLARED")
+BASE_COMMIT_ARGUMENT = "{base_commit}"  # the only verifier-supplied binding: input base_commit.sha
 SAFE_PATH = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\0]+$")
 
 
-def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str]] | str:
+def command_declaration(entry: Any) -> tuple[list[str], dict[str, Any], list[str], dict[str, str]] | str:
     """The row's own command for one check id, read verbatim; a string says why it is undeclared."""
     if not isinstance(entry, Mapping) or "offline_command" not in entry:
         return "no offline_command in the row entry"
     argv, expected, paths = entry.get("offline_command"), entry.get("expected"), entry.get("command_paths")
+    bindings = entry.get("argument_bindings") or {}
     if argv == UNDECLARED_COMMAND:
         return "offline_command is " + UNDECLARED_COMMAND
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
         return "offline_command is not a non-empty argv list"
     if not isinstance(expected, Mapping) or type(expected.get("exit_code")) is not int \
-            or not set(expected) <= {"exit_code", "stdout_disposition"} \
-            or ("stdout_disposition" in expected and expected["stdout_disposition"] not in DISPOSITIONS):
-        return "expected is not {exit_code[, stdout_disposition]}"
+            or not set(expected) <= {"exit_code", "stdout_json_subset", "stderr_last_line"} \
+            or not isinstance(expected.get("stdout_json_subset", {}), Mapping) \
+            or not isinstance(expected.get("stderr_last_line", ""), str):
+        return "expected is not {exit_code[, stdout_json_subset][, stderr_last_line]}"
     if not isinstance(paths, list) or not paths or not all(isinstance(q, str) and SAFE_PATH.match(q) for q in paths):
         return "command_paths is not a non-empty list of repository-relative paths"
-    return list(argv), dict(expected), list(paths)
+    if not isinstance(bindings, Mapping) or not all(isinstance(k, str) for k in bindings):
+        return "argument_bindings is not an object"
+    return list(argv), dict(expected), list(paths), dict(bindings)
 
 
-def stdout_disposition(stdout: bytes) -> str | None:
-    try:
-        text = stdout.decode("utf-8")
-    except UnicodeError:
-        return None
-    for candidate in [text] + [line for line in reversed(text.splitlines()) if line.strip()]:
+def outcome_matches(expected: Mapping[str, Any], code: int | None, stdout: bytes, stderr: bytes) -> bool:
+    """P1's check_outcome_matches (row check_command_rule): exit_code equal; every stdout_json_subset key equal
+    in the JSON stdout; stderr_last_line equal to the last non-blank stderr line."""
+    if code is None or code != expected.get("exit_code"):
+        return False
+    if "stdout_json_subset" in expected:
         try:
-            value = json.loads(candidate)
-        except ValueError:
-            continue
-        return value.get("disposition") if isinstance(value, dict) and isinstance(value.get("disposition"), str) else None
-    return None
+            out = json.loads(stdout.decode("utf-8"))
+        except (UnicodeError, ValueError):
+            return False
+        if not isinstance(out, dict) or any(out.get(k) != v for k, v in expected["stdout_json_subset"].items()):
+            return False
+    if "stderr_last_line" in expected:
+        lines = [line for line in stderr.decode("utf-8", "replace").splitlines() if line.strip()]
+        if not lines or lines[-1].strip() != expected["stderr_last_line"]:
+            return False
+    return True
+
+
+def stderr_last_line(stderr: bytes) -> str | None:
+    lines = [line for line in stderr.decode("utf-8", "replace").splitlines() if line.strip()]
+    return lines[-1].strip() if lines else None
+
+
+def stdout_subset(stdout: bytes, keys: Iterable[str]) -> dict[str, Any] | None:
+    try:
+        out = json.loads(stdout.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        return None
+    return {k: out.get(k) for k in sorted(keys)} if isinstance(out, dict) else None
 
 
 def run_row_commands(head_checkout: Path, head: str, planned: list[tuple[str, list[str], dict[str, Any]]],
@@ -420,15 +464,21 @@ def run_row_commands(head_checkout: Path, head: str, planned: list[tuple[str, li
     if base.exists():
         shutil.rmtree(base)
     root = base / "head"
-    rc.materialize(head_checkout, head, root)
     env = rc.base_env(base / "home")
-    (base / "home").mkdir()
+    (base / "home").mkdir(parents=True)
+    # The exact head as a git repository (commands such as the registry fence read history): fetched from the
+    # local clone by path, so nothing leaves the box; HEAD is detached at the head.
+    for step in (["git", "init", "-q", str(root)],
+                 ["git", "-C", str(root), "fetch", "-q", "--no-tags", str(head_checkout.resolve()), head],
+                 ["git", "-C", str(root), "checkout", "-q", "--detach", head]):
+        if subprocess.run(step, capture_output=True, env=env).returncode:
+            raise OSError("could not materialize the head as a repository: " + " ".join(step[3:4]))
     env["PYTHONPATH"] = str(rc.PROBE)
     results = []
     for check_id, argv, expected in planned:
         log = base / ("probe-" + check_id + ".log")
         log.write_text("")
-        run = [sys.executable if a == "python" else a for a in argv]
+        run = [sys.executable if a in ("python", "python3") and i == 0 else a for i, a in enumerate(argv)]
         try:
             completed = subprocess.run(run, cwd=root, env={**env, "S1_PROBE_LOG": str(log)},
                                        capture_output=True, timeout=rc.CHECK_TIMEOUT_S)
@@ -436,12 +486,13 @@ def run_row_commands(head_checkout: Path, head: str, planned: list[tuple[str, li
         except (subprocess.TimeoutExpired, OSError):
             code, stdout, stderr = None, b"", b""
         reads = sorted(set(log.read_text().split("\n")) - {""})
-        seen = stdout_disposition(stdout) if "stdout_disposition" in expected else None
-        met = code is not None and code == expected["exit_code"] and \
-            ("stdout_disposition" not in expected or seen == expected["stdout_disposition"])
+        met = outcome_matches(expected, code, stdout, stderr)
+        # Bound: what the row's expected compares. Raw stderr/stdout carry run timings (unittest's
+        # "Ran N tests in Xs") and are not part of the comparison, so only their compared parts are kept.
         results.append({"id": check_id, "kind": "row-offline-command", "command": argv, "expected": expected,
-                        "exit_code": code, "stdout_disposition": seen,
-                        "stdout_sha256": "sha256:" + sha256_hex(stdout), "stderr_sha256": "sha256:" + sha256_hex(stderr),
+                        "exit_code": code, "stderr_last_line": stderr_last_line(stderr),
+                        "stdout_json_subset": stdout_subset(stdout, (expected.get("stdout_json_subset") or {}).keys())
+                        if "stdout_json_subset" in expected else None,
                         "outcome": "DID_NOT_COMPLETE" if code is None else ("AS_EXPECTED" if met else "NOT_AS_EXPECTED"),
                         "clock_reads": [r.split(" ", 1)[1] for r in reads if r.startswith("CLOCK ")],
                         "network_reads": [r.split(" ", 1)[1] for r in reads if r.startswith("NETWORK ")]})
@@ -454,7 +505,6 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         "receipt_schema_file": RECEIPT_SCHEMA_FILE, "receipt_schema_blob_sha": RECEIPT_SCHEMA_BLOB,
         "declaration_basis": "P1_ROW " + ROW_ID + " (ids and, per id, offline_command, expected, command_paths, read "
                              "verbatim); no per-head pass criteria: the head's " + rc.DECLARATION_PATH + " is not read",
-        "row_command_pin": ROW_COMMAND_PIN,
         "evidence_role": "ADMISSION_INPUT_EVIDENCE_ONLY", "appended_by": "StegVerse-Labs/.github#3255 (not here)",
         "authentic_ledger_receipt": False, "authority_effect": "NONE", "verifier_clock_read": False,
         "verifier_network_read": False, "credentials_passed": False, "verifier_ref": verifier_ref(),
@@ -518,20 +568,31 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                 raise Global("SV_CHANGE_CONTENT_NOT_AT_HEAD", "SV_CHANGE_CONTENT_IS_THE_HEAD_TREE",
                              "every content blob_digest equal to the head's bytes", "re-derive the SV_CHANGE at the head",
                              str(c.get("path")))
+        base = None
+        spec = document.get("base_commit")
+        if spec is not None:
+            base = spec["sha"]
+            if not rc.head_present(checkout, base) or rc.git(checkout, "merge-base", "--is-ancestor", base, head).returncode:
+                raise Global("BASE_COMMIT_NOT_AN_ANCESTOR_IN_THE_CLONE", "THE_SUPPLIED_BASE_IS_AN_ANCESTOR_OF_THE_HEAD",
+                             "base_commit.sha present in --checkout and an ancestor of " + head + " (never fetched)",
+                             "re-run with the merge-base from the local clone", base)
+        bundle["base_commit"] = dict(spec) if spec is not None else None
         bundle["row_commands_sha256"] = "sha256:" + sha256_hex(canon({i: row["checks"][i] for i in emit}))
         planned: list[tuple[str, list[str], dict[str, Any]]] = []
         for check_id in emit:
             entry = row["checks"].get(check_id)
             declared = command_declaration(entry)
             if isinstance(declared, str):
-                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
-                    "CHECK_COMMAND_UNDECLARED", "THE_ROW_DECLARES_AN_OFFLINE_COMMAND_FOR_THE_CHECK",
-                    ROW_FILE + " " + ROW_ID + " checks." + check_id + " carrying offline_command (argv from the "
-                    "repository root, epoch as an argument), expected {exit_code[, stdout_disposition]} and "
-                    "command_paths", "declare the command in the row (P1) and re-mint at the same head"))
+                status = entry.get("command_status") if isinstance(entry, Mapping) else None
+                fields = six("CHECK_COMMAND_UNDECLARED", "CHECK_HAS_OFFLINE_COMMAND",
+                             ROW_FILE + " " + ROW_ID + " checks." + check_id + " carrying offline_command, expected "
+                             "and command_paths", "after the row declares the command; re-mint at the same head")
+                if isinstance(status, Mapping) and status.get("failure_code") == "CHECK_COMMAND_UNDECLARED":
+                    fields.update({k: status[k] for k in SIX_FIELDS if isinstance(status.get(k), str) and status[k]})
+                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, fields)
                 bundle["checks"].append({"id": check_id, "outcome": "CHECK_COMMAND_UNDECLARED", "detail": declared})
                 continue
-            argv, expected, paths = declared
+            argv, expected, paths, bindings = declared
             missing = [q for q in paths if not (root / q).is_file()]
             if missing:
                 receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
@@ -541,7 +602,17 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                 bundle["checks"].append({"id": check_id, "outcome": "CHECK_COMMAND_ABSENT_AT_HEAD",
                                          "absent_command_paths": missing})
                 continue
-            planned.append((check_id, [epoch if a == EPOCH_ARGUMENT else a for a in argv], expected))
+            unbound = sorted({a for a in argv if a in bindings and a != BASE_COMMIT_ARGUMENT}
+                             | ({BASE_COMMIT_ARGUMENT} if BASE_COMMIT_ARGUMENT in argv and base is None else set()))
+            if unbound:
+                receipts[check_id] = receipt(check_id, "FAIL_CLOSED", change_d, head, epoch, six(
+                    "CHECK_ARGUMENT_NOT_SUPPLIED", "EVERY_ARGUMENT_BINDING_IS_SUPPLIED_BY_THE_VERIFIER",
+                    "the input's base_commit (a 40-hex ancestor of the head present in the local clone) for "
+                    + ", ".join(unbound), "re-mint with the binding supplied; nothing was run"))
+                bundle["checks"].append({"id": check_id, "outcome": "CHECK_ARGUMENT_NOT_SUPPLIED", "unbound": unbound})
+                continue
+            planned.append((check_id, [base if a == BASE_COMMIT_ARGUMENT and a in bindings else a for a in argv],
+                            expected))
         if planned:
             first = run_row_commands(checkout, head, planned, work / "run")
             second = run_row_commands(checkout, head, planned, work / "run")
@@ -557,7 +628,7 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                     disp, f = "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS",
                                        "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
                 elif a["outcome"] != "AS_EXPECTED":
-                    disp, f = "DENY", ("REQUIRED_CHECK_FAILED_AT_HEAD", "THE_COMMAND_GIVES_THE_ROWS_EXPECTED_RESULT")
+                    disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_FAILED_AT_HEAD", "THE_COMMAND_GIVES_THE_ROWS_EXPECTED_RESULT")
                 else:
                     disp, f = "ALLOW", None
                 receipts[check_id] = receipt(check_id, disp, change_d, head, epoch, None if f is None else six(
