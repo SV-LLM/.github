@@ -1,0 +1,64 @@
+{
+  "schema": "sv-llm.organization-tree/v0.1",
+  "organization": "SV-LLM",
+  "coordination_repository": ".github",
+  "repositories": [
+    {
+      "name": ".github",
+      "class": "ORGANIZATION_COORDINATION",
+      "required": true,
+      "status": "ESTABLISHED",
+      "role": "Shared organization architecture, contracts, work-context/Sandbox interfaces, authority boundaries and profile."
+    },
+    {
+      "name": "OpenAI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "required": true,
+      "status": "ESTABLISHED",
+      "role": "OpenAI-specific capability declarations, constraints and attributable contribution packaging.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Sandbox",
+      "class": "COLLABORATION_PLANE",
+      "required": true,
+      "status": "REQUIRED_NOT_YET_ESTABLISHED",
+      "role": "Provider-neutral bounded multi-entity collaboration, disagreement/refusal preservation, synthesis provenance and governance handoff packaging.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "StegVerse-AI-Entity",
+      "class": "ECOSYSTEM_ENTITY",
+      "required": true,
+      "status": "REQUIRED_NOT_YET_ESTABLISHED",
+      "role": "Canonical-purpose reconstruction, evidence-versus-receipted-history matching, capability-gap recognition and intelligence orchestration.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "<Additional-LLM>",
+      "class": "INTELLIGENCE_PROVIDER",
+      "required": false,
+      "status": "EXTENSION",
+      "role": "Additional provider/entity-specific capability repository following the common non-authority contract.",
+      "authority_effect": "NONE"
+    }
+  ],
+  "external_authorities": {
+    "task_registry": "StegVerse Task Registry",
+    "worker_claims": "WorkerCoordinator",
+    "transition_authority": "Interlock/InTr",
+    "provider_neutral_transport": "StegVerse-org/LLM-adapter",
+    "credentials": "TV/TVC",
+    "publication": "Publisher",
+    "custody": "Master Records"
+  },
+  "completeness_without_additional_llms": {
+    "required_repositories": [
+      ".github",
+      "OpenAI",
+      "Sandbox",
+      "StegVerse-AI-Entity"
+    ],
+    "statement": "Additional LLM repositories are extensions. The four required repositories form the minimum SV-LLM organization topology; runtime completeness additionally requires their documented contracts to be implemented and integrated through existing StegVerse authority surfaces."
+  }
+}
