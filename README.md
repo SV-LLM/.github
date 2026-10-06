@@ -4,48 +4,62 @@
 
 ```text
 SV-LLM/
-├── .github/                    organization contract and documentation
-├── OpenAI/                     OpenAI-specific intelligence capability
-├── Sandbox/                    provider-neutral multi-entity collaboration plane
-├── StegVerse-AI-Entity/       StegVerse ecosystem orchestration/evidence-matching entity
-└── <Additional-LLM>/           additional provider/entity capability repos as added
+├── .github/        organization architecture, topology and shared policy documentation
+├── schemas/        provider-neutral machine-readable SV-LLM contracts
+├── sandbox/        provider-neutral multi-entity collaboration plane
+├── StegVerse_AI/   StegVerse ecosystem orchestration/evidence-matching entity
+├── OpenAI/         OpenAI capability surface
+├── Anthropic/      Anthropic capability surface
+├── Google/         Google capability surface
+├── Microsoft/      Microsoft capability surface
+├── Meta/           Meta capability surface
+├── DeepSeek/       DeepSeek capability surface
+├── MoonShot_AI/    Moonshot AI capability surface
+└── xAI/            xAI capability surface
 ```
 
 ### Repository roles
 
-| Repository | Role | Owns | Explicitly does not own |
-| --- | --- | --- | --- |
-| `.github` | Organization coordination contract | Organization tree, shared architecture, common schemas/contracts, work-context and Sandbox interface definitions, authority boundaries, organization profile, canonical handoff | Provider execution, governance disposition, credentials, publication, custody, consequence execution |
-| `OpenAI` | OpenAI intelligence capability | OpenAI-specific capability declaration, invocation constraints, attributable contribution packaging, provider-specific evaluation behavior | Governance authority, Task Registry, WorkerCoordinator, InTr authority, credentials, Publisher, Master Records, provider-neutral routing |
-| `Sandbox` | Multi-entity collaboration plane | Bounded work objects, collaboration sessions, attributable contributions, disagreement/refusal/uncertainty preservation, synthesis lineage, cross-entity work artifacts and governance handoff packaging | Model voting as governance, provider credentials, transition authority, publication, custody |
-| `StegVerse-AI-Entity` | StegVerse ecosystem orchestration/evidence-matching entity | Canonical-purpose reconstruction, evidence-versus-receipted-history matching, capability-gap recognition, orchestration requests, ecosystem-drift interrogation, declared entity capabilities | LLM-provider identity by default, subjective truth determination, consensus authority, transition authority, direct execution authority |
-| `<Additional-LLM>` | Additional intelligence capability | Provider/entity-specific capability declarations, interfaces, constraints, attributable outputs and provider-specific evaluation history | Canonical ecosystem knowledge, governance authority, duplicated LLM-adapter transport |
+| Repository | Class | Role |
+| --- | --- | --- |
+| `.github` | Organization coordination | Canonical organization tree, architecture, authority boundaries, profile, handoffs and shared policy documentation. |
+| `schemas` | Shared contract | Provider-neutral schemas for work objects, capability declarations, contributions, provenance, epistemic state, Inference Window projections and governance handoff references. |
+| `sandbox` | Collaboration plane | Provider-neutral bounded multi-entity sessions; preserves attributable contributions, disagreement, refusal, uncertainty, synthesis lineage and handoff packaging. |
+| `StegVerse_AI` | Ecosystem entity | Reconstructs ecosystem purpose, matches evidence against receipted history, recognizes capability gaps and orchestrates intelligence requests without becoming governance authority. |
+| `OpenAI` | Provider capability | OpenAI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Anthropic` | Provider capability | Anthropic-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Google` | Provider capability | Google-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Microsoft` | Provider capability | Microsoft-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Meta` | Provider capability | Meta-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `DeepSeek` | Provider capability | DeepSeek-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `MoonShot_AI` | Provider capability | Moonshot AI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `xAI` | Provider capability | xAI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 
 ### Dependency shape
 
 ```text
-                         SV-LLM/.github
-                    organization contracts
-                           /       \
-                          /         \
-                         v           v
-             StegVerse-AI-Entity   Sandbox
-                       \            / | \
-                        \          /  |  \
-                         v        v   v   v
-                       capability providers
-                       OpenAI + additional LLMs
-                              |
-                              v
-                  existing StegVerse governance
-                              |
-                              v
-                  authorized consequence path
+                     .github
+          architecture / topology / policy
+                        |
+                     schemas
+          provider-neutral shared contracts
+              /         |          \
+             v          v           v
+      StegVerse_AI   sandbox    provider repos
+             \          |        / / / /
+              \         |       / / / /
+               +---------+------+
+                         |
+                 attributable work
+                         |
+                         v
+              existing StegVerse governance
+                         |
+                         v
+              authorized consequence path
 ```
 
-`.github` defines the shared organization contract; it is not a runtime broker. `Sandbox` is the provider-neutral collaboration surface. Provider repositories such as `OpenAI` implement entity-specific capability boundaries. `StegVerse-AI-Entity` reconstructs ecosystem purpose/evidence and identifies or orchestrates required capabilities without becoming governance authority.
-
-SV-LLM is the organization-level coordination surface for StegVerse intelligence work. It exists to resolve the canonical context required to understand ecosystem work, select appropriate intelligence capabilities, coordinate attributable multi-entity work, and return candidate work to existing StegVerse governance.
+Provider repositories are peers under the shared contract; none owns organization governance. `sandbox` is provider-neutral. `schemas` prevents common wire/work contracts from becoming implicitly owned by `.github`, `sandbox`, or any provider. `StegVerse_AI` is a distinct ecosystem entity, not a provider alias.
 
 SV-LLM is **not** a second governance authority, Task Registry, WorkerCoordinator, provider broker, credential authority, Publisher, custody system, or execution authority.
 
