@@ -23,8 +23,8 @@ This repository is the organization coordination surface for the proposed SV-LLM
 8. Ecosystem AI performs evidence/receipted-history matching rather than model-style interpretive judgment.
 9. The Inference Window is disposition-complete for every disposition available in the applicable Admissibility Matrix.
 10. Provider/entity capability selection creates no authority hierarchy.
-11. Existing LLM-adapter provider routing/transport/distributed-workload responsibilities are reused.
-12. Existing Task Registry, WorkerCoordinator, Interlock/InTr, SDK, TV/TVC, Publisher, and Master Records authorities remain unchanged.
+11. SV-LLM owns its provider coordination, shared provider contracts, provider invocation boundaries and multi-entity collaboration semantics through `schemas`, `sandbox` and provider repositories.
+12. External StegVerse governance, transition, publication and custody systems remain outside SV-LLM and interact only through defined organization boundaries.
 
 ## Initial repository direction
 
