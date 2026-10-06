@@ -138,7 +138,7 @@ Capability resolution may select:
 - an explicit challenger;
 - another bounded capability exposed through the organization.
 
-Provider routing, transport, distributed workload semantics, contributor provenance, and provider-specific connection behavior already owned by `StegVerse-org/LLM-adapter` are reused rather than duplicated here.
+Provider routing, provider invocation, multi-entity workload semantics and contribution provenance are defined within SV-LLM through its shared schemas, sandbox coordination plane and provider repositories.
 
 ## Sandbox
 
@@ -223,8 +223,6 @@ SV-LLM reuses and does not supersede:
 - **WorkerCoordinator** — worker claim/fence authority;
 - **Interlock/InTr** — transition authority and organization-crossing evidence/context path;
 - **StegVerse SDK** — manifest construction/validation and SDK-side contracts;
-- **LLM-adapter** — provider-neutral access, provider transport, distributed workload and contribution provenance;
-- **TV/TVC** — credential/provider-operation and applicable route authority;
 - **Master Records** — custody/reconstruction authority;
 - **Publisher** — governed publication/output continuation where applicable.
 
