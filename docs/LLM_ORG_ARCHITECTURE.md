@@ -117,3 +117,23 @@ This architecture does not:
 - make model consensus evidence of truth;
 - treat projected consequences as observed history;
 - require a persistent user-operated second device.
+
+## Canonical repository topology
+
+The topology below is derived from the repositories actually enumerated in the connected `SV-LLM` organization:
+
+- `.github` — organization architecture, topology, policy documentation and handoffs;
+- `schemas` — shared provider-neutral machine-readable contracts;
+- `sandbox` — provider-neutral multi-entity collaboration;
+- `StegVerse_AI` — StegVerse ecosystem orchestration/evidence-matching entity;
+- `OpenAI`, `Anthropic`, `Google`, `Microsoft`, `Meta`, `DeepSeek`, `MoonShot_AI`, and `xAI` — peer provider capability repositories.
+
+The machine-readable source for this inventory and role map is `data/organization-tree.json`.
+
+Repository separation is intentional. Shared schemas must not become provider-owned. Multi-entity collaboration must not become provider-owned. The StegVerse AI entity must retain an identity and governed history distinct from both collaboration sessions and model providers. `.github` defines organization architecture but is not the runtime implementation of those roles.
+
+### Organizational completeness
+
+For the architecture currently defined, the enumerated organization already contains the required **classes** of repository: organization coordination, shared contracts, provider-neutral collaboration, ecosystem entity, and provider capabilities. No additional non-provider repository is justified merely to satisfy the current architecture.
+
+That is an organizational-topology statement only. It does not imply runtime completeness: empty or uninitialized repositories still require their contracts, implementation, validation, and integration with existing StegVerse authority surfaces.

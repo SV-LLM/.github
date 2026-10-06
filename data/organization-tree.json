@@ -1,0 +1,87 @@
+{
+  "schema": "sv-llm.organization-tree/v0.2",
+  "organization": "SV-LLM",
+  "source": "connected GitHub organization enumeration",
+  "repositories": [
+    {
+      "name": ".github",
+      "class": "ORGANIZATION_COORDINATION",
+      "role": "Architecture, topology, authority boundaries, profile, handoffs and shared policy documentation."
+    },
+    {
+      "name": "schemas",
+      "class": "SHARED_CONTRACT",
+      "role": "Provider-neutral machine-readable contracts for work, capabilities, contributions, provenance, epistemic state, Inference Window and governance handoff."
+    },
+    {
+      "name": "sandbox",
+      "class": "COLLABORATION_PLANE",
+      "role": "Provider-neutral bounded multi-entity collaboration and attributable synthesis/handoff."
+    },
+    {
+      "name": "StegVerse_AI",
+      "class": "ECOSYSTEM_ENTITY",
+      "role": "Ecosystem-purpose reconstruction, evidence-versus-receipted-history matching, capability-gap recognition and intelligence orchestration.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "OpenAI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "OpenAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Anthropic",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Anthropic-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Google",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Google-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Microsoft",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Microsoft-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Meta",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Meta-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "DeepSeek",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "DeepSeek-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "MoonShot_AI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "MoonShot_AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "xAI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "xAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    }
+  ],
+  "invariants": [
+    "Provider participation does not confer governance authority.",
+    "Provider-neutral contracts belong in schemas rather than a provider repository.",
+    "Multi-entity collaboration belongs in sandbox rather than a provider repository.",
+    "StegVerse_AI remains distinct from provider identities and governance authority.",
+    "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher, SDK and Master Records authorities are not duplicated in SV-LLM."
+  ],
+  "completeness_assessment": {
+    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, the StegVerse ecosystem entity, and eight provider capability surfaces. No additional non-provider repository is presently justified by the documented architecture.",
+    "implementation_state": "Repository existence does not establish implementation or integration completeness. Empty/uninitialized repositories require their role contracts and implementations to be established before runtime completeness can be claimed."
+  }
+}
