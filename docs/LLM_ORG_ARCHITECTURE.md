@@ -120,13 +120,20 @@ This architecture does not:
 
 ## Canonical repository topology
 
-The minimum SV-LLM topology, excluding optional additional LLM/provider repositories, is:
+The topology below is derived from the repositories actually enumerated in the connected `SV-LLM` organization:
 
-1. `.github` — organization coordination contract and canonical documentation;
-2. `OpenAI` — first concrete intelligence-provider capability surface;
-3. `Sandbox` — provider-neutral multi-entity collaboration plane;
-4. `StegVerse-AI-Entity` — ecosystem orchestration and evidence/receipted-history matching entity.
+- `.github` — organization architecture, topology, policy documentation and handoffs;
+- `schemas` — shared provider-neutral machine-readable contracts;
+- `sandbox` — provider-neutral multi-entity collaboration;
+- `StegVerse_AI` — StegVerse ecosystem orchestration/evidence-matching entity;
+- `OpenAI`, `Anthropic`, `Google`, `Microsoft`, `Meta`, `DeepSeek`, `MoonShot_AI`, and `xAI` — peer provider capability repositories.
 
-Additional LLM repositories extend capability coverage but are not required to define the core organization topology. The machine-readable source for this topology is `data/organization-tree.json`.
+The machine-readable source for this inventory and role map is `data/organization-tree.json`.
 
-Repository separation is intentional. The Sandbox must not be hidden inside a provider repository because collaboration is provider-neutral. The StegVerse AI Entity must not be hidden inside the Sandbox or a provider repository because its identity and governed work history are distinct from any one collaboration session or model provider. The `.github` repository defines these contracts but does not become their runtime implementation.
+Repository separation is intentional. Shared schemas must not become provider-owned. Multi-entity collaboration must not become provider-owned. The StegVerse AI entity must retain an identity and governed history distinct from both collaboration sessions and model providers. `.github` defines organization architecture but is not the runtime implementation of those roles.
+
+### Organizational completeness
+
+For the architecture currently defined, the enumerated organization already contains the required **classes** of repository: organization coordination, shared contracts, provider-neutral collaboration, ecosystem entity, and provider capabilities. No additional non-provider repository is justified merely to satisfy the current architecture.
+
+That is an organizational-topology statement only. It does not imply runtime completeness: empty or uninitialized repositories still require their contracts, implementation, validation, and integration with existing StegVerse authority surfaces.
