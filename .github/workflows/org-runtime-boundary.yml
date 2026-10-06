@@ -8,6 +8,8 @@ on:
       - 'org-kernel/**'
       - '.stegverse/transition-ledger/**'
       - 'docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json'
+      - 'resident-runtime/**'
+      - 'data/organization-*.json'
       - 'ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md'
       - '.github/workflows/org-runtime-boundary.yml'
   push:
@@ -18,6 +20,8 @@ on:
       - 'org-kernel/**'
       - '.stegverse/transition-ledger/**'
       - 'docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json'
+      - 'resident-runtime/**'
+      - 'data/organization-*.json'
       - 'ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md'
       - '.github/workflows/org-runtime-boundary.yml'
   workflow_dispatch:
@@ -49,5 +53,7 @@ jobs:
 
       - name: Validate vendored organization kernel
         run: python org-kernel/tests/test_kernel.py
-      - name: Validate SV-LLM organization crossing (egress to federation peers, ingress to SV-LLM)
+      - name: Validate federation directory projection
+        run: python org-boundary/runtime/federation_projection.py verify
+      - name: Validate SV-LLM manifest-bound ledgered crossings
         run: python org-runtime/tests/test_org_crossing.py

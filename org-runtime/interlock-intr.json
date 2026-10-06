@@ -32,5 +32,26 @@
   "github_token_runtime_authority": "NONE",
   "authority_transfer_assumed": false,
   "authority_effect_resolution": "DERIVED_FROM_APPLICABLE_TRANSITION_ELEMENTS",
-  "repository_endpoint_rule": "APPLICATION_REPOSITORIES_EXPOSE_PROFILES_ONLY_ORG_DOT_GITHUB_OWNS_ORG_COMMUNICATION"
+  "repository_endpoint_rule": "MANIFEST_DETERMINES_DESTINATION_EXISTING_DESTINATION_SUFFICIENT_NO_ENDPOINT_PROFILE_REQUIRED",
+  "crossing_surface": "org-runtime/crossing.py",
+  "crossing_disposition_recording": "EVERY_DISPOSITION_REPO_LEDGER_THEN_ORGANIZATION_LEDGER",
+  "destination_resolution": {
+    "egress": "MANIFEST_NAMED_ORGANIZATION_IN_FEDERATION_DIRECTORY_PROJECTION",
+    "ingress": "MANIFEST_NAMED_REPOSITORY_IN_data/organization-tree.json_OR_REGISTERED_BOUNDARY_SERVICE"
+  },
+  "federation_directory": {
+    "path": "org-boundary/registry/federation.json",
+    "class": "PROJECTION_OF_CANONICAL",
+    "tool": "org-boundary/runtime/federation_projection.py"
+  },
+  "conformance_standard": {
+    "actions_by_manifest_required": true,
+    "manifest_determines_destination": true,
+    "destination_existence_sufficient_for_ingress_and_egress": true,
+    "destination_liveness_is_transition_predicate": false,
+    "external_machine_awaiting_allowed": false,
+    "always_on_receiver_required": false,
+    "receiver_unavailable_disposition": "DURABLE_QUEUE_OR_EVENT_EPHEMERAL_MATERIALIZATION",
+    "post_closure_authentic_observer_gate_allowed": false
+  }
 }

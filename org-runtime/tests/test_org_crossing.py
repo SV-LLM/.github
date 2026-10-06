@@ -1,78 +1,89 @@
 #!/usr/bin/env python3
-"""SV-LLM organization-crossing proof through the vendored kernel.
+"""SV-LLM organization crossings: manifest-bound, ledgered, never awaiting.
 
-Uses this repository's real boundary registry and standing surfaces as the
-SV-LLM root. Peers are synthetic roots carrying only their published
-organization identity, so this proves SV-LLM's wiring, not a peer's runtime.
-Source-level evidence only: no resident runtime is observed here.
+Runs against a copy of this repository so ledgers, spool and materializations
+land in a temporary tree. Peers are synthetic roots carrying only their
+published organization identity: this proves SV-LLM's boundary, not a peer's.
+Source-level evidence only.
 """
-import importlib.util, json, shutil, tempfile
+import importlib.util, json, os, shutil, tempfile
 from pathlib import Path
 
 REPO=Path(__file__).resolve().parents[2]
-spec=importlib.util.spec_from_file_location("kernel",REPO/"org-kernel/kernel.py"); k=importlib.util.module_from_spec(spec); spec.loader.exec_module(k)
-ORG="SV-LLM"
-CONTROL="sv-llm.org-control"
 STANDING={"mode":"ESTABLISH_GENESIS","node_ref":"sv-llm-crossing-test-node","predecessor":None}
-NOW=k.HB_ANCHOR_UNIX_NS+5_000_000_000
 
-def peer_root(base:Path, org:str)->Path:
-    root=base/org; (root/"org-boundary/registry").mkdir(parents=True)
-    (root/"org-boundary/runtime").mkdir(parents=True); (root/"docs").mkdir(parents=True)
-    shutil.copy2(REPO/"org-boundary/runtime/node_standing.py",root/"org-boundary/runtime/node_standing.py")
-    shutil.copy2(REPO/"docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json",root/"docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json")
+def load(name,path):
+    spec=importlib.util.spec_from_file_location(name,path); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
+
+def peer_root(base,org,k):
+    root=base/"peers"/org; (root/"org-boundary/registry").mkdir(parents=True)
+    shutil.copytree(REPO/"org-boundary/runtime",root/"org-boundary/runtime"); (root/"docs").mkdir()
+    shutil.copy2(REPO/"docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json",root/"docs")
     slug=k.organization_slug(org)
-    reg={"organization":org,"services":[{"service_id":slug+".org-control","repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL",
-         "accepts":["ecosystem.communication","ecosystem.monitor.request","ecosystem.work.request"]}]}
-    (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
+    (root/"org-boundary/registry/services.json").write_text(json.dumps({"organization":org,"services":[
+        {"service_id":slug+".org-control","repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}))
     return root
 
-registry=k.load_registry(REPO)
-assert registry["organization"]==ORG
-assert {s["service_id"] for s in registry["services"]}=={CONTROL,"sv-llm.boundary-diagnostic"}
-directory=k.load_federation_directory(REPO)
-peers=[row["organization"] for row in directory["organizations"]]
+def chain(ledger):
+    head=json.loads((ledger/"HEAD.json").read_text())["receipt_sha256"]; rows=[]
+    while head:
+        r=json.loads((ledger/"receipts"/(head.split(":",1)[1]+".json")).read_text()); rows.append(r); head=r["previous_receipt_sha256"]
+    return rows[::-1]
 
 with tempfile.TemporaryDirectory() as td:
-    base=Path(td); mesh=base/"mesh"; sv=base/"sv-llm"
-    shutil.copytree(REPO/"org-boundary",sv/"org-boundary"); shutil.copytree(REPO/"docs",sv/"docs")
-    roots={org:peer_root(base,org) for org in peers}
+    base=Path(td); root=base/"sv-llm"
+    shutil.copytree(REPO,root,ignore=shutil.ignore_patterns(".git","__pycache__","materialized"))
+    os.environ["STEGVERSE_REPO_LEDGER_ROOT"]=str(base/"repo-ledger"); os.environ["STEGVERSE_ORG_LEDGER_ROOT"]=str(base/"org-ledger")
+    mesh=base/"mesh"
+    c=load("crossing",root/"org-runtime/crossing.py"); k=c.kernel
+    assert c.ORG=="SV-LLM"
+    peers=[r["organization"] for r in k.load_federation_directory(root)["organizations"] if r["organization"]!=c.ORG]
 
-    # EGRESS: SV-LLM -> every federation peer, addressed InTr frames on the shared spool.
+    # EGRESS to every peer. No peer root exists yet: the transition succeeds at egress, nothing waits.
     for org in peers:
-        packet=k.build_packet(origin_org=ORG,origin_service=CONTROL,destination_org=org,
-                              destination_service=k.organization_slug(org)+".org-control",
-                              payload={"message_class":"ecosystem.monitor.request","subject":"sv-llm-egress-proof"},
-                              standing=STANDING,packet_id=f"sv-llm-egress-{k.organization_slug(org)}")
-        k.publish_packet(packet,root=mesh,now_ns=NOW)
-    assert k.consume_addressed_frames(sv,mesh_root=mesh)==[]
+        out=c.egress({"manifest_id":"egress-"+org,"destination":{"organization":org},"payload":{"probe":"egress"}},
+                     standing=STANDING,mesh_root=mesh,root=root)
+        assert out["transition_class"]=="ORGANIZATION_EGRESS_EMITTED" and out["disposition"]=="ALLOW" and out["awaits_receiver"] is False
+        assert Path(out["spool_path"]).exists()
+    roots={org:peer_root(base,org,k) for org in peers}
     for org in peers:
-        consumed=k.consume_addressed_frames(roots[org],mesh_root=mesh)
-        assert len(consumed)==1, org
-        ingested=consumed[0]["result"]; result=ingested["execution_result"]
-        assert ingested["status"]=="CONSUMED" and ingested["packet"]["origin"]["org"]==ORG
-        assert result["organization"]==org and result["reconstruction"]["status"]=="RECONSTRUCTED"
-        frame=json.loads(Path(consumed[0]["path"]).read_text())
-        assert frame["origin_org"]==ORG and frame["authority_effect"]=="NONE_CARRIER_ONLY"
+        got=k.consume_addressed_frames(roots[org],mesh_root=mesh)
+        assert len(got)==1 and got[0]["result"]["status"]=="CONSUMED" and got[0]["result"]["packet"]["origin"]["org"]=="SV-LLM", org
     print("SV_LLM_EGRESS_PASS",len(peers))
 
-    # INGRESS: a peer -> SV-LLM, consumed only by SV-LLM's real registry.
-    packet=k.build_packet(origin_org="StegVerse-Labs",origin_service="stegverse-labs.org-control",destination_org=ORG,
-                          destination_service=CONTROL,payload={"message_class":"ecosystem.monitor.request","subject":"sv-llm-ingress-proof"},
-                          standing=STANDING,packet_id="sv-llm-ingress-001")
-    k.publish_packet(packet,root=mesh,now_ns=NOW)
-    consumed=k.consume_addressed_frames(sv,mesh_root=mesh)
-    assert len(consumed)==1 and consumed[0]["result"]["status"]=="CONSUMED"
-    result=consumed[0]["result"]["execution_result"]
-    assert result["organization"]==ORG and result["service_id"]==CONTROL
-    assert [x["kind"] for x in result["receipts"]]==["INGRESS_ACCEPTED","DISPATCHED","CONSUMED","RESULT_BOUND","EGRESS_EMITTED"]
-    for r in roots.values():
-        assert all(x["result"]["packet"]["packet_id"]!="sv-llm-ingress-001" for x in k.consume_addressed_frames(r,mesh_root=mesh))
+    # EGRESS refusals are transitions too, and are recorded.
+    for manifest,predicate in (({"manifest_id":"x","destination":{"organization":"Not-An-Org"}},"DESTINATION_NOT_IN_FEDERATION_DIRECTORY"),
+                               ({"manifest_id":"y","destination":{"organization":"SV-LLM"}},"DESTINATION_IS_THIS_ORGANIZATION"),
+                               ({"destination":{"organization":"StegVerse-Labs"}},"MANIFEST_ID_MISSING")):
+        out=c.egress(manifest,standing=STANDING,mesh_root=mesh,root=root)
+        assert out["transition_class"]=="ORGANIZATION_EGRESS_REFUSED" and out["failed_predicate"]==predicate and out["org_receipt_sha256"]
+    print("SV_LLM_EGRESS_REFUSAL_RECORDED_PASS")
+
+    # INGRESS: the manifest names an existing SV-LLM repository. No endpoint profile is declared or needed.
+    def send(pid,payload,service="sv-llm.org-control"):
+        k.publish_packet(k.build_packet(origin_org="StegVerse-Labs",origin_service="stegverse-labs.org-control",destination_org="SV-LLM",
+                         destination_service=service,payload=payload,standing=STANDING,packet_id=pid),root=mesh)
+    send("in-sandbox",{"manifest":{"manifest_id":"m-sandbox","destination":{"organization":"SV-LLM","repository":"sandbox"},"payload":{"work":"w"}}})
+    send("in-missing-repo",{"manifest":{"manifest_id":"m-missing","destination":{"organization":"SV-LLM","repository":"does-not-exist"}}})
+    send("in-wrong-org",{"manifest":{"manifest_id":"m-wrong","destination":{"organization":"AaCT-E","repository":"sandbox"}}})
+    send("in-control",{"message_class":"ecosystem.monitor.request","subject":"probe"})
+    send("in-unregistered",{"probe":1},service="sv-llm.unregistered")
+    results={r["packet_id"]:r for r in c.ingress(mesh_root=mesh,root=root)}
+    assert results["in-sandbox"]["transition_class"]=="ORGANIZATION_INGRESS_MATERIALIZED"
+    assert results["in-sandbox"]["destination_repository"]=="SV-LLM/sandbox" and Path(results["in-sandbox"]["materialization_path"]).exists()
+    assert results["in-missing-repo"]["failed_predicate"]=="DESTINATION_REPOSITORY_DOES_NOT_EXIST"
+    assert results["in-wrong-org"]["failed_predicate"]=="MANIFEST_DESTINATION_ORGANIZATION_MISMATCH"
+    assert results["in-control"]["transition_class"]=="ORGANIZATION_INGRESS_CONSUMED"
+    assert results["in-unregistered"]["failed_predicate"]=="BOUNDARY_DISPATCH_REFUSED"
+    assert all(r["org_receipt_sha256"] for r in results.values())
+    assert c.ingress(mesh_root=mesh,root=root)==[]   # consumed once; an empty spool records nothing
     print("SV_LLM_INGRESS_PASS")
 
-    # Fail closed: an unregistered SV-LLM service is refused, never auto-created.
-    bad=k.build_packet(origin_org="StegVerse-Labs",origin_service="stegverse-labs.org-control",destination_org=ORG,
-                       destination_service="sv-llm.unregistered",payload={},standing=STANDING,packet_id="sv-llm-unregistered-001")
-    try: k.dispatch(sv,bad); raise AssertionError("unregistered service dispatched")
-    except ValueError as e: assert str(e)=="unknown_service"
-    print("SV_LLM_FAIL_CLOSED_PASS")
+    # Every disposition is on both ledgers, in one unbroken chain each.
+    repo_chain=chain(base/"repo-ledger"); org_chain=chain(base/"org-ledger")
+    expected=len(peers)+3+5
+    assert len(repo_chain)==expected and len(org_chain)==expected
+    assert all(r["repository"]=="SV-LLM/.github" for r in repo_chain)
+    assert [o["repo_receipt_sha256"] for o in org_chain]==[r["receipt_sha256"] for r in repo_chain]
+    assert all(o["organization"]=="SV-LLM" and o["authority_effect"]=="NONE" for o in org_chain)
+    print("SV_LLM_LEDGER_CHAIN_PASS",expected)

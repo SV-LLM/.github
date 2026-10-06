@@ -22,5 +22,5 @@
       "runtime_required_for_consumption": false
     }
   ],
-  "boundary_rule": "All organization-crossing communication is generated and consumed through SV-LLM/.github using Interlock/InTr; endpoint authority remains transition-governed. SV-LLM application repositories register INTERNAL_ENDPOINT services here only once they expose a declared endpoint profile."
+  "boundary_rule": "All organization-crossing communication is generated and consumed through SV-LLM/.github using Interlock/InTr as manifest-bound state transitions; the manifest determines the destination and an existing destination is sufficient. SV-LLM repositories are destinations by existence (data/organization-tree.json) and declare no endpoint profile."
 }

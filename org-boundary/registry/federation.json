@@ -103,5 +103,14 @@
   ],
   "denominator": 14,
   "authority_effect": "NONE",
-  "carrier": "HB_DERIVED"
+  "carrier": "HB_DERIVED",
+  "projection": {
+    "source_repository": "StegVerse-Labs/.github",
+    "source_path": "org-boundary/registry/federation.json",
+    "source_commit": "c4ed8de7f567ac16117a17cd05a118c6a52a440d",
+    "source_sha256": "sha256:c172c97f9f95293331d9efd00bac82dbe50a66693a99ba2cb8da3c593c4c21af",
+    "entries_sha256": "sha256:688e2d9b129dce4cdc8e0dc8a69fca38097015aaef51269861b5705dbcdf9bf7",
+    "rule": "CANONICAL_ENTRIES_UNCHANGED_LOCAL_ADDITIONS_PROHIBITED_UPDATE_BY_REPROJECTION",
+    "authority_effect": "NONE_PROJECTION_ONLY"
+  }
 }

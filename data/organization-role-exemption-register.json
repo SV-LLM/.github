@@ -27,6 +27,21 @@
     "A_RECEIVER_IS_NOT_ALWAYS_ON",
     "AN_AUTHENTIC_OBSERVER_HAS_NOT_YET_LOOKED"
   ],
-  "exemptions": [],
+  "exemptions": [
+    {
+      "exemption_id": "SV-LLM-EXEMPTION-001",
+      "surface": "org-kernel/kernel.py direct crossing entrypoints (publish_packet, publish_ecosystem_message, publish_ecosystem_from_directory, ingest_frame, consume_addressed_frames, consume_and_respond) as vendored unchanged from StegVerse-Labs/.github@c4ed8de7",
+      "owning_existing_goal": "Universal Organization Resident Kernel (StegVerse-Labs/.github/org-kernel, canonical_source)",
+      "failure_code": "ORGANIZATION_ROLE_CONFORMANCE_NOT_DECLARED",
+      "failed_predicate": "EVERY_STATE_TRANSITION_OCCURRING_WITHIN_THE_ORGANIZATION_EMITS_AN_ORGANIZATION_RECEIPT",
+      "why_manifest_bound_state_transition_is_not_yet_possible": "The canonical kernel publishes and consumes crossings without appending repository or organization receipts. SV-LLM vendors the kernel byte-identically and does not fork it; every SV-LLM crossing is made through org-runtime/crossing.py, which records each disposition on both ledgers. The kernel's own entrypoints remain callable directly and would bypass that record.",
+      "disposition": "DENY_DIRECT_USE_ROUTE_THROUGH_org-runtime/crossing.py",
+      "required_evidence_or_repair": "Canonical kernel records every crossing disposition on the repository and organization ledgers (or exposes a ledger hook), released in StegVerse-Labs/.github/org-kernel and re-vendored here; then this exemption is removed.",
+      "retry_entrypoint": "python org-runtime/tests/test_org_crossing.py && python org-kernel/tests/test_kernel.py",
+      "next_attempt": "On the next canonical org-kernel release",
+      "expires_or_review_on": "2026-11-06",
+      "exemption_grants_authority": false
+    }
+  ],
   "authority_effect": "NONE_REGISTER_ONLY"
 }
