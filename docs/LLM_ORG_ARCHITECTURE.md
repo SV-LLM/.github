@@ -111,7 +111,6 @@ This architecture does not:
 - replace Interlock/InTr;
 - create a second Admissibility Matrix;
 - create provider credentials;
-- replace LLM-adapter routing or distributed workload;
 - publish directly around Publisher;
 - replace Master Records;
 - make model consensus evidence of truth;
