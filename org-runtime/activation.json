@@ -1,0 +1,38 @@
+{
+  "schema": "stegverse.organization-resident-runtime-activation/v1",
+  "organization": "SV-LLM",
+  "owner_repository": "SV-LLM/.github",
+  "activation_source_scope": "ORG_DOT_GITHUB_ONLY",
+  "activation_request_generator": "org-runtime/runtime_boundary.py",
+  "heartbeat_reference": {
+    "frequency_hz": 100,
+    "period_ms": 10,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "grants_execution_authority": false
+  },
+  "credential_authority": "TV/TVC",
+  "github_token_runtime_authority": "NONE",
+  "github_actions_runtime_authority": "NONE",
+  "authority_transfer_assumed": false,
+  "authority_effect_resolution": "DERIVED_FROM_APPLICABLE_TRANSITION_ELEMENTS",
+  "runtime_reality_authority": "Organization",
+  "runtime_reality_locus": "ORGANIZATION_LEDGER_ROOT",
+  "runtime_reality_write_mode": "MANIFEST_DIRECTED_APPEND",
+  "runtime_reality_contract": ".stegverse/transition-ledger/org-contract.json",
+  "crossing_surface": "org-runtime/crossing.py",
+  "conformance_standard": {
+    "actions_by_manifest_required": true,
+    "manifest_determines_destination": true,
+    "destination_existence_sufficient_for_ingress_and_egress": true,
+    "destination_liveness_is_transition_predicate": false,
+    "external_machine_awaiting_allowed": false,
+    "always_on_receiver_required": false,
+    "receiver_unavailable_disposition": "DURABLE_QUEUE_OR_EVENT_EPHEMERAL_MATERIALIZATION",
+    "post_closure_authentic_observer_gate_allowed": false
+  },
+  "nonclaims": [
+    "source presence is not a transition",
+    "GitHub Actions is validation only and holds no runtime authority",
+    "a transition is real when appended to the organization ledger; observing a process, listener or receiver neither establishes nor gates it"
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "schema": "stegverse.organization-role-runtime-reality-deployment/v1",
+  "declaration_id": "ORGANIZATION-ROLE-RUNTIME-REALITY-DEPLOYMENT-001",
+  "organization": "SV-LLM",
+  "declared_on": "2026-10-06",
+  "completion_evidence_contract_version": "v1",
+  "evidence_class": "SOURCE_IMPLEMENTED",
+  "authority_effect": "NONE_DECLARATION_ONLY",
+  "deployment_scope": "THIS_ORGANIZATION_ONLY_EACH_ORGANIZATION_DEPLOYS_IN_ITS_OWN_DOT_GITHUB",
+  "adopted_from": {
+    "repository": "StegVerse-Labs/.github",
+    "path": "data/organization-role-runtime-reality-deployment.json"
+  },
+  "role_change": {
+    "invariant_key": "runtime_reality_authority",
+    "previous_value": "Master Records",
+    "current_value": "Organization",
+    "reality_locus": "ORGANIZATION_LEDGER_ROOT",
+    "reality_lock": "ORGANIZATION_LEDGER_LOCK",
+    "reality_write_mode": "MANIFEST_DIRECTED_APPEND",
+    "organization_ledger_contract": ".stegverse/transition-ledger/org-contract.json",
+    "organization_receipt_schema": "stegverse.organization-transition-receipt/v1",
+    "organization_scope_rule": "EVERY_STATE_TRANSITION_OCCURRING_WITHIN_THE_ORGANIZATION_EMITS_AN_ORGANIZATION_RECEIPT"
+  },
+  "master_records_restated_role": {
+    "role": "RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER",
+    "runtime_reality_authority": "NONE",
+    "transition_authority": "NONE",
+    "records": "RELEASED_ORGANIZATION_BATCH_RECEIPTS",
+    "release_predecessor_required": "VERIFIED_ORGANIZATION_RECEIPT_CHAIN_SEGMENT",
+    "retained_capabilities": [
+      "CUSTODY",
+      "RECONSTRUCTION",
+      "CROSS_ORGANIZATION_HISTORY"
+    ],
+    "propagation_target": "master-records/.github",
+    "may_gate_organization_runtime_reality": false,
+    "may_be_awaited_by_a_transition": false
+  },
+  "conformance_standard": {
+    "actions_by_manifest_required": true,
+    "state_transition_dependent": true,
+    "external_machine_awaiting_allowed": false,
+    "destination_sufficiency_rule": "MANIFEST_DETERMINES_THE_DESTINATION_AND_AN_EXISTING_DESTINATION_IS_SUFFICIENT_FOR_INGRESS_AND_EGRESS",
+    "receiver_unavailable_disposition": "DURABLE_QUEUE_OR_EVENT_EPHEMERAL_MATERIALIZATION",
+    "always_on_receiver_required": false,
+    "post_closure_authentic_observer_gate_allowed": false,
+    "non_conforming_surface_disposition": "DECLARED_EXEMPTION_REQUIRED",
+    "non_conforming_surface_failure_code": "ORGANIZATION_ROLE_CONFORMANCE_NOT_DECLARED"
+  },
+  "exemption_path": {
+    "register": "data/organization-role-exemption-register.json",
+    "required_fields": [
+      "surface",
+      "owning_existing_goal",
+      "failed_predicate",
+      "why_manifest_bound_state_transition_is_not_yet_possible",
+      "required_evidence_or_repair",
+      "retry_entrypoint",
+      "next_attempt",
+      "expires_or_review_on"
+    ],
+    "rule": "A_SURFACE_THAT_CANNOT_YET_BE_MANIFEST_BOUND_MUST_HOLD_A_REGISTERED_EXEMPTION_RATHER_THAN_REMAIN_SILENTLY_NON_CONFORMING",
+    "exemption_grants_authority": false
+  },
+  "superseded_prose_statements": {
+    "rule": "A_PROSE_STATEMENT_ASSIGNING_OBSERVED_OR_RUNTIME_REALITY_AUTHORITY_TO_MASTER_RECORDS_IS_SUPERSEDED_BY_THIS_DECLARATION_AT_ITS_OWNING_SURFACE",
+    "cross_owner_edit_performed": false,
+    "measured_on_commit_of_this_declaration": true,
+    "count": 0,
+    "files": []
+  },
+  "retained_statements": {
+    "rule": "A_STATEMENT_THAT_MASTER_RECORDS_IS_CUSTODY_RECONSTRUCTION_ONLY_AND_HOLDS_NO_TRANSITION_AUTHORITY_REMAINS_CORRECT_AND_IS_NOT_SUPERSEDED",
+    "reason": "THIS_DECLARATION_MOVES_RUNTIME_REALITY_NOT_CUSTODY",
+    "files": [
+      "README.md",
+      "docs/LLM_ORG_ARCHITECTURE.md",
+      "docs/LLM_ORG_FOUNDATION_MIRROR_HANDOFF.md",
+      "data/organization-tree.json"
+    ]
+  },
+  "this_declaration_does_not": [
+    "MUTATE_ANY_CANONICAL_TASK_RECORD",
+    "CLOSE_ANY_GOAL",
+    "CLAIM_RUNTIME_OBSERVATION",
+    "CREATE_A_SCHEDULER_RUNTIME_LEDGER_CREDENTIAL_OR_DEVICE",
+    "GRANT_TRANSITION_EXECUTION_CUSTODY_OR_CREDENTIAL_AUTHORITY",
+    "REQUIRE_AN_EXTERNAL_MACHINE_OR_SECOND_DEVICE"
+  ]
+}

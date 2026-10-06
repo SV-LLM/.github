@@ -1,0 +1,26 @@
+{
+  "schema_version": "sv-llm.service-registry.v1",
+  "organization": "SV-LLM",
+  "services": [
+    {
+      "service_id": "sv-llm.org-control",
+      "repository": "SV-LLM/.github",
+      "boundary_role": "BOUNDARY_LOCAL_CONTROL",
+      "profile_status": "ACTIVE",
+      "accepts": [
+        "ecosystem.communication",
+        "ecosystem.monitor.request",
+        "ecosystem.work.request"
+      ],
+      "runtime_required_for_consumption": false
+    },
+    {
+      "service_id": "sv-llm.boundary-diagnostic",
+      "repository": "SV-LLM/.github",
+      "boundary_role": "BOUNDARY_LOCAL_DIAGNOSTIC",
+      "profile_status": "ACTIVE",
+      "runtime_required_for_consumption": false
+    }
+  ],
+  "boundary_rule": "All organization-crossing communication is generated and consumed through SV-LLM/.github using Interlock/InTr as manifest-bound state transitions; the manifest determines the destination and an existing destination is sufficient. SV-LLM repositories are destinations by existence (data/organization-tree.json) and declare no endpoint profile."
+}
