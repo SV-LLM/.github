@@ -117,3 +117,16 @@ This architecture does not:
 - make model consensus evidence of truth;
 - treat projected consequences as observed history;
 - require a persistent user-operated second device.
+
+## Canonical repository topology
+
+The minimum SV-LLM topology, excluding optional additional LLM/provider repositories, is:
+
+1. `.github` — organization coordination contract and canonical documentation;
+2. `OpenAI` — first concrete intelligence-provider capability surface;
+3. `Sandbox` — provider-neutral multi-entity collaboration plane;
+4. `StegVerse-AI-Entity` — ecosystem orchestration and evidence/receipted-history matching entity.
+
+Additional LLM repositories extend capability coverage but are not required to define the core organization topology. The machine-readable source for this topology is `data/organization-tree.json`.
+
+Repository separation is intentional. The Sandbox must not be hidden inside a provider repository because collaboration is provider-neutral. The StegVerse AI Entity must not be hidden inside the Sandbox or a provider repository because its identity and governed work history are distinct from any one collaboration session or model provider. The `.github` repository defines these contracts but does not become their runtime implementation.
