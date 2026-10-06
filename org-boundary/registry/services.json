@@ -1,0 +1,26 @@
+{
+  "schema_version": "sv-llm.service-registry.v1",
+  "organization": "SV-LLM",
+  "services": [
+    {
+      "service_id": "sv-llm.org-control",
+      "repository": "SV-LLM/.github",
+      "boundary_role": "BOUNDARY_LOCAL_CONTROL",
+      "profile_status": "ACTIVE",
+      "accepts": [
+        "ecosystem.communication",
+        "ecosystem.monitor.request",
+        "ecosystem.work.request"
+      ],
+      "runtime_required_for_consumption": false
+    },
+    {
+      "service_id": "sv-llm.boundary-diagnostic",
+      "repository": "SV-LLM/.github",
+      "boundary_role": "BOUNDARY_LOCAL_DIAGNOSTIC",
+      "profile_status": "ACTIVE",
+      "runtime_required_for_consumption": false
+    }
+  ],
+  "boundary_rule": "All organization-crossing communication is generated and consumed through SV-LLM/.github using Interlock/InTr; endpoint authority remains transition-governed. SV-LLM application repositories register INTERNAL_ENDPOINT services here only once they expose a declared endpoint profile."
+}

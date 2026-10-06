@@ -228,6 +228,10 @@ SV-LLM reuses and does not supersede:
 - **Master Records** — custody/reconstruction authority;
 - **Publisher** — governed publication/output continuation where applicable.
 
+## Organization Interlock/InTr boundary
+
+All SV-LLM data crossing to or from other StegVerse organizations is generated and consumed at this `.github` boundary as Interlock/InTr packets on HB-derived carrier frames, using the organization-neutral kernel vendored from `StegVerse-Labs/.github`. The boundary carries data; it grants no transition, credential, routing or execution authority. See `ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md`.
+
 ## Consumer integration
 
 The later Ecosystem Chat consumer loop is a separate integration objective:

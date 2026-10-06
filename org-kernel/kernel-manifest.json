@@ -1,0 +1,66 @@
+{
+  "schema_version": "stegverse.org-resident-kernel-manifest/v1",
+  "kernel_version": "1.3.2",
+  "canonical_source": "StegVerse-Labs/.github/org-kernel",
+  "organization_neutral": true,
+  "modules": [
+    "HB reference derivation",
+    "HB-derived InTr carrier",
+    "organization addressing",
+    "service registry dispatch",
+    "five-stage receipts",
+    "same-execution reconstruction",
+    "write-once federation outbox",
+    "shared sovereign federation spool",
+    "addressed HB-derived InTr frame publish/scan/consume",
+    "ecosystem-wide multicast fanout",
+    "org-control message consumption",
+    "ecosystem result aggregation",
+    "resident status responses",
+    "durable ecosystem work intake",
+    "governed request-response frames",
+    "federation directory consumption",
+    "durable federation frame deduplication",
+    "node standing admission gate"
+  ],
+  "authority": {
+    "heartbeat": "NONE",
+    "carrier": "NONE",
+    "github_actions": "NONE",
+    "credential_authority": "TV/TVC"
+  },
+  "excluded_as_application_specific": [
+    "StegFin workers",
+    "SV-DN1 workers",
+    "HIL workers",
+    "TVC provider workers",
+    "KV-specific workers"
+  ],
+  "federation": {
+    "transport": "shared local sovereign spool",
+    "default_root": "$XDG_STATE_HOME/stegverse/org-federation",
+    "override_env": "STEGVERSE_ORG_FEDERATION_ROOT",
+    "broker_required": false,
+    "github_runtime_required": false,
+    "carrier": "HB_DERIVED_INTR_FRAME",
+    "authority_effect": "NONE",
+    "replay_policy": "WRITE_ONCE_PER_NODE_CONSUMPTION_MARKER",
+    "duplicate_frame_consumption": false
+  },
+  "ecosystem_communications": {
+    "message_classes": [
+      "ecosystem.communication",
+      "ecosystem.monitor.request",
+      "ecosystem.work.request"
+    ],
+    "fanout": "ONE_GOVERNED_COMMUNICATION_TO_N_ADDRESSED_INTR_PACKETS",
+    "common_communication_id": true,
+    "per_org_receipts": true,
+    "rollup_reconstruction": true,
+    "receipt_grants_execution_authority": false,
+    "response_path": "PER_ORG_GOVERNED_RESPONSE_TO_ORIGIN",
+    "monitoring": "REQUEST_STATUS_AND_COLLECT_RESPONSES",
+    "work": "QUEUE_FOR_LOCAL_ADMISSION_EVALUATION",
+    "work_request_receipt_grants_execution_authority": false
+  }
+}
