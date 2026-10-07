@@ -1,0 +1,42 @@
+{
+  "schema": "sv-llm.organization-role-reference-adoption/v1",
+  "reference": {
+    "repository": "StegVerse-org/.github",
+    "commit": "702f896246c44c5857bfdc8227f953655958f4d5"
+  },
+  "adopted_by": "SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001",
+  "files": {
+    "resident-runtime/ledger_store.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:a3c52fb8a8f28bd0cd56135eecef19e469b8b23513650c6c0cf9dfa870e67db3"
+    },
+    ".stegverse/transition-ledger/emit.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:bccdf2e4e2ead81e0bef46b66f0182a3d4c510cd8cca2bc2a7105b1751dc2803"
+    },
+    "resident-runtime/aggregate_repo_transition.py": {
+      "rule": "declared_insertion",
+      "reference_sha256": "sha256:5f4bb4c26bfcff62caa033e858f0ed509471149413282ca5b1eced32c2b5e4c4",
+      "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
+      "insertion_offset": 13381,
+      "insertion_bytes": 2403,
+      "insertion_sha256": "sha256:57a9cadd19d7b100afb071455cc0a5e241ddc0c7a4c665d86f1a6428e5290faa"
+    }
+  },
+  "contracts": {
+    ".stegverse/transition-ledger/org-contract.json": {
+      "rule": "contract",
+      "excluded_keys": [
+        "organization"
+      ],
+      "reference_sha256": "sha256:1416ca10ba278566d5461266ff648f3f88df409a29a785825347c3182c5e91e9"
+    },
+    ".stegverse/transition-ledger/contract.json": {
+      "rule": "contract",
+      "excluded_keys": [
+        "repository"
+      ],
+      "reference_sha256": "sha256:59900260090513fba1bf3f486128358c7a8299eb72cccf18602858411f10921d"
+    }
+  }
+}
