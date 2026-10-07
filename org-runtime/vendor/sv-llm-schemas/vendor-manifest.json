@@ -1,0 +1,13 @@
+{
+  "schema": "sv-llm.vendored-contract-manifest/v1",
+  "canonical_source": "SV-LLM/schemas",
+  "source_commit": "efeae461ccd7965fbbb640935d0e80259e3040c6",
+  "source_commit_status": "HEAD OF SV-LLM/schemas PR #1 (unmerged at vendoring time); re-vendor from the main merge commit after merge if PR #1 is squash-merged",
+  "reason": "SV-LLM/schemas is private and this repository is public; a workflow here cannot check it out without a credential. Files are copied byte-for-byte and verified by digest.",
+  "authority_effect": "NONE",
+  "files": {
+    "entity-capability.schema.json": "sha256:b5850f9ae149811910b136ce5913f8841293537940187ae8daffd9e4c6fe384e",
+    "capability-id.schema.json": "sha256:2c57c766dc0ed7b6393665b6d48f0ef630eab613c3c2d9441f713ff38e5ae8a7",
+    "tools/sv_llm_canonical_json.py": "sha256:a9a3077ea0dc5b4eaf735fcf3f95d196e18f6c5eb79d70824036d6186f640129"
+  }
+}

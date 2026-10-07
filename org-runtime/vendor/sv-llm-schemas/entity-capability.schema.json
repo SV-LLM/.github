@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SV-LLM/schemas/blob/main/entity-capability.schema.json",
+  "title": "sv-llm.entity-capability/v0.1",
+  "description": "Entity-neutral capability declaration for Sandbox participation. Supports provider-class and non-provider SV-LLM entities. Registration additionally requires canonical organization-tree membership and an eligible class (INTELLIGENCE_PROVIDER, ECOSYSTEM_ENTITY). declaration_sha256 is the SV_LLM_CANONICAL_JSON_V1 digest of the parsed declaration. Declaring capabilities grants no governance authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "entity",
+    "repository",
+    "role",
+    "authority_effect",
+    "accepts",
+    "capabilities",
+    "contribution",
+    "interface_constraints",
+    "prohibited"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sv-llm.entity-capability/v0.1"
+    },
+    "entity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "$ref": "#/$defs/repository_short_name"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Declared organizational or intelligence role; grants no governance authority."
+    },
+    "authority_effect": {
+      "const": "NONE"
+    },
+    "accepts": {
+      "type": "object",
+      "required": [
+        "work_schema"
+      ],
+      "properties": {
+        "work_schema": {
+          "const": "sv-llm.sandbox-work/v0.1"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "capability-id.schema.json"
+      }
+    },
+    "contribution": {
+      "type": "object",
+      "required": [
+        "contribution_schema"
+      ],
+      "properties": {
+        "contribution_schema": {
+          "const": "sv-llm.contribution/v0.1"
+        }
+      }
+    },
+    "interface_constraints": {
+      "type": "object",
+      "description": "Machine-readable admission, invocation, evidence, privacy, cost, latency or other declared interface bounds."
+    },
+    "prohibited": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Authority and actions the entity does not possess."
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "repository_short_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?![\\s\\S])",
+      "description": "organization-tree repositories[].name value, e.g. Anthropic."
+    },
+    "capability_declaration_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "path",
+        "declaration_sha256"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/repository_short_name"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+(?![\\s\\S])",
+          "description": "Repository-relative path; never derived from provider or entity name."
+        },
+        "declaration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "capability_assignment_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "capability_declaration_ref",
+        "declaration"
+      ],
+      "description": "Evidence body of a CAPABILITY_ASSIGNMENT receipt. Step 1 carries the validated declaration inline. Runtime invariants: declaration_sha256 equals the SV_LLM_CANONICAL_JSON_V1 digest of declaration; capability is in declaration.capabilities; capability_declaration_ref.repository equals declaration.repository. Replacing inline carriage requires a versioned contract change.",
+      "properties": {
+        "capability": {
+          "$ref": "capability-id.schema.json"
+        },
+        "capability_declaration_ref": {
+          "$ref": "#/$defs/capability_declaration_ref"
+        },
+        "declaration": {
+          "$ref": "#"
+        }
+      }
+    }
+  }
+}
