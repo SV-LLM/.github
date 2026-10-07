@@ -25,6 +25,17 @@
       "authority_effect": "NONE"
     },
     {
+      "name": "Ecosystem_Chat",
+      "class": "ECOSYSTEM_ENTITY",
+      "role": "Governed external-entity to StegVerse ecosystem interaction interface; ecosystem-specialized Sandbox participant and browser-facing path for manifest-bound SDK work proposal and return correlation.",
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Ecosystem_Chat",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:9463e4775962757c754d4595467898c57712fdba5683c1706df42d35711466b2"
+      }
+    },
+    {
       "name": "OpenAI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "OpenAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
@@ -87,11 +98,12 @@
     "Provider participation does not confer governance authority.",
     "Provider-neutral contracts belong in schemas rather than a provider repository.",
     "Multi-entity collaboration belongs in sandbox rather than a provider repository.",
-    "StegVerse_AI remains distinct from provider identities and governance authority.",
+    "StegVerse_AI remains distinct from provider identities, Ecosystem_Chat, and governance authority.",
+    "Ecosystem_Chat is an SV-LLM ecosystem entity and interface contract owner; its current public/browser implementation remains in StegVerse-Labs/Site.",
     "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher, SDK and Master Records authorities are not duplicated in SV-LLM."
   ],
   "completeness_assessment": {
-    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, the StegVerse ecosystem entity, and eight provider capability surfaces. No additional non-provider repository is presently justified by the documented architecture.",
+    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eight provider capability surfaces.",
     "implementation_state": "Repository existence does not establish implementation or integration completeness. Empty/uninitialized repositories require their role contracts and implementations to be established before runtime completeness can be claimed."
   }
 }
