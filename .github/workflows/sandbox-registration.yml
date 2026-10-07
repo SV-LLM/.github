@@ -1,0 +1,37 @@
+name: Validate Sandbox Entity Registration
+
+on:
+  pull_request:
+    paths:
+      - 'org-runtime/sandbox_registration.py'
+      - 'org-runtime/tests/test_sandbox_registration.py'
+      - 'org-runtime/vendor/sv-llm-schemas/**'
+      - 'data/organization-tree.json'
+      - 'data/organization-tree.schema.json'
+      - '.github/workflows/sandbox-registration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'org-runtime/sandbox_registration.py'
+      - 'org-runtime/tests/test_sandbox_registration.py'
+      - 'org-runtime/vendor/sv-llm-schemas/**'
+      - 'data/organization-tree.json'
+      - 'data/organization-tree.schema.json'
+      - '.github/workflows/sandbox-registration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install jsonschema
+        run: python -m pip install "jsonschema==4.26.0"
+      - name: Sandbox registration predicates
+        run: python -B org-runtime/tests/test_sandbox_registration.py

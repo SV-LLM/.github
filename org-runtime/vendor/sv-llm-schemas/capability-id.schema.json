@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SV-LLM/schemas/blob/main/capability-id.schema.json",
+  "title": "sv-llm.capability-id/v0.1",
+  "description": "Shared controlled vocabulary of Sandbox capability identifiers. Each identifier has exactly one canonical meaning, given by its description below. Adding or redefining an identifier requires a versioned change to this document; entity repositories MUST NOT create canonical meanings locally. sandbox-work, entity-capability, CAPABILITY_ASSIGNMENT evidence and contribution all reference this vocabulary. A capability identifier never confers governance or any other authority.",
+  "allOf": [
+    {
+      "$ref": "#/$defs/identifier_syntax"
+    },
+    {
+      "$ref": "#/$defs/not_prohibited"
+    }
+  ],
+  "oneOf": [
+    {
+      "const": "reasoning",
+      "description": "Analyze supplied information to derive bounded conclusions, implications, or solution steps."
+    },
+    {
+      "const": "synthesis",
+      "description": "Combine multiple attributable inputs into a derived work product while preserving source lineage, disagreement, refusal, and uncertainty. An entity declaring synthesis may contribute a synthesis within its bounded assignment; this does not transfer or replace the Sandbox runtime responsibility to synthesize participating contributions into expected_output_or_handoff."
+    },
+    {
+      "const": "code_analysis",
+      "description": "Inspect supplied source code or code artifacts to identify structure, behavior, defects, constraints, or implications."
+    },
+    {
+      "const": "code_generation",
+      "description": "Produce candidate source code or code artifacts within the manifested and permitted work bounds."
+    },
+    {
+      "const": "document_analysis",
+      "description": "Inspect supplied documents or document content to extract, compare, classify, or derive bounded findings."
+    },
+    {
+      "const": "cross_repository_contract_analysis",
+      "description": "Compare declared interfaces, schemas, invariants, or contracts across multiple authorized repository views without treating repository reachability as evidence."
+    },
+    {
+      "const": "adversarial_review",
+      "description": "Challenge a candidate claim, design, artifact, or conclusion by searching for contradictions, unsupported assumptions, failure modes, or counterexamples."
+    },
+    {
+      "const": "candidate_repair",
+      "description": "Produce a bounded proposed correction to an identified defect or incompatibility without directly authorizing or executing the consequential transition."
+    },
+    {
+      "const": "forward_disposition_inference",
+      "description": "Derive a non-authoritative projected disposition from supplied disposition-complete evidence while preserving that the result is inference rather than governance."
+    }
+  ],
+  "$defs": {
+    "identifier_syntax": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
+    },
+    "not_prohibited": {
+      "description": "Authority-like identifiers cannot enter the vocabulary: the exact identifier governance, and any identifier matching (^|_)authority$.",
+      "not": {
+        "anyOf": [
+          {
+            "const": "governance"
+          },
+          {
+            "type": "string",
+            "pattern": "(^|_)authority(?![\\s\\S])"
+          }
+        ]
+      }
+    },
+    "proposed_identifier": {
+      "description": "Validates an identifier proposed for a future version of this vocabulary: syntax and the authority guard only.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/identifier_syntax"
+        },
+        {
+          "$ref": "#/$defs/not_prohibited"
+        }
+      ]
+    }
+  }
+}

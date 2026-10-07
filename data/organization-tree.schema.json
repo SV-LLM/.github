@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SV-LLM/.github/blob/main/data/organization-tree.schema.json",
+  "title": "sv-llm.organization-tree/v0.2",
+  "description": "SV-LLM canonical organization tree. capability_declaration_ref is optional on Sandbox-eligible entries (INTELLIGENCE_PROVIDER, ECOSYSTEM_ENTITY) and prohibited on others. An eligible entry without it is valid tree data but is not Sandbox-registered: registration returns DENY with CAPABILITY_DECLARATION_REF_ABSENT (org-runtime/sandbox_registration.py). The ref shape is owned by SV-LLM/schemas sv-llm.entity-capability/v0.1. Repository names must be unique; the registration runtime checks this. The tree confers no governance authority.",
+  "type": "object",
+  "required": [
+    "schema",
+    "organization",
+    "repositories"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sv-llm.organization-tree/v0.2"
+    },
+    "organization": {
+      "const": "SV-LLM"
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/repository"
+      }
+    }
+  },
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "required": [
+        "name",
+        "class",
+        "role"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+(?![\\s\\S])"
+        },
+        "class": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z_]*(?![\\s\\S])"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_effect": {
+          "const": "NONE"
+        },
+        "capability_declaration_ref": {
+          "$ref": "https://github.com/SV-LLM/schemas/blob/main/entity-capability.schema.json#/$defs/capability_declaration_ref"
+        }
+      },
+      "if": {
+        "properties": {
+          "class": {
+            "enum": [
+              "INTELLIGENCE_PROVIDER",
+              "ECOSYSTEM_ENTITY"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "authority_effect"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "capability_declaration_ref"
+          ]
+        }
+      }
+    }
+  }
+}
