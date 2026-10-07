@@ -67,14 +67,20 @@ class CanonicalTree(unittest.TestCase):
         names = {row["name"] for row in tree["repositories"]}
         self.assertFalse(names & set(FIXTURES) | {n for n in names if n.lower().startswith("fixture")})
 
-    def test_canonical_entries_are_not_yet_registered(self):
-        # R1(a): no real entity has a conforming declaration until Step 3, so none carries a ref.
+    def test_canonical_entries_registration_state(self):
+        # R1(a): only entries whose migrated declarations are bound carry a ref.
         tree = reg.load_tree()
+        with_ref = {row["name"] for row in tree["repositories"] if "capability_declaration_ref" in row}
+        self.assertEqual(with_ref, {"Anthropic", "OpenAI"})
         for row in tree["repositories"]:
             result = reg.register(row["name"], declaration=None)
             self.assertEqual(result["disposition"], reg.DENY)
-            expected = ("CAPABILITY_DECLARATION_REF_PRESENT" if row["class"] in reg.ELIGIBLE_CLASSES
-                        else "ENTITY_CLASS_IS_SANDBOX_ELIGIBLE")
+            if row["class"] not in reg.ELIGIBLE_CLASSES:
+                expected = "ENTITY_CLASS_IS_SANDBOX_ELIGIBLE"
+            elif row["name"] in with_ref:
+                expected = "DECLARATION_CONTENT_SUPPLIED"
+            else:
+                expected = "CAPABILITY_DECLARATION_REF_PRESENT"
             self.assertEqual(result["failed_predicate"], expected, row["name"])
 
     def test_existing_consumer_unaffected(self):

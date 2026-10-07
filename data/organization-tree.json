@@ -28,13 +28,23 @@
       "name": "OpenAI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "OpenAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "OpenAI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:2c184bf0ab05198ca43f88e9c17e685a559abda5f6a6dd579637f41705541389"
+      }
     },
     {
       "name": "Anthropic",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Anthropic-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Anthropic",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:7ede6106dcfab9f9260085aaecbff1104ca144bba1630be73a5ba6dc14cbd9f2"
+      }
     },
     {
       "name": "Google",
