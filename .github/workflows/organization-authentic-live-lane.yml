@@ -1,0 +1,122 @@
+name: SV-LLM Organization Authentic Live Lane (manual)
+
+# SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001: the only
+# authentic entrypoint. One organization-owned execution, one ledger root:
+#
+#   1. reference adoption parity (offline) before the ledger is opened;
+#   2. the pinned SV-LLM/sandbox checkout;
+#   3. open the organization ledger with the manifested genesis transition and
+#      append one authentic parent (org-runtime/authentic_live_lane.py);
+#   4. the Sandbox authentic lane in this same run and ledger root, gated
+#      before any browser install;
+#   5. the execution-scoped ledgers, report and digests as one 90-day evidence
+#      artifact (an evidence copy, never state; nothing crosses runs).
+#
+# The organization ledger is the StegVerse-org reference ledger bound exactly
+# as the reference binds it (PosixLedgerStore at STEGVERSE_ORG_LEDGER_ROOT):
+# ledger_persistence EXECUTION_SCOPED_SAME_AS_REFERENCE, no durability claimed
+# beyond this run. Every non-ALLOW ends the run red with a typed disposition.
+# SV-LLM/sandbox is private: its checkout reads with the
+# SV_LLM_SANDBOX_READ_TOKEN secret when present, otherwise this repository's
+# token, and an unreadable source is FAIL_CLOSED
+# AUTHENTIC_LANE_SOURCE_UNAVAILABLE before the ledger is opened.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authentic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: One execution-scoped ledger root for the whole run
+        run: |
+          echo "STEGVERSE_ORG_LEDGER_ROOT=$RUNNER_TEMP/sv-llm-org-ledger" >> "$GITHUB_ENV"
+          echo "STEGVERSE_REPO_LEDGER_ROOT=$RUNNER_TEMP/sv-llm-dotgithub-repo-ledger" >> "$GITHUB_ENV"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/evidence" >> "$GITHUB_ENV"
+      - name: Reference adoption parity (offline, before the ledger is opened)
+        run: python -B resident-runtime/reference_adoption.py verify --out "$EVIDENCE_DIR/reference-adoption.json"
+      - name: Check out SV-LLM/sandbox at the pinned commit
+        id: sandbox
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: SV-LLM/sandbox
+          ref: a4f2cfb0a3677e9c21920d6c42a8352928b2a913
+          path: sandbox
+          token: ${{ secrets.SV_LLM_SANDBOX_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - name: An unreadable Sandbox source is FAIL_CLOSED
+        if: steps.sandbox.outcome != 'success'
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          report = {"schema": "sv-llm.sandbox-live-llm-report/v1", "lane": "authentic", "disposition": "FAIL_CLOSED",
+                    "failed_predicate": "AUTHENTIC_LANE_SOURCE_UNAVAILABLE",
+                    "required_evidence_or_repair": "Give this repository read access to SV-LLM/sandbox (repository secret "
+                                                   "SV_LLM_SANDBOX_READ_TOKEN, read-only Contents on SV-LLM/sandbox) or make "
+                                                   "the Sandbox source readable to this workflow.",
+                    "retry_entrypoint": "SV-LLM/.github:.github/workflows/organization-authentic-live-lane.yml (workflow_dispatch)",
+                    "next_attempt": "Dispatch this workflow again once the Sandbox source is readable.",
+                    "executed_by": os.environ.get("GITHUB_REPOSITORY"),
+                    "ledger_persistence": "EXECUTION_SCOPED_SAME_AS_REFERENCE",
+                    "authoritative_organization_runtime_reality": False, "authority_effect": "NONE"}
+          path = pathlib.Path(os.environ["EVIDENCE_DIR"]) / "report.json"
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2))
+          PY
+          exit 1
+      - name: Open the organization ledger and append the authentic parent
+        id: organization
+        run: |
+          python -B org-runtime/authentic_live_lane.py prepare --target sandbox/live/target.json \
+            --out "$EVIDENCE_DIR/organization-steps.json"
+          echo "parent=$(python -c 'import json,os; print(json.load(open(os.environ["EVIDENCE_DIR"]+"/organization-steps.json"))["parent_org_receipt_sha256"])')" >> "$GITHUB_OUTPUT"
+      - name: Authentic lane gate (organization execution, ledger opened, parent and subject present)
+        env:
+          LIVE_LANE: authentic
+          SV_LLM_DOTGITHUB_ROOT: ${{ github.workspace }}
+          PARENT_ORG_RECEIPT_SHA256: ${{ steps.organization.outputs.parent }}
+        run: python -B sandbox/live/run_live_llm.py --preflight
+      - name: Install dependencies and Chromium
+        run: |
+          python -m pip install "jsonschema==4.26.0" "playwright==1.52.0"
+          python -m playwright install --with-deps chromium
+      - name: Authentic lane
+        env:
+          LIVE_LANE: authentic
+          SV_LLM_DOTGITHUB_ROOT: ${{ github.workspace }}
+          PARENT_ORG_RECEIPT_SHA256: ${{ steps.organization.outputs.parent }}
+        run: python -B sandbox/live/run_live_llm.py
+      - name: Copy the execution-scoped ledgers into the evidence and digest it
+        if: always()
+        run: |
+          mkdir -p "$EVIDENCE_DIR/ledgers"
+          for root in "$STEGVERSE_ORG_LEDGER_ROOT" "$STEGVERSE_REPO_LEDGER_ROOT"; do
+            if [ -d "$root" ]; then cp -r "$root" "$EVIDENCE_DIR/ledgers/"; fi
+          done
+          python - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          files = {str(p.relative_to(root)): "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted(root.rglob("*")) if p.is_file() and p.name != "artifact-digests.json"}
+          (root / "artifact-digests.json").write_text(json.dumps(
+              {"schema": "sv-llm.authentic-live-lane-artifact-digests/v1",
+               "retention_class": "LIVE_RUN_EVIDENCE_RETENTION_NOT_PERMANENT_CUSTODY",
+               "artifact_role": "EVIDENCE_COPY_ONLY", "files": files}, indent=2, sort_keys=True) + "\n")
+          PY
+      - name: Retain live-run evidence (90 days)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sv-llm-authentic-live-lane-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/evidence
+          retention-days: 90
+          if-no-files-found: error
