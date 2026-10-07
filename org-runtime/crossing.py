@@ -43,6 +43,7 @@ SLUG=kernel.organization_slug(ORG)
 CONTROL=SLUG+".org-control"
 CREDENTIAL_AUTHORITY="TV/TVC"
 
+LEDGER_OPENED="ORGANIZATION_LEDGER_OPENED"
 EGRESS_EMITTED="ORGANIZATION_EGRESS_EMITTED"
 EGRESS_REFUSED="ORGANIZATION_EGRESS_REFUSED"
 INGRESS_MATERIALIZED="ORGANIZATION_INGRESS_MATERIALIZED"
@@ -68,8 +69,13 @@ def require_manifest(manifest:Any)->dict[str,Any]:
         raise Refused("MANIFEST_DESTINATION_MISSING")
     return manifest
 
-def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT)->dict[str,Any]:
-    """Append one transition to the repository ledger, then the organization ledger."""
+def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT, genesis:bool=False)->dict[str,Any]:
+    """Append one transition to the repository ledger, then the organization ledger.
+
+    The organization chain is opened only by an explicit genesis transition
+    (open_organization_ledger); on an empty organization ledger any other record
+    is refused FAIL_CLOSED ORG_LEDGER_GENESIS_NOT_DECLARED.
+    """
     predecessor=sha(subject); successor=sha(outcome)
     transition_id=transition_class+":"+successor[7:31]
     run=subprocess.run([sys.executable,str(root/".stegverse/transition-ledger/emit.py"),
@@ -83,8 +89,20 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         repo_receipt,org_transition_class=transition_class,
         boundary_evidence={"disposition":outcome["disposition"],"credential_authority":CREDENTIAL_AUTHORITY,
                            "transition_authority":"Interlock/InTr"},
-        authority_effect="NONE")
+        authority_effect="NONE",genesis=genesis)
     return {"repo_receipt_sha256":repo_receipt["receipt_sha256"],"org_receipt_sha256":org_receipt["receipt_sha256"]}
+
+def open_organization_ledger(root:Path=ROOT)->dict[str,Any]:
+    """Open this organization's ledger chain with a declared genesis transition.
+
+    Genesis is declared state, never inferred from an empty ledger. Against a
+    ledger that already has a HEAD this is refused DENY
+    ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER and nothing is written.
+    """
+    subject={"intended_action":"OPEN_ORGANIZATION_LEDGER","organization":ORG}
+    outcome={"disposition":"ALLOW","organization":ORG,"authority_effect":"NONE"}
+    return {"transition_class":LEDGER_OPENED,**outcome,
+            **record(LEDGER_OPENED,subject=subject,outcome=outcome,root=root,genesis=True)}
 
 def resolve_peer(organization:str, root:Path=ROOT)->dict[str,Any]:
     if organization==ORG: raise Refused("DESTINATION_IS_THIS_ORGANIZATION","an intra-organization manifest does not cross the boundary")
@@ -171,8 +189,11 @@ def main()->int:
     p=argparse.ArgumentParser(); sub=p.add_subparsers(dest="cmd",required=True)
     e=sub.add_parser("egress"); e.add_argument("--manifest",required=True); e.add_argument("--standing",required=True)
     sub.add_parser("ingress")
+    sub.add_parser("open-ledger")
     ns=p.parse_args()
-    if ns.cmd=="egress":
+    if ns.cmd=="open-ledger":
+        out=open_organization_ledger()
+    elif ns.cmd=="egress":
         out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()))
     else:
         out=ingress()
