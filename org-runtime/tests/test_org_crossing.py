@@ -39,6 +39,22 @@ with tempfile.TemporaryDirectory() as td:
     assert c.ORG=="SV-LLM"
     peers=[r["organization"] for r in k.load_federation_directory(root)["organizations"] if r["organization"]!=c.ORG]
 
+    # The organization chain is opened by a declared genesis transition, never by an empty ledger.
+    try:
+        c.egress({"manifest_id":"before-genesis","destination":{"organization":"Not-An-Org"}},
+                 standing=STANDING,mesh_root=mesh,root=root)
+        raise AssertionError("an undeclared genesis was accepted")
+    except SystemExit as refused:
+        assert getattr(refused,"failed_predicate",None)=="ORG_LEDGER_GENESIS_NOT_DECLARED", refused
+    opened=c.open_organization_ledger(root=root)
+    assert opened["transition_class"]=="ORGANIZATION_LEDGER_OPENED" and opened["org_receipt_sha256"]
+    try:
+        c.open_organization_ledger(root=root)
+        raise AssertionError("a second genesis was accepted")
+    except SystemExit as refused:
+        assert refused.failed_predicate=="ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER" and refused.disposition=="DENY"
+    print("SV_LLM_LEDGER_GENESIS_PASS")
+
     # EGRESS to every peer. No peer root exists yet: the transition succeeds at egress, nothing waits.
     for org in peers:
         out=c.egress({"manifest_id":"egress-"+org,"destination":{"organization":org},"payload":{"probe":"egress"}},
@@ -81,9 +97,14 @@ with tempfile.TemporaryDirectory() as td:
 
     # Every disposition is on both ledgers, in one unbroken chain each.
     repo_chain=chain(base/"repo-ledger"); org_chain=chain(base/"org-ledger")
-    expected=len(peers)+3+5
-    assert len(repo_chain)==expected and len(org_chain)==expected
+    expected=len(peers)+3+5+1   # +1: the declared genesis
+    # The refused pre-genesis attempt and the refused second genesis wrote one repository receipt each
+    # (the repository ledger records the attempt) and no organization receipt.
+    assert len(repo_chain)==expected+2 and len(org_chain)==expected
+    assert org_chain[0]["org_transition_class"]=="ORGANIZATION_LEDGER_OPENED" and org_chain[0]["chain_genesis"] is True
     assert all(r["repository"]=="SV-LLM/.github" for r in repo_chain)
-    assert [o["repo_receipt_sha256"] for o in org_chain]==[r["receipt_sha256"] for r in repo_chain]
+    org_sources=[o["repo_receipt_sha256"] for o in org_chain]
+    assert org_sources==[r["receipt_sha256"] for r in repo_chain if r["receipt_sha256"] in set(org_sources)]
+    assert all(o["boundary_evidence"]["state_digest_rule"]=="SV_LLM_LEGACY_RECEIPT_CHAIN" for o in org_chain)
     assert all(o["organization"]=="SV-LLM" and o["authority_effect"]=="NONE" for o in org_chain)
     print("SV_LLM_LEDGER_CHAIN_PASS",expected)

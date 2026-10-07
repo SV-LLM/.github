@@ -1,338 +1,374 @@
 #!/usr/bin/env python3
-import argparse,base64,fcntl,hashlib,json,os,tempfile
-from datetime import datetime,timezone
+"""Append organization receipts with serialized, durable HEAD publication.
+
+The organization ledger is local sovereign state. This emitter neither performs
+InTr transport nor grants transition authority.
+
+Admission is governed by the `consumes` list in the organization ledger
+contract, not by a single hard-coded schema. Every state transition occurring
+within the organization emits an organization receipt, so a canonical governed
+state transition manifested through Interlock/InTr is admitted on its own
+terms and bound by its own canonical digest.
+
+The exact source transition receipt is retained under `source-receipts/` in
+the same store transaction as the organization receipt and HEAD, so the
+organization ledger can replay a source transition without the ledger that
+emitted it (contract: preserves_source_transition_receipt).
+
+The predecessor organization state is an explicit sha256 digest, FROM_HEAD or
+GENESIS. FROM_HEAD binds the current HEAD receipt digest and is resolved inside
+each compare-and-swap attempt, so a contended append cannot bind a stale
+predecessor. GENESIS opens an empty chain and is accepted only while HEAD is
+absent; a chain is never opened by default.
+"""
+from contextlib import nullcontext
+import argparse
+import base64
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import sys
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]
-C=json.loads((ROOT/".stegverse/transition-ledger/org-contract.json").read_text())
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ledger_store import HEAD_KEY, RECEIPT_PREFIX, SOURCE_PREFIX, PosixLedgerStore, receipt_key, source_key  # noqa: E402
 
-def canon(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
-def sha(v): return "sha256:"+hashlib.sha256(canon(v)).hexdigest()
+ROOT = Path(__file__).resolve().parents[1]
+C = json.loads((ROOT / ".stegverse/transition-ledger/org-contract.json").read_text())
+
+_spec = importlib.util.spec_from_file_location("kernel", ROOT / "org-kernel/kernel.py")
+kernel = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(kernel)  # noqa: E402
+
+
+
+SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+FROM_HEAD = "FROM_HEAD"
+GENESIS = "GENESIS"
+
+
+class OrgLedgerAppendRefused(SystemExit):
+    """A refused append, carrying its disposition and failed predicate.
+
+    A SystemExit, so command-line use and existing callers behave as before,
+    while a caller that records dispositions reads them from the exception.
+    Nothing is written when this is raised.
+    """
+
+    retry_entrypoint = "resident-runtime/aggregate_repo_transition.py::append"
+
+    def __init__(self, disposition, failed_predicate):
+        super().__init__(failed_predicate)
+        self.disposition = disposition
+        self.failed_predicate = failed_predicate
+
+
+def require_state_digest(field, value):
+    """A field named *_sha256 must carry one, or the chain records a claim it cannot check."""
+    if not isinstance(value, str) or not SHA256_REF.match(value):
+        raise SystemExit("ORG_LEDGER_" + field.upper() + "_NOT_A_SHA256_DIGEST")
+    return value
+
+
+def canon(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+
+
+def sha(value):
+    return "sha256:" + hashlib.sha256(canon(value)).hexdigest()
+
+
 def ledger_root():
-    o=os.getenv("STEGVERSE_ORG_LEDGER_ROOT")
-    if o: return Path(o).expanduser().resolve()
-    return (Path(os.getenv("XDG_STATE_HOME",str(Path.home()/".local/state")))/"stegverse/org-ledgers"/C["organization"]).resolve()
-def load(p): return json.loads(Path(p).read_text())
+    override = os.getenv("STEGVERSE_ORG_LEDGER_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return (Path(os.getenv("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+            / "stegverse/org-ledgers" / C["organization"]).resolve()
+
+
+def load(path):
+    return json.loads(Path(path).read_text())
+
 
 def verify_required_evidence(receipt):
-    """Require exact inline canonical evidence bytes for organization-local replay."""
-    manifest=receipt.get("required_evidence_manifest")
-    if not isinstance(manifest,list): raise ValueError("canonical required evidence manifest missing")
-    seen=set()
+    """Require exact inline canonical evidence bytes for organization-local replay.
+
+    Organization replay must terminate on this chain alone, so a canonical state
+    transition carries its own evidence bytes rather than a reachability promise.
+    """
+    manifest = receipt.get("required_evidence_manifest")
+    if not isinstance(manifest, list):
+        raise SystemExit("canonical required evidence manifest missing")
+    seen = set()
     for item in manifest:
-        if not isinstance(item,dict): raise ValueError("canonical evidence entry invalid")
-        for key in ("evidence_id","evidence_type","origin_transition_id","encoding","sha256","content"):
-            if key not in item: raise ValueError("canonical evidence field missing: "+key)
-        identity=item["evidence_id"]
-        if not isinstance(identity,str) or not identity or identity in seen:
-            raise ValueError("canonical evidence identity invalid")
+        if not isinstance(item, dict):
+            raise SystemExit("canonical evidence entry invalid")
+        for key in ("evidence_id", "evidence_type", "origin_transition_id",
+                    "encoding", "sha256", "content"):
+            if key not in item:
+                raise SystemExit("canonical evidence field missing: " + key)
+        identity = item["evidence_id"]
+        if not isinstance(identity, str) or not identity or identity in seen:
+            raise SystemExit("canonical evidence identity invalid")
         seen.add(identity)
-        if not isinstance(item["evidence_type"],str) or not item["evidence_type"] or item["origin_transition_id"]!=receipt.get("transition_id"):
-            raise ValueError("canonical evidence transition binding invalid")
-        encoding=item["encoding"]
-        content=item["content"]
-        if encoding=="canonical-json": raw=canon(content)
-        elif encoding=="utf-8" and isinstance(content,str): raw=content.encode("utf-8")
-        elif encoding=="base64" and isinstance(content,str):
-            try: raw=base64.b64decode(content.encode("ascii"),validate=True)
-            except (ValueError,UnicodeError) as exc: raise ValueError("canonical evidence base64 invalid") from exc
-        else: raise ValueError("canonical evidence encoding invalid")
-        digest=item["sha256"]
-        if not isinstance(digest,str) or len(digest)!=64 or hashlib.sha256(raw).hexdigest()!=digest:
-            raise ValueError("canonical required evidence digest mismatch")
-
-
-def retain_source(root, receipt, verified):
-    """Keep immutable exact source bytes under the existing private org ledger root."""
-    digest=verified["source_transition_sha256"]
-    if not isinstance(digest,str) or len(digest)!=71 or not digest.startswith("sha256:"):
-        raise ValueError("organization source hash invalid")
-    directory=root/"source-receipts"
-    directory.mkdir(mode=0o700,parents=True,exist_ok=True)
-    path=directory/(digest[7:]+".json")
-    if path.exists():
-        stored=load(path)
-        if stored!=receipt or verify_source(stored)["source_transition_sha256"]!=digest:
-            raise ValueError("retained organization source receipt conflict")
-        return path
-    fd,name=tempfile.mkstemp(prefix=".source-",dir=str(directory))
-    try:
-        with os.fdopen(fd,"w",encoding="utf-8") as stream:
-            stream.write(json.dumps(receipt,indent=2,sort_keys=True,ensure_ascii=False)+"\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        if path.exists():
-            stored=load(path)
-            if stored!=receipt: raise ValueError("retained organization source receipt conflict")
-        else: os.replace(name,path)
-    finally:
-        if os.path.exists(name): os.unlink(name)
-    return path
+        if (not isinstance(item["evidence_type"], str) or not item["evidence_type"]
+                or item["origin_transition_id"] != receipt.get("transition_id")):
+            raise SystemExit("canonical evidence transition binding invalid")
+        encoding = item["encoding"]
+        content = item["content"]
+        if encoding == "canonical-json":
+            raw = canon(content)
+        elif encoding == "utf-8" and isinstance(content, str):
+            raw = content.encode("utf-8")
+        elif encoding == "base64" and isinstance(content, str):
+            try:
+                raw = base64.b64decode(content.encode("ascii"), validate=True)
+            except (ValueError, UnicodeError) as exc:
+                raise SystemExit("canonical evidence base64 invalid") from exc
+        else:
+            raise SystemExit("canonical evidence encoding invalid")
+        digest = item["sha256"]
+        if not isinstance(digest, str) or len(digest) != 64 or hashlib.sha256(raw).hexdigest() != digest:
+            raise SystemExit("canonical required evidence digest mismatch")
 
 
 def verify_source(receipt):
-    schema=receipt.get("schema")
-    allowed=C.get("consumes")
-    if isinstance(allowed,str): allowed=[allowed]
-    if schema not in (allowed or []): raise ValueError("organization source receipt schema mismatch")
-    if schema=="stegverse.repo-transition-receipt/v1":
-        repository=str(receipt.get("repository",""))
-        if not repository.startswith(C["organization"]+"/"): raise ValueError("repo outside organization")
-        claimed=receipt.get("receipt_sha256"); body=dict(receipt); body.pop("receipt_sha256",None)
-        if claimed!=sha(body): raise ValueError("repo receipt hash mismatch")
+    """Verify a source transition receipt this organization's contract consumes.
+
+    The contract's `consumes` list is the admission gate. Every state transition
+    occurring within the organization emits an organization receipt, so a
+    canonical governed transition is admitted on its own terms: it is bound by
+    its own canonical digest and keeps its own schema and transition id, rather
+    than being relabelled as a repository transition it is not.
+    """
+    schema = receipt.get("schema")
+    allowed = C.get("consumes")
+    if isinstance(allowed, str):
+        allowed = [allowed]
+    if schema not in (allowed or []):
+        raise SystemExit("organization source receipt schema mismatch")
+    transition_id = receipt.get("transition_id")
+    if not isinstance(transition_id, str) or not transition_id:
+        raise SystemExit("organization source transition id invalid")
+    if schema == "stegverse.repo-transition-receipt/v1":
+        repository = str(receipt.get("repository", ""))
+        if not repository.startswith(C["organization"] + "/"):
+            raise SystemExit("repo outside organization")
+        claimed = receipt.get("receipt_sha256")
+        body = dict(receipt)
+        body.pop("receipt_sha256", None)
+        if claimed != sha(body):
+            raise SystemExit("repo receipt hash mismatch")
         return {
-            "source_receipt_schema":schema,
-            "source_transition_sha256":claimed,
-            "source_transition_id":receipt["transition_id"],
-            "source_repository":repository,
-            "repo_receipt_sha256":claimed,
-            "repo_transition_id":receipt["transition_id"],
-            "canonical_state_transition_receipt_sha256":None,
-            "subject_or_correlation_id":None,
+            "source_receipt_schema": schema,
+            "source_transition_sha256": claimed,
+            "source_transition_id": transition_id,
+            "source_repository": repository,
+            "repo_receipt_sha256": claimed,
+            "repo_transition_id": transition_id,
+            "canonical_state_transition_receipt_sha256": None,
+            "subject_or_correlation_id": None,
         }
     verify_required_evidence(receipt)
-    digest=sha(receipt)
+    digest = sha(receipt)
     return {
-        "source_receipt_schema":schema,
-        "source_transition_sha256":digest,
-        "source_transition_id":receipt["transition_id"],
-        "source_repository":None,
-        "repo_receipt_sha256":None,
-        "repo_transition_id":None,
-        "canonical_state_transition_receipt_sha256":digest,
-        "subject_or_correlation_id":receipt.get("subject_or_correlation_id"),
+        "source_receipt_schema": schema,
+        "source_transition_sha256": digest,
+        "source_transition_id": transition_id,
+        "source_repository": None,
+        "repo_receipt_sha256": None,
+        "repo_transition_id": None,
+        "canonical_state_transition_receipt_sha256": digest,
+        "subject_or_correlation_id": receipt.get("subject_or_correlation_id"),
     }
 
-def _existing_exact_source(d, source, *, org_transition_class, predecessor_org_state_sha256, successor_org_state_sha256, boundary_evidence, authority_effect):
-    """Reuse an immutable organization receipt for an exact already-recorded transition.
 
-    The existing receipt directory is the only index; no new store or authority
-    is introduced. A retry after an incomplete Master Records submission must
-    not append a second organization transition for the same exact source.
-    """
-    for path in sorted(d.glob("*.json")):
-        row=load(path)
-        if row.get("source_transition_sha256") != source["source_transition_sha256"]:
-            continue
-        if row.get("source_receipt_schema") != source["source_receipt_schema"]:
-            raise ValueError("organization source digest/schema collision")
-        body=dict(row)
-        claimed=body.pop("receipt_sha256",None)
-        if claimed != sha(body) or path.stem != claimed.split(":",1)[-1]:
-            raise ValueError("existing organization receipt integrity invalid")
-        if (
-            row.get("source_transition_id") != source["source_transition_id"]
-            or row.get("org_transition_class") != org_transition_class
-            or row.get("authority_effect") != authority_effect
-            or row.get("boundary_evidence") != dict(boundary_evidence or {})
-            or (predecessor_org_state_sha256 is not None and row.get("predecessor_org_state_sha256") != predecessor_org_state_sha256)
-            or (successor_org_state_sha256 is not None and row.get("successor_org_state_sha256") != successor_org_state_sha256)
-        ):
-            raise ValueError("existing organization source transition context conflict")
-        return row
-    return None
-
-def _atomic_json(path, value):
-    """Durably replace a JSON record while holding the organization append lock."""
-    path = Path(path)
-    fd, name = tempfile.mkstemp(prefix=".append-", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-        directory_fd = os.open(str(path.parent), os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    finally:
-        if os.path.exists(name):
-            os.unlink(name)
+def _validate_existing_head(store):
+    head = store.get(HEAD_KEY)
+    if head is None:
+        # A missing HEAD with existing receipts requires explicit recovery;
+        # never silently fork or reset the organization chain.
+        if store.list_prefix(RECEIPT_PREFIX):
+            raise SystemExit("ORG_LEDGER_HEAD_MISSING_WITH_EXISTING_RECEIPTS")
+        return None
+    previous = head.get("receipt_sha256")
+    if not isinstance(previous, str) or not previous.startswith("sha256:"):
+        raise SystemExit("ORG_LEDGER_HEAD_INVALID")
+    receipt = store.get(receipt_key(previous))
+    if receipt is None:
+        raise SystemExit("ORG_LEDGER_HEAD_RECEIPT_MISSING")
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    if receipt.get("receipt_sha256") != previous or sha(body) != previous:
+        raise SystemExit("ORG_LEDGER_HEAD_RECEIPT_HASH_MISMATCH")
+    # A receipt written before a crash but not published as HEAD must not be
+    # silently bypassed. Detect all unreachable receipts before appending.
+    reachable = set()
+    cursor = previous
+    while cursor:
+        if cursor in reachable:
+            raise SystemExit("ORG_LEDGER_PREDECESSOR_CYCLE")
+        reachable.add(cursor)
+        record = store.get(receipt_key(cursor))
+        if record is None:
+            raise SystemExit("ORG_LEDGER_PREDECESSOR_MISSING")
+        record_body = dict(record)
+        record_body.pop("receipt_sha256", None)
+        if record.get("receipt_sha256") != cursor or sha(record_body) != cursor:
+            raise SystemExit("ORG_LEDGER_PREDECESSOR_HASH_MISMATCH")
+        cursor = record.get("previous_receipt_sha256")
+    if store.list_prefix(RECEIPT_PREFIX) != {receipt_key(digest) for digest in reachable}:
+        raise SystemExit("ORG_LEDGER_UNPUBLISHED_OR_ORPHAN_RECEIPTS_RECOVERY_REQUIRED")
+    # A retained source copy is published only through the receipt that names
+    # it. Ledgers written before retention existed simply have none.
+    sources = {source_key(store.get(receipt_key(digest))["source_transition_sha256"])
+               for digest in reachable
+               if isinstance(store.get(receipt_key(digest)).get("source_transition_sha256"), str)}
+    if not store.list_prefix(SOURCE_PREFIX) <= sources:
+        raise SystemExit("ORG_LEDGER_ORPHAN_SOURCE_RECEIPTS_RECOVERY_REQUIRED")
+    return previous
 
 
-def _packet_establishment_source(released_batch):
-    """Deterministic source transition for a release-born packet establishment.
+def append(source_receipt, org_transition_class, predecessor_state, successor_state,
+           boundary_evidence, authority_effect, hb_epoch=None, store=None):
+    # Admission is decided before the append lock is taken; an inadmissible
+    # source receipt never contends for the organization ledger.
+    source = verify_source(source_receipt)
+    if predecessor_state not in (FROM_HEAD, GENESIS):
+        require_state_digest("predecessor_org_state_sha256", predecessor_state)
+    require_state_digest("successor_org_state_sha256", successor_state)
+    retained = {source_key(source["source_transition_sha256"]): source_receipt}
+    # Ordering is a heartbeat count, not a clock reading. A supplied tick keeps
+    # the receipt reproducible; deriving one from the host clock is permitted
+    # but marks itself so the two can be told apart.
+    heartbeat = kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference()
+    target = store or PosixLedgerStore(ledger_root())
+    target.initialize()
+    # The storage substrate owns serialization. A lost comparison writes
+    # nothing, so a retry cannot strand an orphan receipt.
+    for _attempt in range(128):
+        guard = target.exclusive() if hasattr(target, "exclusive") else nullcontext()
+        with guard:
+            expected_head = target.get(HEAD_KEY)
+            previous = (expected_head or {}).get("receipt_sha256")
+            _validate_existing_head(target)
+            # Resolved against the HEAD this attempt will compare against, so a
+            # retry after a lost comparison re-resolves rather than reusing it.
+            if predecessor_state == FROM_HEAD:
+                if expected_head is None:
+                    raise OrgLedgerAppendRefused("FAIL_CLOSED", "ORG_LEDGER_GENESIS_NOT_DECLARED")
+                predecessor = previous
+            elif predecessor_state == GENESIS:
+                if expected_head is not None:
+                    raise OrgLedgerAppendRefused("DENY", "ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER")
+                predecessor = None
+            else:
+                predecessor = predecessor_state
+        body = {
+            "schema": "stegverse.organization-transition-receipt/v1",
+            "organization": C["organization"],
+            **source,
+            "org_transition_class": org_transition_class,
+            "predecessor_org_state_sha256": predecessor,
+            "successor_org_state_sha256": successor_state,
+            "boundary_evidence": boundary_evidence,
+            "authority_effect": authority_effect,
+            "hb_reference": heartbeat,
+            "previous_receipt_sha256": previous,
+        }
+        if predecessor_state == GENESIS:
+            body["chain_genesis"] = True
+        digest = sha(body)
+        receipt = {**body, "receipt_sha256": digest}
+        key = receipt_key(digest)
+        new_head = {
+            "organization": C["organization"],
+            "receipt_sha256": digest,
+            "receipt_path": target.locator(key),
+        }
+        if target.append_transaction(key, receipt, expected_head, new_head, immutable=retained):
+            return receipt
+    raise SystemExit("ORG_LEDGER_APPEND_CONTENTION_EXHAUSTED")
 
-    The organization append owner performs this transition itself, so no
-    external caller supplies its source receipt. It is derived from the exact
-    released batch id, which makes an exact retry idempotent.
-    """
-    return {
-        "schema": "stegverse.canonical-state-transition-receipt/v1",
-        "transition_id": "ORG-RECEIPT-PACKET-ESTABLISHMENT:" + released_batch["batch_id"],
-        "transition_sequence": 1,
-        "subject_or_correlation_id": released_batch["batch_id"],
-        "transition_outcome": "OBSERVED",
-        "required_evidence_manifest": [
-            {
-                "evidence_id": "released_batch_commitment",
-                "evidence_type": "ORGANIZATION_BATCH_COMMITMENT",
-                "origin_transition_id": "ORG-RECEIPT-PACKET-ESTABLISHMENT:" + released_batch["batch_id"],
-                "encoding": "canonical-json",
-                "content": {
-                    "batch_id": released_batch["batch_id"],
-                    "last_org_receipt_sha256": released_batch["last_org_receipt_sha256"],
-                    "closure_reason": released_batch["closure_reason"],
-                },
-                "sha256": hashlib.sha256(canon({
-                    "batch_id": released_batch["batch_id"],
-                    "last_org_receipt_sha256": released_batch["last_org_receipt_sha256"],
-                    "closure_reason": released_batch["closure_reason"],
-                })).hexdigest(),
-            }
-        ],
-    }
+
+# -- SV-LLM compatibility wrapper (temporary) ----------------------------------
+STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"
 
 
 def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TRANSITION",
                          predecessor_org_state_sha256=None, successor_org_state_sha256=None,
-                         boundary_evidence=None, authority_effect="NONE", parent_manifest=None,
-                         establishes_packet=False, now_ns=None):
-    """Serialize appends; the governing parent manifest owns packet release.
+                         boundary_evidence=None, authority_effect="NONE", genesis=False,
+                         hb_epoch=None, store=None):
+    """SV-LLM's existing caller shape over the reference append(); temporary.
 
-    A manifested receipt packet's first receipt records its own establishment.
-    `establishes_packet` marks the four-part WorkerCoordinator transition whose
-    t(0) accounting opens the first packet; later packets are opened by the
-    single transition that releases their predecessor.
+    It preserves SV-LLM's legacy state-digest rule until callers pass explicit
+    organization-state digests, and declares that rule whenever it applies:
+    boundary evidence carries state_digest_rule SV_LLM_LEGACY_RECEIPT_CHAIN and
+    the fields it was applied to.
+
+      predecessor: FROM_HEAD (the current HEAD receipt digest, resolved inside
+                   append's compare-and-swap), or GENESIS when genesis=True. An
+                   empty ledger is opened only by genesis=True.
+      successor:   the source transition digest.
+
+    These are receipt-chain digests, not organization-state digests as the
+    reference's other callers pass. That is the divergence this wrapper names
+    rather than hides. It adds no other semantics: refusals
+    (OrgLedgerAppendRefused) propagate unchanged and nothing is retried here.
+    Retire it once callers supply explicit digests.
     """
-    root = ledger_root()
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with (root / ".append.lock").open("a+b") as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-        try:
-            released = None
-            effective_boundary_evidence = dict(boundary_evidence or {})
-            if parent_manifest is not None:
-                # The governing parent manifest owns packet release, authorized
-                # once at establishment. A satisfied or expired prior packet is
-                # released and carried through the existing canonical custody
-                # client as a manifest-directed consequence. That custody result
-                # is execution evidence only; it must never mint or replace the
-                # parent manifest's governance disposition.
-                import organization_batch_custody as batches
-                # Establishment is declared by the manifest. A manifest without
-                # one stays count-governed and unchanged, so manifests written
-                # before packets had a t(0) remain valid.
-                manifest_establishes = batches.manifest_declares_establishment(parent_manifest)
-                if establishes_packet and not manifest_establishes:
-                    raise ValueError("t(0) establishment requires a manifest establishment declaration")
-                if establishes_packet:
-                    effective_boundary_evidence[batches.ESTABLISHMENT_KEY] = batches.establishment_record(
-                        parent_manifest, kind="MANIFEST_ASSIGNMENT_T0"
-                    )
-                released = batches.release_satisfied_packet_before_next_transition(
-                    parent_manifest, root=root, now_ns=now_ns
-                )
-                if released is not None:
-                    if establishes_packet:
-                        raise ValueError("t(0) establishment cannot also release a prior packet")
-                    release_execution_result = batches.submit_released_batch(root, released["batch_id"])
-                    if release_execution_result.get("state") not in {"COMPLETED", "FAILED"}:
-                        raise ValueError("released organization batch execution result invalid")
-                    if release_execution_result.get("governance_disposition") is not None:
-                        raise ValueError("released organization batch attempted governance escalation")
-                    carried = {
-                        "batch_id": released["batch_id"],
-                        "execution_result": release_execution_result["state"],
-                        "reason": release_execution_result.get("reason"),
-                        "authority_effect": release_execution_result.get("authority_effect"),
-                    }
-                    if manifest_establishes:
-                        # Release and successor establishment are one transition
-                        # and one receipt. It is member #1 of the packet it
-                        # opens, so the release has its own identity rather than
-                        # riding as an attribute of an unrelated work transition.
-                        _aggregate_transition_locked(
-                            _packet_establishment_source(released),
-                            org_transition_class="ORGANIZATION_RECEIPT_PACKET_ESTABLISHMENT",
-                            boundary_evidence={
-                                batches.ESTABLISHMENT_KEY: batches.establishment_record(
-                                    parent_manifest, kind="PRIOR_PACKET_RELEASE", released_batch=carried
-                                ),
-                                "parent_manifest_released_batch": carried,
-                            },
-                            authority_effect="NONE",
-                        )
-                    else:
-                        effective_boundary_evidence["parent_manifest_released_batch"] = carried
-            record = _aggregate_transition_locked(
-                receipt, org_transition_class=org_transition_class,
-                predecessor_org_state_sha256=predecessor_org_state_sha256,
-                successor_org_state_sha256=successor_org_state_sha256,
-                boundary_evidence=effective_boundary_evidence, authority_effect=authority_effect,
-            )
-            if released is not None:
-                state = batches.open_packet_state(parent_manifest, root=root, now_ns=now_ns)
-                if state["receipt_count"] != (2 if manifest_establishes else 1):
-                    raise ValueError("successor organization receipt packet did not initialize correctly")
-            return record
-        finally:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    if genesis and predecessor_org_state_sha256 is not None:
+        raise OrgLedgerAppendRefused("DENY", "ORG_LEDGER_GENESIS_WITH_EXPLICIT_PREDECESSOR")
+    evidence = dict(boundary_evidence or {})
+    applied = []
+    if predecessor_org_state_sha256 is not None:
+        predecessor = predecessor_org_state_sha256
+    elif genesis:
+        predecessor = GENESIS
+    else:
+        predecessor = FROM_HEAD
+        applied.append("predecessor_org_state_sha256")
+    if successor_org_state_sha256 is not None:
+        successor = successor_org_state_sha256
+    else:
+        successor = verify_source(receipt)["source_transition_sha256"]
+        applied.append("successor_org_state_sha256")
+    if applied:
+        evidence["state_digest_rule"] = STATE_DIGEST_RULE
+        evidence["state_digest_rule_fields"] = applied
+    return append(receipt, org_transition_class, predecessor, successor, evidence, authority_effect,
+                  hb_epoch=hb_epoch, store=store)
 
-
-def _aggregate_transition_locked(receipt, *, org_transition_class="ORGANIZATION_STATE_TRANSITION", predecessor_org_state_sha256=None, successor_org_state_sha256=None, boundary_evidence=None, authority_effect="NONE"):
-    source=verify_source(receipt)
-    root=ledger_root(); d=root/"receipts"; d.mkdir(parents=True,exist_ok=True); h=root/"HEAD.json"
-    existing=_existing_exact_source(
-        d,source,org_transition_class=org_transition_class,
-        predecessor_org_state_sha256=predecessor_org_state_sha256,
-        successor_org_state_sha256=successor_org_state_sha256,
-        boundary_evidence=boundary_evidence,authority_effect=authority_effect,
-    )
-    if existing is not None:
-        retain_source(root,receipt,source)
-        return existing
-    retain_source(root,receipt,source)
-    prev=load(h).get("receipt_sha256") if h.exists() else None
-    predecessor=predecessor_org_state_sha256 or prev
-    successor=successor_org_state_sha256 or source["source_transition_sha256"]
-    body={
-        "schema":"stegverse.organization-transition-receipt/v1",
-        "organization":C["organization"],
-        **source,
-        "org_transition_class":org_transition_class,
-        "predecessor_org_state_sha256":predecessor,
-        "successor_org_state_sha256":successor,
-        "boundary_evidence":dict(boundary_evidence or {}),
-        "authority_effect":authority_effect,
-        "observed_at":datetime.now(timezone.utc).isoformat(),
-        "previous_receipt_sha256":prev,
-    }
-    digest=sha(body); record={**body,"receipt_sha256":digest}; fp=d/(digest.split(":",1)[1]+".json")
-    if fp.exists() and load(fp)!=record: raise ValueError("org receipt collision")
-    if not fp.exists(): _atomic_json(fp,record)
-    _atomic_json(h,{"organization":C["organization"],"receipt_sha256":digest,"receipt_path":str(fp)})
-    return record
 
 def main():
-    p=argparse.ArgumentParser()
-    p.add_argument("--repo-receipt")
-    p.add_argument("--transition-receipt")
-    p.add_argument("--org-transition-class",default=None)
-    p.add_argument("--predecessor-org-state-sha256")
-    p.add_argument("--successor-org-state-sha256")
-    p.add_argument("--boundary-evidence-json",default="{}")
-    p.add_argument("--authority-effect",default="NONE")
-    p.add_argument("--parent-manifest")
-    a=p.parse_args()
-    source_path=a.transition_receipt or a.repo_receipt
-    if not source_path: raise SystemExit("transition receipt required")
-    receipt=load(source_path)
-    default_class="REPO_STATE_PROPAGATION" if receipt.get("schema")=="stegverse.repo-transition-receipt/v1" else "ORGANIZATION_STATE_TRANSITION"
-    try:
-        record=aggregate_transition(
-            receipt,
-            org_transition_class=a.org_transition_class or default_class,
-            predecessor_org_state_sha256=a.predecessor_org_state_sha256,
-            successor_org_state_sha256=a.successor_org_state_sha256,
-            boundary_evidence=json.loads(a.boundary_evidence_json),
-            authority_effect=a.authority_effect,
-            parent_manifest=load(a.parent_manifest) if a.parent_manifest else None,
-        )
-    except ValueError as exc:
-        raise SystemExit(str(exc))
-    print(json.dumps(record,sort_keys=True))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-receipt")
+    parser.add_argument("--transition-receipt")
+    parser.add_argument("--org-transition-class", default=None)
+    parser.add_argument("--predecessor-org-state-sha256", required=True,
+                        help="sha256 digest, FROM_HEAD (bind the current HEAD), or GENESIS (open an empty chain)")
+    parser.add_argument("--successor-org-state-sha256", required=True)
+    parser.add_argument("--boundary-evidence-json", default="{}")
+    parser.add_argument("--authority-effect", default="NONE")
+    parser.add_argument("--hb-epoch", type=int, default=None,
+                        help="heartbeat epoch; derived from the host clock, and marked as derived, when absent")
+    args = parser.parse_args()
+    source_path = args.transition_receipt or args.repo_receipt
+    if not source_path:
+        raise SystemExit("transition receipt required")
+    receipt = load(source_path)
+    default_class = ("REPO_STATE_PROPAGATION"
+                     if receipt.get("schema") == "stegverse.repo-transition-receipt/v1"
+                     else "ORGANIZATION_STATE_TRANSITION")
+    result = append(receipt, args.org_transition_class or default_class,
+                    args.predecessor_org_state_sha256, args.successor_org_state_sha256,
+                    json.loads(args.boundary_evidence_json), args.authority_effect,
+                    hb_epoch=args.hb_epoch)
+    print(json.dumps(result, sort_keys=True))
 
-if __name__=="__main__": main()
+
+if __name__ == "__main__":
+    main()
