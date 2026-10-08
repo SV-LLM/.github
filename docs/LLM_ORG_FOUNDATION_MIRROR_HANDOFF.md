@@ -24,7 +24,7 @@ This repository is the organization coordination surface for the proposed SV-LLM
 9. The Inference Window is disposition-complete for every disposition available in the applicable Admissibility Matrix.
 10. Provider/entity capability selection creates no authority hierarchy.
 11. Existing LLM-adapter provider routing/transport/distributed-workload responsibilities are reused.
-12. Existing Task Registry, WorkerCoordinator, Interlock/InTr, SDK, TV/TVC, Publisher, and Master Records authorities remain unchanged.
+12. Existing Task Registry, WorkerCoordinator, Interlock/InTr, SDK, TV/TVC and Publisher authorities, and Master Records organization records and reconstruction, remain unchanged.
 
 ## Initial repository direction
 

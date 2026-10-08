@@ -18,7 +18,7 @@ Cross-ecosystem review is performed against an immutable view produced from one 
 - **Schema** defines and exposes the provider-neutral immutable review view and accepts requests to expand that view.
 - **LLM/AI reviewers** consume Schema views and produce attributable candidate findings bound to the exact view and InTr receipt.
 - **LLM-adapter** is provider transport only. It does not own review evidence or custody.
-- **Master Records** is not a dependency, prerequisite, fallback custody authority, or direct review-data source for this protocol.
+- **Master Records** relates only to organization records and reconstruction, and has no role in this protocol.
 
 ## Review-source rule
 
@@ -65,7 +65,7 @@ A reviewer-local connectivity limitation is never a finalization predicate.
 - `EXPANSION_REQUIRED`: required evidence is outside the current view; nonterminal.
 - `UNRECEIPTED_UNAVAILABLE_EVIDENCE_PROHIBITED`: unavailable evidence is claimed without a terminal InTr receipt.
 - `REVIEW_FINALIZATION_WITH_UNRESOLVED_EVIDENCE_PROHIBITED`: finalization attempted while required evidence remains merely outside the current view.
-- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made dependent on Master Records custody, availability, endpoint, receipt, replay, or reconstruction.
+- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made to rely on a Master Records organization record or reconstruction.
 
 ## Consequence
 

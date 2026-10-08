@@ -71,7 +71,7 @@ class CanonicalTree(unittest.TestCase):
         # R1(a): only entries whose migrated declarations are bound carry a ref.
         tree = reg.load_tree()
         with_ref = {row["name"] for row in tree["repositories"] if "capability_declaration_ref" in row}
-        self.assertEqual(with_ref, {"Anthropic", "OpenAI"})
+        self.assertEqual(with_ref, {"Anthropic", "OpenAI", "Ecosystem_Chat"})
         for row in tree["repositories"]:
             result = reg.register(row["name"], declaration=None)
             self.assertEqual(result["disposition"], reg.DENY)

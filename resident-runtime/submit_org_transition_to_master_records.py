@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Publish one organization transition receipt for Master Records custody and reconstruction.
+"""Publish one organization transition receipt to the Master Records organization record for reconstruction.
 
 Per-organization-transition custody, ported from the StegVerse-org reference
 (StegVerse-org/.github resident-runtime/submit_org_transition_to_master_records.py)
 and parameterized: the organization comes from this repository's organization
 ledger contract and the origin service from its own service registry, so
-nothing here names another organization. Master Records holds organization-record
-custody and reconstruction only. Publishing never gates this organization's
-runtime reality, and no predecessor standing is defaulted.
+nothing here names another organization.
+Master Records relates only to organization records and reconstruction.
+Publishing never gates this organization's runtime reality, and no
+predecessor standing is defaulted.
 """
 import argparse
 import importlib.util
