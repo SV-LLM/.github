@@ -174,7 +174,7 @@ def require_custody(custody:dict[str,Any]|None)->dict[str,Any]:
     return custody
 
 def dispatch(root:Path, packet:dict[str,Any], *, custody:dict[str,Any]|None=None,
-             node_state:Any|None=None)->dict[str,Any]:
+             node_state:Any|None=None, epoch:int|None=None)->dict[str,Any]:
     require_custody(custody)
     registry=load_registry(root)
     if packet["destination"]["org"]!=registry["organization"]: raise ValueError("wrong_destination_org")
@@ -212,7 +212,7 @@ def dispatch(root:Path, packet:dict[str,Any], *, custody:dict[str,Any]|None=None
         r=receipt(kind,packet["packet_id"],service["service_id"],prev,{"payload_hash":sha(packet["payload"])})
         receipts.append(r); prev=r["receipt_id"]
     if role=="BOUNDARY_LOCAL_CONTROL":
-        application_result=handle_control_message(root,packet,registry,node_state=node_state)
+        application_result=handle_control_message(root,packet,registry,node_state=node_state,epoch=epoch)
     else:
         application_result={"echo":packet["payload"]}
     return {"schema_version":SCHEMA,"organization":registry["organization"],"packet_id":packet["packet_id"],
@@ -237,7 +237,10 @@ def _ingest(root:Path, frame:dict[str,Any], *, custody:dict[str,Any], node_state
     registry=load_registry(root)
     if frame["destination_org"]!=registry["organization"]:
         return {"status":"IGNORED_NOT_ADDRESSED","packet_id":frame["packet_id"]}
-    result=dispatch(root,packet,custody=custody,node_state=node_state)
+    # The epoch of the frame being consumed, which recovery has validated. What
+    # the answer embeds is then a function of the frame, not of this pass.
+    epoch=(frame.get("heartbeat_reference") or {}).get("epoch")
+    result=dispatch(root,packet,custody=custody,node_state=node_state,epoch=epoch)
     return {"status":"CONSUMED","packet":packet,"execution_result":result}
 
 def ingest_frame(root:Path, frame:dict[str,Any], *, repo_ledger_root:Path|None=None,
@@ -521,7 +524,13 @@ def load_federation_directory(root:Path)->dict[str,Any]:
         raise ValueError("federation_directory_denominator_mismatch")
     return value
 
-def resident_status(root:Path, registry:dict[str,Any]|None=None)->dict[str,Any]:
+def resident_status(root:Path, registry:dict[str,Any]|None=None, *, epoch:int|None=None)->dict[str,Any]:
+    """This node's status. Inside an answer it carries the epoch of the frame
+    it answers, so answering the same frame again builds the same answer frame
+    and publishing it is a write-once no-op. It used to sample the host clock
+    there, which made every re-answer a different frame. Without a frame epoch
+    (a local status read, never published) the sample is a live host reading
+    and is labelled as derived from the clock."""
     reg=registry or load_registry(root)
     activation_path=root/"resident-runtime/activation-manifest.json"
     activation=json.loads(activation_path.read_text()) if activation_path.exists() else {}
@@ -533,7 +542,7 @@ def resident_status(root:Path, registry:dict[str,Any]|None=None)->dict[str,Any]:
       "registered_service_count":len(reg.get("services") or []),
       "registered_services":[s.get("service_id") for s in reg.get("services") or []],
       "org_control_service":organization_slug(reg["organization"])+".org-control",
-      "heartbeat_reference":hb_reference(),
+      "heartbeat_reference":hb_reference(epoch=epoch) if epoch is not None else hb_reference(),
       "runtime_observation_claimed":False
     }
 
@@ -563,7 +572,7 @@ def persist_work_request(root:Path, packet:dict[str,Any], *, store:Any|None=None
             "execution_authority_inferred":False}
 
 def handle_control_message(root:Path, packet:dict[str,Any], registry:dict[str,Any],
-                           *, node_state:Any|None=None)->dict[str,Any]:
+                           *, node_state:Any|None=None, epoch:int|None=None)->dict[str,Any]:
     payload=packet.get("payload") or {}
     message_class=payload.get("message_class")
     result={
@@ -575,7 +584,7 @@ def handle_control_message(root:Path, packet:dict[str,Any], registry:dict[str,An
       "execution_authority_effect":packet["transition"]["authority_effect"]
     }
     if message_class=="ecosystem.monitor.request":
-        result["monitor_status"]=resident_status(root,registry)
+        result["monitor_status"]=resident_status(root,registry,epoch=epoch)
     elif message_class=="ecosystem.work.request":
         result["work_intake"]=persist_work_request(root,packet,store=node_state)
     elif message_class=="ecosystem.communication":
