@@ -59,6 +59,8 @@ jobs:
         run: python org-boundary/runtime/federation_projection.py verify
       - name: Validate SV-LLM manifest-bound ledgered crossings
         run: python org-runtime/tests/test_org_crossing.py
+      - name: Validate SV-LLM egress addressed by a manifest-declared capability
+        run: python -B org-runtime/tests/test_org_crossing_capability.py
       - name: Validate organization ledger predecessor resolution, explicit genesis and source retention
         run: python -m unittest discover -s org-runtime/tests -p 'test_org_ledger_predecessor_resolution.py' -v
       - name: Validate the SV-LLM compatibility wrapper and per-transition custody
