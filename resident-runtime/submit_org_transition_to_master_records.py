@@ -21,7 +21,7 @@ K = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(K)
 
 DESTINATION_ORG = "master-records"
-DESTINATION_SERVICE = "master-records.ecosystem-transition-ledger"
+DESTINATION_SERVICE = "organization.ecosystem-transition-ledger"
 TRANSITION_REFERENCE = "ecosystem.transition.organization-record.v1"
 
 
