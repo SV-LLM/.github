@@ -117,7 +117,7 @@ SV-LLM does not copy canonical ecosystem truth into provider repositories. Conte
 - schemas and tests;
 - manifests;
 - mirror handoffs;
-- receipts and Master Records references;
+- receipts and Master Records organization-record references;
 - cross-repository contracts;
 - current implementation state.
 
@@ -225,7 +225,7 @@ SV-LLM reuses and does not supersede:
 - **StegVerse SDK** — manifest construction/validation and SDK-side contracts;
 - **LLM-adapter** — provider-neutral access, provider transport, distributed workload and contribution provenance;
 - **TV/TVC** — credential/provider-operation and applicable route authority;
-- **Master Records** — custody/reconstruction authority;
+- **Master Records** — organization records and reconstruction;
 - **Publisher** — governed publication/output continuation where applicable.
 
 ## Organization Interlock/InTr boundary

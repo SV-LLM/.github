@@ -30,7 +30,7 @@ TASK
  -> existing governance
  -> authorized execution/publication if admitted
  -> authentic observation
- -> receipts / Master Records
+ -> organization receipts / Master Records organization records
  -> future work context
 ```
 
@@ -54,7 +54,7 @@ work
 ├── current handoffs
 ├── manifests
 ├── known evidence
-├── receipt / Master Records references
+├── receipt / Master Records organization-record references
 ├── dependencies
 ├── prohibited architectural drift
 └── unresolved predicates

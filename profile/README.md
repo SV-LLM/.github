@@ -61,6 +61,6 @@ REVIEWING
 
 If acquisition cannot succeed, InTr returns a receipted `EXPANSION_DENIED` or `EXPANSION_FAILED` disposition. Only that receipted terminal disposition may support a final review that identifies required evidence as unavailable. A reviewer MUST NOT finalize with an unverified statement such as “unable to review unconnected data source.”
 
-Master Records is not a dependency, prerequisite, fallback custody authority, or review-data source for this protocol. Organization Records owns custody of the organization action and acquisition receipts. LLM-adapter remains provider transport only and has no custody role.
+Master Records relates only to organization records and reconstruction, and has no role in this protocol. Organization Records owns custody of the organization action and acquisition receipts. LLM-adapter remains provider transport only and has no custody role.
 
 The machine-readable contract is `SV-LLM/schemas/ecosystem-review-view.schema.json`.

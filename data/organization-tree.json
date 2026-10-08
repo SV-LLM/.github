@@ -32,7 +32,7 @@
       "capability_declaration_ref": {
         "repository": "Ecosystem_Chat",
         "path": "contracts/entity-capability.json",
-        "declaration_sha256": "sha256:9463e4775962757c754d4595467898c57712fdba5683c1706df42d35711466b2"
+        "declaration_sha256": "sha256:e89828f1fb48aefb83713d86d18173517fe62ef7533d9c7d7153d649664a6307"
       }
     },
     {
@@ -43,7 +43,7 @@
       "capability_declaration_ref": {
         "repository": "OpenAI",
         "path": "contracts/entity-capability.json",
-        "declaration_sha256": "sha256:2c184bf0ab05198ca43f88e9c17e685a559abda5f6a6dd579637f41705541389"
+        "declaration_sha256": "sha256:1efe299a9e1222405717d1a24195187546f87e1dd19fd7965500e528ec01b4e0"
       }
     },
     {
@@ -54,7 +54,7 @@
       "capability_declaration_ref": {
         "repository": "Anthropic",
         "path": "contracts/entity-capability.json",
-        "declaration_sha256": "sha256:7ede6106dcfab9f9260085aaecbff1104ca144bba1630be73a5ba6dc14cbd9f2"
+        "declaration_sha256": "sha256:5ce1281ffeac1bf2eb84f88341fa2cef27f1e23d66c92e0f3adc574fbec46746"
       }
     },
     {
@@ -100,7 +100,7 @@
     "Multi-entity collaboration belongs in sandbox rather than a provider repository.",
     "StegVerse_AI remains distinct from provider identities, Ecosystem_Chat, and governance authority.",
     "Ecosystem_Chat is an SV-LLM ecosystem entity and interface contract owner; its current public/browser implementation remains in StegVerse-Labs/Site.",
-    "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher, SDK and Master Records authorities are not duplicated in SV-LLM."
+    "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher and SDK authorities, and Master Records organization records and reconstruction, are not duplicated in SV-LLM."
   ],
   "completeness_assessment": {
     "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eight provider capability surfaces.",
