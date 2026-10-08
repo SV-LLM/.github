@@ -1,8 +1,8 @@
-"""SV-LLM migration to the StegVerse-org reference: wrapper (T5) and custody parameterization (T6).
+"""SV-LLM migration to the StegVerse-org reference: wrapper (T5) and organization record parameterization (T6).
 
 ORGANIZATION-ROLE-REFERENCE-MIGRATION-FINAL-REVIEW-002. The temporary
 aggregate_transition wrapper keeps SV-LLM's caller shape over the reference
-append() and declares the legacy state-digest rule. Custody is published per
+append() and declares the legacy state-digest rule. Organization records are published per
 organization transition, with this organization's identity only.
 """
 import importlib.util
@@ -23,7 +23,7 @@ def load(name, path):
 
 agg = load("svllm_org_ledger", "resident-runtime/aggregate_repo_transition.py")
 ledger = load("svllm_ledger_store", "resident-runtime/ledger_store.py")
-custody = load("svllm_custody", "resident-runtime/submit_org_transition_to_master_records.py")
+record = load("svllm_organization_record", "resident-runtime/submit_org_transition_to_master_records.py")
 
 
 def repo_receipt(number):
@@ -87,28 +87,31 @@ class Wrapper(unittest.TestCase):
         self.assertNotIn("organization_batch_custody", text)
 
 
-class Custody(unittest.TestCase):
-    def test_T6_custody_packet_carries_only_this_organizations_identity(self):
+class OrganizationRecord(unittest.TestCase):
+    def test_T6_organization_record_packet_carries_only_this_organizations_identity(self):
         with tempfile.TemporaryDirectory() as root:
             receipt = agg.aggregate_transition(repo_receipt(1), genesis=True, store=ledger.PosixLedgerStore(root))
-        packet = custody.build_custody_packet(receipt, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},
-                                              {"mode": "GENESIS", "node_ref": "sv-llm-test", "predecessor": None})
+        packet = record.build_organization_record_packet(receipt, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},
+                                                         {"mode": "GENESIS", "node_ref": "sv-llm-test", "predecessor": None})
         text = json.dumps(packet)
-        self.assertEqual(custody.organization(), "SV-LLM")
-        self.assertEqual(custody.origin_service("SV-LLM"), "sv-llm.org-control")
+        self.assertEqual(record.organization(), "SV-LLM")
+        self.assertEqual(record.origin_service("SV-LLM"), "sv-llm.org-control")
         self.assertIn('"SV-LLM"', text)
         self.assertIn("sv-llm.org-control", text)
         self.assertIn("master-records.ecosystem-transition-ledger", text)
         self.assertNotIn("StegVerse-org", text)
         self.assertNotIn("stegverse-org", text)
+        self.assertIn('"ORGANIZATION_RECORD_ORGANIZATION_TRANSITION"', text)
+        self.assertIn('"ecosystem.transition.organization-record.v1"', text)
+        self.assertNotIn("custody", text.lower())
 
-    def test_custody_refuses_foreign_receipt_and_defaulted_standing(self):
+    def test_organization_record_refuses_foreign_receipt_and_defaulted_standing(self):
         foreign = {"schema": "stegverse.organization-transition-receipt/v1", "organization": "StegVerse-org"}
         with self.assertRaisesRegex(SystemExit, "owner mismatch"):
-            custody.build_custody_packet(foreign, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {"predecessor": None})
+            record.build_organization_record_packet(foreign, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {"predecessor": None})
         own = {"schema": "stegverse.organization-transition-receipt/v1", "organization": "SV-LLM"}
         with self.assertRaisesRegex(SystemExit, "standing must declare"):
-            custody.build_custody_packet(own, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {})
+            record.build_organization_record_packet(own, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {})
 
     def test_source_names_no_other_organization(self):
         text = (ROOT / "resident-runtime/submit_org_transition_to_master_records.py").read_text()
