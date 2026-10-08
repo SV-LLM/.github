@@ -15,13 +15,14 @@ STANDING={"mode":"ESTABLISH_GENESIS","node_ref":"sv-llm-crossing-test-node","pre
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
 
-def peer_root(base,org,k):
+def peer_root(base,org,k,row):
     root=base/"peers"/org; (root/"org-boundary/registry").mkdir(parents=True)
     shutil.copytree(REPO/"org-boundary/runtime",root/"org-boundary/runtime"); (root/"docs").mkdir()
     shutil.copy2(REPO/"docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json",root/"docs")
-    slug=k.organization_slug(org)
+    service=row.get("addressed_service") or k.organization_slug(org)+".org-control"
+    role=row.get("addressed_service_role","BOUNDARY_LOCAL_CONTROL")
     (root/"org-boundary/registry/services.json").write_text(json.dumps({"organization":org,"services":[
-        {"service_id":slug+".org-control","repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}))
+        {"service_id":service,"repository":row["repository"],"boundary_role":role}]}))
     return root
 
 def chain(ledger):
@@ -37,7 +38,8 @@ with tempfile.TemporaryDirectory() as td:
     mesh=base/"mesh"
     c=load("crossing",root/"org-runtime/crossing.py"); k=c.kernel
     assert c.ORG=="SV-LLM"
-    peers=[r["organization"] for r in k.load_federation_directory(root)["organizations"] if r["organization"]!=c.ORG]
+    rows={r["organization"]:r for r in k.load_federation_directory(root)["organizations"] if r["organization"]!=c.ORG}
+    peers=list(rows)
 
     # The organization chain is opened by a declared genesis transition, never by an empty ledger.
     try:
@@ -61,7 +63,7 @@ with tempfile.TemporaryDirectory() as td:
                      standing=STANDING,mesh_root=mesh,root=root)
         assert out["transition_class"]=="ORGANIZATION_EGRESS_EMITTED" and out["disposition"]=="ALLOW" and out["awaits_receiver"] is False
         assert Path(out["spool_path"]).exists()
-    roots={org:peer_root(base,org,k) for org in peers}
+    roots={org:peer_root(base,org,k,rows[org]) for org in peers}
     for org in peers:
         got=k.consume_addressed_frames(roots[org],mesh_root=mesh)
         assert len(got)==1 and got[0]["result"]["status"]=="CONSUMED" and got[0]["result"]["packet"]["origin"]["org"]=="SV-LLM", org
