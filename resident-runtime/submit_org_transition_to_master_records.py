@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Publish one organization transition receipt for Master Records custody and reconstruction.
+"""Publish one organization transition receipt as a Master Records organization record.
 
-Per-organization-transition custody, ported from the StegVerse-org reference
+Per-organization-transition organization record, ported from the StegVerse-org reference
 (StegVerse-org/.github resident-runtime/submit_org_transition_to_master_records.py)
 and parameterized: the organization comes from this repository's organization
 ledger contract and the origin service from its own service registry, so
-nothing here names another organization. Master Records holds organization-record
-custody and reconstruction only. Publishing never gates this organization's
-runtime reality, and no predecessor standing is defaulted.
+nothing here names another organization. Master Records relates to organization
+records and reconstruction only. Organization = runtime/observed reality; Interlock/InTr
+admits transitions. Publishing never conditions this organization's runtime reality,
+and no predecessor standing is defaulted.
 """
 import argparse
 import importlib.util
@@ -41,7 +42,7 @@ def origin_service(org, root=ROOT):
     return rows[0]["service_id"]
 
 
-def build_custody_packet(receipt, predecessor_ecosystem_state_sha256, successor_ecosystem_state_sha256,
+def build_organization_record_packet(receipt, predecessor_ecosystem_state_sha256, successor_ecosystem_state_sha256,
                          relation_evidence, standing, root=ROOT):
     org = organization(root)
     if receipt.get("schema") != "stegverse.organization-transition-receipt/v1":
@@ -68,7 +69,7 @@ def main():
     p.add_argument("--relation-evidence-json", default="{}")
     p.add_argument("--standing", required=True, help="JSON file declaring mode, node_ref and the predecessor key")
     a = p.parse_args()
-    packet = build_custody_packet(load(a.org_receipt), a.predecessor_ecosystem_state_sha256,
+    packet = build_organization_record_packet(load(a.org_receipt), a.predecessor_ecosystem_state_sha256,
                                   a.successor_ecosystem_state_sha256, json.loads(a.relation_evidence_json),
                                   load(a.standing))
     published = K.publish_packet(packet)
