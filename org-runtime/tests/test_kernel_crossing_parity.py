@@ -495,9 +495,12 @@ class IngressMaterializesInNodeState(unittest.TestCase):
     def test_the_unreferenced_transport_is_gone(self):
         self.assertFalse((REPO / "org-boundary/runtime/intr_transport.py").exists())
         here = Path(__file__).resolve()
-        referencing = [str(p.relative_to(REPO)) for pattern in ("*.py", "*.json", "*.yml")
-                       for p in REPO.rglob(pattern)
-                       if ".git" not in p.parts and p.resolve() != here and "intr_transport" in p.read_text(errors="ignore")]
+        # SV-LLM's own trees only: CI checks out the StegVerse-org reference
+        # beside them, and that organization's files are not SV-LLM's references.
+        own = (".github", ".stegverse", "data", "docs", "org-boundary", "org-kernel", "org-runtime", "resident-runtime")
+        referencing = [str(p.relative_to(REPO)) for top in own for pattern in ("*.py", "*.json", "*.yml")
+                       for p in (REPO / top).rglob(pattern)
+                       if p.resolve() != here and "intr_transport" in p.read_text(errors="ignore")]
         self.assertEqual(referencing, [])
 
 
