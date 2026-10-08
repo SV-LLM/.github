@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
-import importlib.util, json, shutil, tempfile
+import importlib.util, json, tempfile
 from pathlib import Path
 spec=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(spec); spec.loader.exec_module(k)
+_peer_spec=importlib.util.spec_from_file_location("peer_organization","org-runtime/tests/peer_organization.py")
+peers=importlib.util.module_from_spec(_peer_spec); _peer_spec.loader.exec_module(peers)
 
-TREE=Path("org-kernel/kernel.py").resolve().parents[1]
-CONTRACT="docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json"
-#: A synthetic root is a dispatch root like any other, so it has to carry the
-#: standing surfaces the kernel resolves from it. Copied rather than stubbed:
-#: a test root that admits a crossing this organization's real root would refuse
-#: proves nothing about the real root.
-def provision_standing(root:Path)->None:
-    (root/"org-boundary/runtime").mkdir(parents=True,exist_ok=True)
-    shutil.copy2(TREE/"org-boundary/runtime/node_standing.py",root/"org-boundary/runtime/node_standing.py")
-    (root/"docs").mkdir(parents=True,exist_ok=True)
-    shutil.copy2(TREE/CONTRACT,root/CONTRACT)
-
+#: Every node below is a materialized organization: its own copy of the kernel,
+#: emitters and ledger contracts, its own supplied ledgers and node state, and a
+#: declared genesis. The kernel records every crossing it consumes or publishes
+#: on its own organization's ledgers and refuses a root that is not its own, so
+#: a bare directory standing in for a node would prove nothing.
 STANDING={"mode":"ESTABLISH_GENESIS","node_ref":"kernel-test-node","predecessor":None}
+ORGS=["AaCT-E","Admissible-Existence","AdmittedCode","Data-Continuation","ECAT-ICAT-Formal",
+      "formalism-tests","GCAT-BCAT-Engine","Infrastructure-Continuity-Ventures","master-records",
+      "StegGhost","StegVerse-002","StegVerse-Labs","StegVerse-org","Triad-Test"]
+
+def node(base,org,role,*,directory=None,activation=None):
+    peer=peers.materialize(base,org,[{"service_id":k.organization_slug(org)+"."+role,"repository":org+"/.github",
+                                      "boundary_role":"BOUNDARY_LOCAL_"+("CONTROL" if role=="org-control" else "DIAGNOSTIC")}])
+    if directory is not None:
+        (peer.root/"org-boundary/registry/federation.json").write_text(json.dumps(directory))
+    if activation is not None:
+        (peer.root/"resident-runtime/activation-manifest.json").write_text(json.dumps(activation))
+    return peer
+
 with tempfile.TemporaryDirectory() as td:
- root=Path(td); (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
- reg={"organization":"Kernel-Test","services":[{"service_id":"kernel-test.boundary-diagnostic","repository":"Kernel-Test/.github","boundary_role":"BOUNDARY_LOCAL_DIAGNOSTIC"}]}
- (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
+ peer=node(Path(td),"Kernel-Test","boundary-diagnostic")
  packet={"schema_version":"stegverse.intr.org-boundary.v1","packet_id":"kernel-test-001","direction":"INGRESS",
  "origin":{"org":"Peer","service":"peer.boundary-diagnostic"},"destination":{"org":"Kernel-Test","service":"kernel-test.boundary-diagnostic"},
  "carrier":{"kind":"HB_DERIVED","reference":"canonical"},"intr_profile":"stegverse.intr.org-boundary.v1",
@@ -27,51 +33,56 @@ with tempfile.TemporaryDirectory() as td:
  "evidence":{"ingress_receipt":None,"dispatch_receipt":None,"consumption_receipt":None,"egress_receipt":None,"reconstruction_reference":None}}
  frame=k.carrier_frame(packet,now_ns=k.HB_ANCHOR_UNIX_NS+1_000_000_000)
  recovered=k.recover_packet(frame); assert recovered==packet
- out=k.ingest_frame(root,frame); assert out["status"]=="CONSUMED"; assert out["execution_result"]["reconstruction"]["status"]=="RECONSTRUCTED"
+ # A direct ingest is a recorded crossing: without custody it refuses before dispatching.
+ try:
+     peer.kernel.ingest_frame(peer.root,frame); raise AssertionError("an unrecorded ingest was accepted")
+ except ValueError as refused:
+     assert "ledger_location_required_from_materializer" in str(refused)
+ out=peer.kernel.ingest_frame(peer.root,frame,**peer.ledgers()); assert out["status"]=="CONSUMED"; assert out["execution_result"]["reconstruction"]["status"]=="RECONSTRUCTED"
  assert [x["kind"] for x in out["execution_result"]["receipts"]]==["INGRESS_ACCEPTED","DISPATCHED","CONSUMED","RESULT_BOUND","EGRESS_EMITTED"]
+ # A diagnostic is the processor, so nothing selected one, and the result says
+ # so rather than leaving a declaration looking like one that was processed.
+ assert out["execution_result"]["processing_selection"]=="BOUNDARY_LOCAL_NO_PROCESSOR_SELECTED"
+ assert out["execution_result"]["declared_capability_processed"] is False
+ assert out["organization_record"]["organization_receipt_sha256"].startswith("sha256:")
+ assert {r["transition_class"] for r in peer.receipts("repo")}=={"ORGANIZATION_LEDGER_OPENED","ORGANIZATION_FEDERATION_CROSSING_CONSUMED"}
  print("PASS")
 
 
 # federation mesh source-level proof
 with tempfile.TemporaryDirectory() as td:
     mesh=Path(td)/"mesh"
-    a=Path(td)/"a"; b=Path(td)/"b"
-    for root,org in ((a,"Org-A"),(b,"Org-B")):
-        (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
-        slug=org.lower()
-        reg={"organization":org,"services":[{"service_id":slug+".boundary-diagnostic","repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_DIAGNOSTIC"}]}
-        (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
-    packet=k.build_packet(origin_org="Org-A",origin_service="org-a.boundary-diagnostic",
-                          destination_org="Org-B",destination_service="org-b.boundary-diagnostic",
-                          payload={"probe":"mesh"},standing=STANDING,packet_id="mesh-a-to-b-001")
-    pub=k.publish_packet(packet,root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+2_000_000_000)
-    assert Path(pub["path"]).exists()
-    assert k.consume_addressed_frames(a,mesh_root=mesh)==[]
-    consumed=k.consume_addressed_frames(b,mesh_root=mesh)
+    a=node(Path(td),"Org-A","boundary-diagnostic"); b=node(Path(td),"Org-B","boundary-diagnostic")
+    packet=a.kernel.build_packet(origin_org="Org-A",origin_service="org-a.boundary-diagnostic",
+                                 destination_org="Org-B",destination_service="org-b.boundary-diagnostic",
+                                 payload={"probe":"mesh"},standing=STANDING,packet_id="mesh-a-to-b-001")
+    # Publishing is a recorded emission: without the organization's custody it refuses.
+    try:
+        a.kernel.publish_packet(packet,root=mesh,epoch=200); raise AssertionError("an unrecorded publish was accepted")
+    except ValueError as refused:
+        assert "crossing_custody_required_from_recording_operation" in str(refused)
+    assert not mesh.exists()
+    pub=a.publish(packet,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+2_000_000_000)
+    assert Path(pub["path"]).exists() and pub["organization_record"]["organization_receipt_sha256"]
+    assert [r["transition_class"] for r in a.receipts("repo") if r["transition_class"]!="ORGANIZATION_LEDGER_OPENED"]==["ORGANIZATION_FEDERATION_CROSSING_EMITTED"]
+    assert a.consume_addressed(mesh_root=mesh)==[]
+    consumed=b.consume_addressed(mesh_root=mesh)
     assert len(consumed)==1
     assert consumed[0]["result"]["status"]=="CONSUMED"
     assert consumed[0]["result"]["execution_result"]["reconstruction"]["status"]=="RECONSTRUCTED"
+    assert consumed[0]["organization_record"]["organization_receipt_sha256"]
 print("FEDERATION_PASS")
 
 
 # 14-node ecosystem-wide communication fanout / aggregation proof
 with tempfile.TemporaryDirectory() as td:
     mesh=Path(td)/"mesh"
-    orgs=["AaCT-E","Admissible-Existence","AdmittedCode","Data-Continuation","ECAT-ICAT-Formal",
-          "formalism-tests","GCAT-BCAT-Engine","Infrastructure-Continuity-Ventures","master-records",
-          "StegGhost","StegVerse-002","StegVerse-Labs","StegVerse-org","Triad-Test"]
-    roots={}
-    for org in orgs:
-        root=Path(td)/k.organization_slug(org)
-        (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
-        service=k.organization_slug(org)+".org-control"
-        reg={"organization":org,"services":[{"service_id":service,"repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}
-        (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
-        roots[org]=root
-    pub=k.publish_ecosystem_message(
+    nodes={org:node(Path(td),org,"org-control") for org in ORGS}
+    origin=nodes["StegVerse-Labs"]
+    pub=origin.kernel.publish_ecosystem_message(
         origin_org="StegVerse-Labs",
         origin_service="stegverse-labs.org-control",
-        organizations=orgs,
+        organizations=ORGS,
         standing=STANDING,
         message_class="ecosystem.monitor.request",
         subject="ecosystem-broadcast-001",
@@ -79,10 +90,12 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="REPORT_STATUS",
         communication_id="ecosystem-broadcast-001",
         root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+3_000_000_000
+        now_ns=k.HB_ANCHOR_UNIX_NS+3_000_000_000,
+        custody=origin.custody()
     )
     assert pub["published_count"]==14
-    results={org:k.consume_addressed_frames(root,mesh_root=mesh) for org,root in roots.items()}
+    assert sum(r["transition_class"]=="ORGANIZATION_FEDERATION_CROSSING_EMITTED" for r in origin.receipts("repo"))==14
+    results={org:n.consume_addressed(mesh_root=mesh) for org,n in nodes.items()}
     rollup=k.aggregate_ecosystem_results("ecosystem-broadcast-001",results)
     assert rollup["complete"] is True
     assert rollup["consumed_count"]==14
@@ -93,24 +106,12 @@ print("ECOSYSTEM_BROADCAST_PASS")
 # 14-node monitor request -> response roll-up proof
 with tempfile.TemporaryDirectory() as td:
     mesh=Path(td)/"mesh"
-    orgs=["AaCT-E","Admissible-Existence","AdmittedCode","Data-Continuation","ECAT-ICAT-Formal",
-          "formalism-tests","GCAT-BCAT-Engine","Infrastructure-Continuity-Ventures","master-records",
-          "StegGhost","StegVerse-002","StegVerse-Labs","StegVerse-org","Triad-Test"]
-    roots={}
-    directory={"denominator":14,"organizations":[{"organization":org} for org in orgs]}
-    for org in orgs:
-        root=Path(td)/k.organization_slug(org)
-        (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
-        (root/"resident-runtime").mkdir(parents=True)
-        service=k.organization_slug(org)+".org-control"
-        reg={"organization":org,"services":[{"service_id":service,"repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}
-        (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
-        (root/"org-boundary/registry/federation.json").write_text(json.dumps(directory))
-        (root/"resident-runtime/activation-manifest.json").write_text(json.dumps({"state":"TEST_ACTIVE","kernel":{"version":"1.3.0"}}))
-        roots[org]=root
-    origin=roots["StegVerse-Labs"]
-    pub=k.publish_ecosystem_from_directory(
-        origin,
+    directory={"denominator":14,"organizations":[{"organization":org} for org in ORGS]}
+    nodes={org:node(Path(td),org,"org-control",directory=directory,
+                    activation={"state":"TEST_ACTIVE","kernel":{"version":"1.3.0"}}) for org in ORGS}
+    origin=nodes["StegVerse-Labs"]
+    pub=origin.kernel.publish_ecosystem_from_directory(
+        origin.root,
         standing=STANDING,
         message_class="ecosystem.monitor.request",
         subject="ecosystem-monitor-response-001",
@@ -118,34 +119,24 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="REPORT_STATUS",
         communication_id="ecosystem-monitor-response-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+4_000_000_000
+        now_ns=k.HB_ANCHOR_UNIX_NS+4_000_000_000,
+        **origin.ledgers()
     )
     assert pub["published_count"]==14
-    for org,root in roots.items():
-        k.consume_and_respond(root,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+4_100_000_000)
+    for org,n in nodes.items():
+        n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+4_100_000_000)
     roll=k.collect_ecosystem_responses("StegVerse-Labs","ecosystem-monitor-response-001",mesh_root=mesh)
     assert roll["response_count"]==14
-    assert {x["organization"] for x in roll["organizations"]}==set(orgs)
+    assert {x["organization"] for x in roll["organizations"]}==set(ORGS)
 
 # 14-node work request -> local admission queue proof
 with tempfile.TemporaryDirectory() as td:
     mesh=Path(td)/"mesh"
-    orgs=["AaCT-E","Admissible-Existence","AdmittedCode","Data-Continuation","ECAT-ICAT-Formal",
-          "formalism-tests","GCAT-BCAT-Engine","Infrastructure-Continuity-Ventures","master-records",
-          "StegGhost","StegVerse-002","StegVerse-Labs","StegVerse-org","Triad-Test"]
-    roots={}
-    directory={"denominator":14,"organizations":[{"organization":org} for org in orgs]}
-    for org in orgs:
-        root=Path(td)/k.organization_slug(org)
-        (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
-        service=k.organization_slug(org)+".org-control"
-        reg={"organization":org,"services":[{"service_id":service,"repository":org+"/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}
-        (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
-        (root/"org-boundary/registry/federation.json").write_text(json.dumps(directory))
-        roots[org]=root
-    origin=roots["StegVerse-Labs"]
-    pub=k.publish_ecosystem_from_directory(
-        origin,
+    directory={"denominator":14,"organizations":[{"organization":org} for org in ORGS]}
+    nodes={org:node(Path(td),org,"org-control",directory=directory) for org in ORGS}
+    origin=nodes["StegVerse-Labs"]
+    pub=origin.kernel.publish_ecosystem_from_directory(
+        origin.root,
         standing=STANDING,
         message_class="ecosystem.work.request",
         subject="ecosystem-work-intake-001",
@@ -153,12 +144,16 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="RECONCILE_LOCAL_STATUS",
         communication_id="ecosystem-work-intake-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+5_000_000_000
+        now_ns=k.HB_ANCHOR_UNIX_NS+5_000_000_000,
+        **origin.ledgers()
     )
     assert pub["published_count"]==14
-    for org,root in roots.items():
-        k.consume_and_respond(root,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+5_100_000_000)
-        inbox=list((root/"resident-runtime/control/inbox").glob("*.json"))
+    for org,n in nodes.items():
+        n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+5_100_000_000)
+        # Work intake is this node's own state, at the location supplied to it,
+        # never under the repository checkout.
+        assert not (n.root/"resident-runtime/control").exists()
+        inbox=list((n.node_state/"control/inbox").glob("*.json"))
         assert len(inbox)==1
         record=json.loads(inbox[0].read_text())
         assert record["state"]=="QUEUED_FOR_LOCAL_ADMISSION_EVALUATION"
@@ -171,27 +166,22 @@ print("ECOSYSTEM_CONTROL_RESPONSE_PASS")
 # durable federation replay/dedup proof
 with tempfile.TemporaryDirectory() as td:
     mesh=Path(td)/"mesh"
-    root=Path(td)/"node"
-    (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
-    (root/"resident-runtime").mkdir(parents=True)
     org="Replay-Test"
-    reg={"organization":org,"services":[{"service_id":"replay-test.org-control","repository":"Replay-Test/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}
-    directory={"denominator":1,"organizations":[{"organization":org}]}
-    (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
-    (root/"org-boundary/registry/federation.json").write_text(json.dumps(directory))
-    (root/"resident-runtime/activation-manifest.json").write_text(json.dumps({"state":"TEST","kernel":{"version":"1.3.1"}}))
-    pub=k.publish_ecosystem_from_directory(
-        root,
+    n=node(Path(td),org,"org-control",directory={"denominator":1,"organizations":[{"organization":org}]},
+           activation={"state":"TEST","kernel":{"version":"1.3.1"}})
+    pub=n.kernel.publish_ecosystem_from_directory(
+        n.root,
         standing=STANDING,
         message_class="ecosystem.communication",
         subject="dedup",
         body={"value":1},
         communication_id="ecosystem-dedup-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+6_000_000_000
+        now_ns=k.HB_ANCHOR_UNIX_NS+6_000_000_000,
+        **n.ledgers()
     )
-    first=k.consume_and_respond(root,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_100_000_000)
-    second=k.consume_and_respond(root,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_200_000_000)
+    first=n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_100_000_000)
+    second=n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_200_000_000)
     assert len(first)==1
     assert len(second)==1 or len(second)==0
     # second cycle may see only the response addressed to self; it must not reconsume the original request.
@@ -203,11 +193,9 @@ print("ECOSYSTEM_DEDUP_PASS")
 # node-standing gate proof: kernel_required 1.3.0 declares this gate, so the
 # gate is proven here rather than implied by the declared version.
 with tempfile.TemporaryDirectory() as td:
-    root=Path(td)/"gate"
-    (root/"org-boundary/registry").mkdir(parents=True); provision_standing(root)
     org="Gate-Test"
-    reg={"organization":org,"services":[{"service_id":"gate-test.org-control","repository":"Gate-Test/.github","boundary_role":"BOUNDARY_LOCAL_CONTROL"}]}
-    (root/"org-boundary/registry/services.json").write_text(json.dumps(reg))
+    n=node(Path(td),org,"org-control")
+    custody=n.custody()
 
     # A standing-less packet cannot be constructed: `standing` has no default.
     try:
@@ -229,15 +217,22 @@ with tempfile.TemporaryDirectory() as td:
             "payload":{"probe":"unstanding"},
             "evidence":{"ingress_receipt":None,"dispatch_receipt":None,"consumption_receipt":None,"egress_receipt":None,"reconstruction_reference":None}}
     try:
-        k.dispatch(root,forged)
+        n.kernel.dispatch(n.root,forged,custody=custody)
         raise AssertionError("dispatch consumed a crossing with no standing")
     except ValueError as refused:
         assert str(refused).startswith("node_standing_refused:"), refused
         assert "no-standing-declared" in str(refused), refused
 
+    # Dispatch records nothing itself, so it refuses a caller without custody.
+    try:
+        n.kernel.dispatch(n.root,{**forged,"standing":STANDING})
+        raise AssertionError("dispatch processed a crossing for a caller that cannot record it")
+    except ValueError as refused:
+        assert "crossing_custody_required_from_recording_operation" in str(refused), refused
+
     # The same crossing, carrying standing, is admitted and the resolved
     # standing travels on the result.
-    admitted=k.dispatch(root,{**forged,"standing":STANDING})
+    admitted=n.kernel.dispatch(n.root,{**forged,"standing":STANDING},custody=custody)
     assert admitted["consumed"] is True
     assert admitted["application_result"]["execution_authority_inferred"] is False
     assert admitted["node_standing_disposition"]=="ALLOW"

@@ -21,7 +21,7 @@ def _bound(op:Any,*,operation_id:str,entry:str,carrier:str,binding_role:str)->bo
             and all(op.get(flag) is False for flag in NON_AUTHORIZING_FLAGS))
 def egress_emitting_operation_bound(t:dict[str,Any])->bool:
     op=(t.get("egress") or {}).get("emitting_operation")
-    return _bound(op,operation_id="ORGANIZATION_INTER_ORG_EGRESS",entry="emission",carrier="org-kernel/kernel.py::publish_packet",binding_role="ORGANIZATION_EMITTING_OPERATION_RESOLUTION") and op.get("origin_is_verified_by_this_boundary") is False and op.get("origin_attestation_state")=="NOT_PROVEN"
+    return _bound(op,operation_id="ORGANIZATION_INTER_ORG_EGRESS",entry="emission",carrier="org-kernel/kernel.py::carry_packet",binding_role="ORGANIZATION_EMITTING_OPERATION_RESOLUTION") and op.get("origin_is_verified_by_this_boundary") is False and op.get("origin_attestation_state")=="NOT_PROVEN"
 def ingress_receiving_operation_bound(t:dict[str,Any])->bool:
     op=(t.get("ingress") or {}).get("receiving_operation")
     return _bound(op,operation_id="ORGANIZATION_INTER_ORG_INGRESS",entry="consumption",carrier="org-kernel/kernel.py::scan_addressed_frames",binding_role="ORGANIZATION_RECEIVING_OPERATION_RESOLUTION")

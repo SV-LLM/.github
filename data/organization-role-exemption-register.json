@@ -30,14 +30,15 @@
   "exemptions": [
     {
       "exemption_id": "SV-LLM-EXEMPTION-001",
-      "surface": "org-kernel/kernel.py direct crossing entrypoints (publish_packet, publish_ecosystem_message, publish_ecosystem_from_directory, ingest_frame, consume_addressed_frames, consume_and_respond), shared kernel contract at semantic parity with StegVerse-org/.github org-kernel (supplied mesh only, node_store seam)",
+      "surface": "org-kernel/kernel.py primitives that record nothing themselves: carry_packet and publish_frame (the carrier write) and dispatch (the processing step). The direct crossing entrypoints this exemption used to name -- publish_packet, publish_ecosystem_message, publish_ecosystem_from_directory, ingest_frame, consume_addressed_frames, consume_and_respond -- now record every crossing they emit, consume or refuse on the repository and organization ledgers, refuse before any effect without both supplied ledger locations, and are no longer exempt.",
       "owning_existing_goal": "Universal Organization Resident Kernel (StegVerse-Labs/.github/org-kernel, canonical_source)",
-      "failure_code": "ORGANIZATION_ROLE_CONFORMANCE_NOT_DECLARED",
+      "failure_code": "KERNEL_PRIMITIVE_RECORDED_BY_ITS_CALLING_OPERATION",
       "failed_predicate": "EVERY_STATE_TRANSITION_OCCURRING_WITHIN_THE_ORGANIZATION_EMITS_AN_ORGANIZATION_RECEIPT",
-      "why_manifest_bound_state_transition_is_not_yet_possible": "The shared kernel publishes and consumes crossings without appending repository or organization receipts. SV-LLM keeps the shared kernel contract and does not add an SV-LLM-only ledger path to it; every SV-LLM crossing is made through org-runtime/crossing.py, which records each disposition on both ledgers. The kernel's own entrypoints remain callable directly (only with a supplied mesh) and would bypass that record.",
-      "disposition": "DENY_DIRECT_USE_ROUTE_THROUGH_org-runtime/crossing.py",
-      "required_evidence_or_repair": "Shared kernel records every crossing disposition on the repository and organization ledgers (or exposes a ledger hook), released in the canonical org-kernel and adopted here; then this exemption is removed.",
-      "retry_entrypoint": "python org-runtime/tests/test_org_crossing.py && python org-kernel/tests/test_kernel.py",
+      "why_manifest_bound_state_transition_is_not_yet_possible": "These primitives are steps inside a crossing that another operation records: org-runtime/crossing.py::egress records each emission it carries as ORGANIZATION_EGRESS_EMITTED, crossing.py::ingress records each disposition it dispatches, and the kernel's recording entrypoints record the crossing their carrier write or dispatch belongs to. A receipt here as well would record one crossing twice, so the primitive emits none, and it cannot verify that its caller recorded it -- it can only require that the caller is able to.",
+      "disposition": "DENY_DIRECT_USE_WITHOUT_CROSSING_CUSTODY",
+      "enforcement": "Each primitive refuses with crossing_custody_required_from_recording_operation unless handed the custody org-kernel/kernel.py::crossing_custody resolves, which requires both supplied ledger locations, this kernel's own repository and organization as the root, and a declared organization-ledger genesis. Tested in org-runtime/tests/test_kernel_crossing_parity.py.",
+      "required_evidence_or_repair": "A custody that binds the calling operation's appended receipt to the primitive's effect, so the kernel verifies the record rather than only the ability to make it, released in the canonical org-kernel and adopted here; then this exemption is removed.",
+      "retry_entrypoint": "python -B -m unittest discover -s org-runtime/tests -p 'test_kernel_crossing_parity.py' -v",
       "next_attempt": "On the next canonical org-kernel release",
       "expires_or_review_on": "2026-11-06",
       "exemption_grants_authority": false
