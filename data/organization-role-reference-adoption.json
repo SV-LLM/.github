@@ -2,7 +2,7 @@
   "schema": "sv-llm.organization-role-reference-adoption/v1",
   "reference": {
     "repository": "StegVerse-org/.github",
-    "commit": "702f896246c44c5857bfdc8227f953655958f4d5"
+    "commit": "60ddd13c186fb064b1226024f9e60c7f0fc29c79"
   },
   "adopted_by": "SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001",
   "files": {
@@ -12,13 +12,13 @@
     },
     ".stegverse/transition-ledger/emit.py": {
       "rule": "byte_identical",
-      "reference_sha256": "sha256:bccdf2e4e2ead81e0bef46b66f0182a3d4c510cd8cca2bc2a7105b1751dc2803"
+      "reference_sha256": "sha256:2264edf97b2d7b35ea10c2ef247c7a97bc9ff7d7521b689a064f5e2447646749"
     },
     "resident-runtime/aggregate_repo_transition.py": {
       "rule": "declared_insertion",
-      "reference_sha256": "sha256:5f4bb4c26bfcff62caa033e858f0ed509471149413282ca5b1eced32c2b5e4c4",
+      "reference_sha256": "sha256:02c1808f243505fd747bdad379ab3d8b6e9c4640c0a5fe654b9c483bbbce1688",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 13381,
+      "insertion_offset": 14757,
       "insertion_bytes": 2403,
       "insertion_sha256": "sha256:57a9cadd19d7b100afb071455cc0a5e241ddc0c7a4c665d86f1a6428e5290faa"
     }

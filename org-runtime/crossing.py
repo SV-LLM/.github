@@ -5,10 +5,11 @@ Every action crossing the SV-LLM boundary is an attempted state transition bound
 to a manifest, and the manifest determines the destination:
 
 * EGRESS -- the manifest names a peer organization. If that organization exists
-  in the federation directory projection, the packet is published to the shared
-  federation spool and the transition succeeds at egress. Nothing waits for the
-  receiver: the spool is the durable queue, so receiver availability and
-  liveness are never predicates.
+  in the federation directory projection, the packet is published by the
+  declared carrier (org-kernel/kernel.py::publish_packet) to the mesh the
+  materializer supplied, and the transition succeeds at egress. Nothing waits
+  for the receiver: the mesh is the durable queue, so receiver availability
+  and liveness are never predicates.
 * INGRESS -- a frame addressed to SV-LLM. If its manifest names an SV-LLM
   repository that exists in this organization's inventory, the manifest is
   materialized for that repository, write-once. Existence of the destination is
@@ -19,6 +20,14 @@ to a manifest, and the manifest determines the destination:
 Every disposition -- including every refusal -- is appended to the repository
 ledger and then the organization ledger, which is where SV-LLM's runtime reality
 is located. An absence is not recorded: no frame means nothing crossed.
+
+Locations are supplied, never derived from the host. The mesh is the
+`mesh_root` argument; there is no environment, home-directory or hosted
+transport fallback. A crossing attempted without one is FAIL_CLOSED
+MESH_LOCATION_REQUIRED_FROM_MATERIALIZER and recorded. The ledgers are
+STEGVERSE_REPO_LEDGER_ROOT and STEGVERSE_ORG_LEDGER_ROOT; without both nothing
+is appended to either and the attempt is FAIL_CLOSED
+LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER.
 
 Interlock/InTr remains the transition authority. Credential authority is TV/TVC.
 Nothing here grants routing, admission, credential or execution authority.
@@ -49,13 +58,47 @@ EGRESS_REFUSED="ORGANIZATION_EGRESS_REFUSED"
 INGRESS_MATERIALIZED="ORGANIZATION_INGRESS_MATERIALIZED"
 INGRESS_CONSUMED="ORGANIZATION_INGRESS_CONSUMED"
 INGRESS_REFUSED="ORGANIZATION_INGRESS_REFUSED"
-ALLOW,DENY="ALLOW","DENY"
+ALLOW,DENY,FAIL_CLOSED="ALLOW","DENY","FAIL_CLOSED"
+MESH_LOCATION_REQUIRED="MESH_LOCATION_REQUIRED_FROM_MATERIALIZER"
+LEDGER_LOCATION_REQUIRED="LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER"
+EGRESS_RETRY="org-runtime/crossing.py::egress"
+INGRESS_RETRY="org-runtime/crossing.py::ingress"
 SDK_MANIFEST_CROSSING_PAYLOAD="stegverse.sdk-manifest-crossing-payload/v1"
 CAPABILITY_PROFILE_ID=re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 class Refused(Exception):
+    disposition=DENY
     def __init__(self, failed_predicate:str, reason:str="") -> None:
         super().__init__(failed_predicate); self.failed_predicate=failed_predicate; self.reason=reason
+
+class FailClosed(Refused):
+    """A refusal because a precondition the materializer owes was not supplied."""
+    disposition=FAIL_CLOSED
+
+class LedgerLocationRefused(SystemExit):
+    """No ledger location was supplied; nothing was appended to either ledger.
+
+    There is no ledger to record this refusal on, so it is the attempt's own
+    disposition, raised to the caller with its failed predicate and retry edge.
+    """
+    disposition=FAIL_CLOSED; failed_predicate=LEDGER_LOCATION_REQUIRED
+    def __init__(self, variable:str) -> None:
+        self.refusal={"schema":"stegverse.organization-ledger-append-refusal/v1","organization":ORG,
+                      "disposition":FAIL_CLOSED,"failed_predicate":LEDGER_LOCATION_REQUIRED,
+                      "required_evidence_or_repair":"supply the ledger root as "+variable,
+                      "retry_entrypoint":"org-runtime/crossing.py::record","consequence_committed":False,
+                      "authority_effect":"NONE_REFUSAL_ONLY"}
+        super().__init__(LEDGER_LOCATION_REQUIRED+": "+json.dumps(self.refusal,sort_keys=True))
+
+def require_ledger_locations()->None:
+    """Both ledger roots are supplied, or neither ledger is touched."""
+    if not os.environ.get("STEGVERSE_REPO_LEDGER_ROOT"): raise LedgerLocationRefused("STEGVERSE_REPO_LEDGER_ROOT")
+    try: organization_ledger.ledger_root()
+    except organization_ledger.LedgerLocationRequired as missing: raise LedgerLocationRefused(missing.variable) from None
+
+def refusal_outcome(refused:Refused, retry_entrypoint:str, **identity:Any)->dict[str,Any]:
+    return {"disposition":refused.disposition,"failed_predicate":refused.failed_predicate,"reason":refused.reason,
+            "retry_entrypoint":retry_entrypoint,**identity}
 
 def sha(v:Any)->str: return kernel.sha(v)
 
@@ -78,6 +121,7 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
     (open_organization_ledger); on an empty organization ledger any other record
     is refused FAIL_CLOSED ORG_LEDGER_GENESIS_NOT_DECLARED.
     """
+    require_ledger_locations()
     predecessor=sha(subject); successor=sha(outcome)
     transition_id=transition_class+":"+successor[7:31]
     run=subprocess.run([sys.executable,str(root/".stegverse/transition-ledger/emit.py"),
@@ -139,6 +183,7 @@ def destination_address(manifest:dict[str,Any], peer:dict[str,Any])->tuple[str,d
 def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, root:Path=ROOT,
            now_ns:int|None=None)->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_OUTBOUND","manifest":manifest}
+    require_ledger_locations()  # before any frame is published: an unrecordable emission must not happen
     try:
         manifest=require_manifest(manifest)
         peer=resolve_peer(manifest["destination"]["organization"],root)
@@ -147,10 +192,11 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
                                    destination_service=destination_service,payload=payload,
                                    standing=standing,transition_reference=manifest["manifest_id"],
                                    packet_id=SLUG+"-"+sha(manifest)[7:31])
+        if mesh_root is None:
+            raise FailClosed(MESH_LOCATION_REQUIRED,"the declared carrier publishes only to a mesh supplied as mesh_root")
         published=kernel.publish_packet(packet,root=mesh_root,now_ns=now_ns)
     except Refused as refused:
-        outcome={"disposition":DENY,"failed_predicate":refused.failed_predicate,"reason":refused.reason,
-                 "manifest_sha256":sha(manifest)}
+        outcome=refusal_outcome(refused,EGRESS_RETRY,manifest_sha256=sha(manifest))
         return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
     outcome={"disposition":ALLOW,"manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),
              "destination_organization":packet["destination"]["org"],"destination_service":destination_service,
@@ -192,8 +238,8 @@ def _ingest(root:Path, frame:dict[str,Any])->dict[str,Any]:
         if name not in organization_repositories(root): raise Refused("DESTINATION_REPOSITORY_DOES_NOT_EXIST")
         path=_materialize(root,name,packet)
     except Refused as refused:
-        outcome={"disposition":DENY,"failed_predicate":refused.failed_predicate,"reason":refused.reason,
-                 "packet_id":frame.get("packet_id"),"origin_organization":frame.get("origin_org")}
+        outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=frame.get("packet_id"),
+                                origin_organization=frame.get("origin_org"))
         return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
     outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
              "manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),"destination_repository":ORG+"/"+name,
@@ -202,7 +248,18 @@ def _ingest(root:Path, frame:dict[str,Any])->dict[str,Any]:
             **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root)}
 
 def ingress(*, mesh_root:Path|None=None, root:Path=ROOT)->list[dict[str,Any]]:
-    """Consume every frame addressed to SV-LLM not already consumed. Never waits for one."""
+    """Consume every frame addressed to SV-LLM not already consumed. Never waits for one.
+
+    Without a supplied mesh there is nothing this boundary may scan, so the
+    attempt is FAIL_CLOSED and recorded rather than resolved against the host.
+    """
+    require_ledger_locations()  # before any frame is consumed or marked seen
+    if mesh_root is None:
+        refused=FailClosed(MESH_LOCATION_REQUIRED,"frames are scanned only from a mesh supplied as mesh_root")
+        subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND","mesh_location":None}
+        outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=None,origin_organization=None)
+        return [{"transition_class":INGRESS_REFUSED,**outcome,
+                 **record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}]
     results=[]
     for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root)):
         result=_ingest(root,item["frame"])
@@ -213,15 +270,17 @@ def ingress(*, mesh_root:Path|None=None, root:Path=ROOT)->list[dict[str,Any]]:
 def main()->int:
     p=argparse.ArgumentParser(); sub=p.add_subparsers(dest="cmd",required=True)
     e=sub.add_parser("egress"); e.add_argument("--manifest",required=True); e.add_argument("--standing",required=True)
-    sub.add_parser("ingress")
+    e.add_argument("--mesh-root",type=Path,required=True)
+    i=sub.add_parser("ingress"); i.add_argument("--mesh-root",type=Path,required=True)
     sub.add_parser("open-ledger")
     ns=p.parse_args()
     if ns.cmd=="open-ledger":
         out=open_organization_ledger()
     elif ns.cmd=="egress":
-        out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()))
+        out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
+                   mesh_root=ns.mesh_root)
     else:
-        out=ingress()
+        out=ingress(mesh_root=ns.mesh_root)
     print(json.dumps(out,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())

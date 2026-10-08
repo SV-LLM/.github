@@ -8,13 +8,76 @@
     "interlock_required": true,
     "intr_required": true,
     "direction": "INGRESS",
-    "standing_resolution": "APPLICABLE_TRANSITION_ELEMENTS"
+    "standing_resolution": "APPLICABLE_TRANSITION_ELEMENTS",
+    "receiving_operation": {
+      "owner_repository": "SV-LLM/.github",
+      "operation_id": "ORGANIZATION_INTER_ORG_INGRESS",
+      "operation": "org-runtime/crossing.py",
+      "consumption": "org-runtime/crossing.py::ingress",
+      "carrier": "org-kernel/kernel.py::scan_addressed_frames",
+      "mesh_location": "SUPPLIED_BY_MATERIALIZER_AS_mesh_root",
+      "mesh_location_unsupplied_disposition": "FAIL_CLOSED",
+      "mesh_location_unsupplied_failed_predicate": "MESH_LOCATION_REQUIRED_FROM_MATERIALIZER",
+      "host_environment_mesh_fallback": false,
+      "transport": "INTERLOCK_INTR",
+      "address_form": "REPOSITORY_OWNED_OPERATION_NOT_HOST_OR_URL",
+      "host_required": false,
+      "environment_url_required": false,
+      "credential_authority": "TV/TVC",
+      "github_token_runtime_authority": "NONE",
+      "consumption_transition_classes": [
+        "ORGANIZATION_INGRESS_MATERIALIZED",
+        "ORGANIZATION_INGRESS_CONSUMED",
+        "ORGANIZATION_INGRESS_REFUSED"
+      ],
+      "every_disposition_is_receipted": true,
+      "binding_role": "ORGANIZATION_RECEIVING_OPERATION_RESOLUTION",
+      "authority_effect": "NONE_BINDING_ONLY",
+      "grants_routing_authority": false,
+      "grants_admission_authority": false,
+      "grants_execution_authority": false,
+      "environment_selected_ingress": false
+    }
   },
   "egress": {
     "interlock_required": true,
     "intr_required": true,
     "direction": "EGRESS",
-    "standing_resolution": "APPLICABLE_TRANSITION_ELEMENTS"
+    "standing_resolution": "APPLICABLE_TRANSITION_ELEMENTS",
+    "emitting_operation": {
+      "owner_repository": "SV-LLM/.github",
+      "operation_id": "ORGANIZATION_INTER_ORG_EGRESS",
+      "operation": "org-runtime/crossing.py",
+      "emission": "org-runtime/crossing.py::egress",
+      "carrier": "org-kernel/kernel.py::publish_packet",
+      "mesh_location": "SUPPLIED_BY_MATERIALIZER_AS_mesh_root",
+      "mesh_location_unsupplied_disposition": "FAIL_CLOSED",
+      "mesh_location_unsupplied_failed_predicate": "MESH_LOCATION_REQUIRED_FROM_MATERIALIZER",
+      "host_environment_mesh_fallback": false,
+      "receipt_append": "resident-runtime/aggregate_repo_transition.py::aggregate_transition",
+      "emits": "stegverse.organization-transition-receipt/v1",
+      "transport": "INTERLOCK_INTR",
+      "address_form": "REPOSITORY_OWNED_OPERATION_NOT_HOST_OR_URL",
+      "host_required": false,
+      "environment_url_required": false,
+      "credential_authority": "TV/TVC",
+      "github_token_runtime_authority": "NONE",
+      "emission_transition_classes": [
+        "ORGANIZATION_EGRESS_EMITTED",
+        "ORGANIZATION_EGRESS_REFUSED"
+      ],
+      "every_disposition_is_receipted": true,
+      "absence_of_a_response_is_not_a_transition": true,
+      "closure_operation_installed": false,
+      "binding_role": "ORGANIZATION_EMITTING_OPERATION_RESOLUTION",
+      "authority_effect": "NONE_BINDING_ONLY",
+      "grants_routing_authority": false,
+      "grants_admission_authority": false,
+      "grants_execution_authority": false,
+      "environment_selected_ingress": false,
+      "origin_attestation_state": "NOT_PROVEN",
+      "origin_is_verified_by_this_boundary": false
+    }
   },
   "heartbeat_derived_carrier": {
     "reference_frequency_hz": 100,

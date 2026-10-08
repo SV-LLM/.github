@@ -45,13 +45,17 @@ python org-boundary/runtime/federation_projection.py verify [--canonical <canoni
 
 SV-LLM-specific: `org-runtime/{activation.json, interlock-intr.json, runtime_boundary.py, crossing.py}`, `org-boundary/registry/services.json`, `org-boundary/runtime/federation_projection.py`, `.stegverse/transition-ledger/{contract.json, org-contract.json}`, `data/organization-role-runtime-reality-deployment.json`, `data/organization-role-exemption-register.json`, `org-runtime/tests/test_org_crossing.py`.
 
-Vendored unchanged from `StegVerse-Labs/.github@c4ed8de7f567ac16117a17cd05a118c6a52a440d`: `org-kernel/` (1.3.2), `org-boundary/runtime/{node_standing.py, intr_transport.py}`, `docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json`, `.stegverse/transition-ledger/emit.py`, `resident-runtime/aggregate_repo_transition.py`. They are not edited locally.
+Vendored unchanged from `StegVerse-Labs/.github@c4ed8de7f567ac16117a17cd05a118c6a52a440d`: `org-boundary/runtime/{node_standing.py, intr_transport.py}`, `docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json`.
+
+Adopted from `StegVerse-org/.github` at the commit recorded in `data/organization-role-reference-adoption.json` and proven by `resident-runtime/reference_adoption.py verify`: `resident-runtime/ledger_store.py`, `.stegverse/transition-ledger/emit.py`, `resident-runtime/aggregate_repo_transition.py` (with the declared SV-LLM wrapper). Ledger roots are supplied (`STEGVERSE_REPO_LEDGER_ROOT`, `STEGVERSE_ORG_LEDGER_ROOT`) or the append is FAIL_CLOSED `LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER`; nothing is derived from `XDG_STATE_HOME` or the home directory.
+
+`org-kernel/` (1.3.2 lineage) holds the shared kernel contract at semantic parity with `StegVerse-org/.github:org-kernel/kernel.py` (no byte identity): the mesh is the location the materializer supplies or the kernel fails closed `mesh_location_required_from_materializer`; there is no environment-variable or home-directory fallback; node and mesh state go through `org-kernel/node_store.py` (atomic `os.link` write-once); frames stay at `frames.d/<sha256(packet_id|frame_sha256)>.json`. `crossing.py` takes the mesh as `mesh_root` (CLI `--mesh-root`) and records an unsupplied mesh as FAIL_CLOSED `MESH_LOCATION_REQUIRED_FROM_MATERIALIZER`. The carrier is declared in `org-runtime/interlock-intr.json` (`egress.emitting_operation`, `ingress.receiving_operation`) and checked by `runtime_boundary.py validate`.
 
 `runtime_boundary.py ingress|egress` only generate envelopes; they send and receive nothing. Crossings go through `crossing.py`.
 
 ## Exemptions
 
-`SV-LLM-EXEMPTION-001`: the vendored kernel's direct crossing entrypoints do not record ledger receipts. Disposition is to deny direct use and route through `crossing.py` until the canonical kernel records crossings.
+`SV-LLM-EXEMPTION-001`: the kernel's direct crossing entrypoints do not record ledger receipts. Disposition is to deny direct use and route through `crossing.py` until the canonical kernel records crossings.
 
 ## Evidence
 
