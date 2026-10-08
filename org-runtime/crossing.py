@@ -24,7 +24,7 @@ Interlock/InTr remains the transition authority. Credential authority is TV/TVC.
 Nothing here grants routing, admission, credential or execution authority.
 """
 from __future__ import annotations
-import argparse, hashlib, importlib.util, json, os, subprocess, sys
+import argparse, hashlib, importlib.util, json, os, re, subprocess, sys
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +50,8 @@ INGRESS_MATERIALIZED="ORGANIZATION_INGRESS_MATERIALIZED"
 INGRESS_CONSUMED="ORGANIZATION_INGRESS_CONSUMED"
 INGRESS_REFUSED="ORGANIZATION_INGRESS_REFUSED"
 ALLOW,DENY="ALLOW","DENY"
+SDK_MANIFEST_CROSSING_PAYLOAD="stegverse.sdk-manifest-crossing-payload/v1"
+CAPABILITY_PROFILE_ID=re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 class Refused(Exception):
     def __init__(self, failed_predicate:str, reason:str="") -> None:
@@ -111,15 +113,38 @@ def resolve_peer(organization:str, root:Path=ROOT)->dict[str,Any]:
     if rows[0].get("transport_profile")!=kernel.PACKET_SCHEMA: raise Refused("DESTINATION_TRANSPORT_PROFILE_UNSUPPORTED")
     return rows[0]
 
+def destination_address(manifest:dict[str,Any], peer:dict[str,Any])->tuple[str,dict[str,Any]]:
+    """The manifest's destination determines the addressed service and payload.
+
+    A destination declaring a `capability` is addressed to the peer's service for
+    that capability (ORGANIZATION_SLUG_DOT_CAPABILITY_PROFILE_ID) and carries the
+    manifest in manifest["payload"]["manifest"] as an SDK manifest crossing
+    payload. Fail closed on a capability that is not a profile id, or one with no
+    carried manifest. Without a capability, the peer's control service is
+    addressed and the whole manifest is carried, as before.
+    """
+    destination=manifest["destination"]
+    if "capability" not in destination:
+        return (peer.get("addressed_service") or kernel.organization_slug(peer["organization"])+".org-control",
+                {"manifest":manifest})
+    capability=destination["capability"]
+    if not isinstance(capability,str) or not CAPABILITY_PROFILE_ID.fullmatch(capability):
+        raise Refused("MANIFEST_CAPABILITY_INVALID","a declared capability must be a profile id (lowercase letters, digits, hyphens)")
+    carried=manifest.get("payload",{}).get("manifest") if isinstance(manifest.get("payload"),dict) else None
+    if not isinstance(carried,dict): raise Refused("MANIFEST_CAPABILITY_PAYLOAD_MISSING","a declared capability requires payload.manifest")
+    return (kernel.organization_slug(peer["organization"])+"."+capability,
+            {"schema":SDK_MANIFEST_CROSSING_PAYLOAD,"declared_transition_surface":destination.get("surface"),
+             "manifest":carried,"manifest_sha256":sha(carried)})
+
 def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, root:Path=ROOT,
            now_ns:int|None=None)->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_OUTBOUND","manifest":manifest}
     try:
         manifest=require_manifest(manifest)
         peer=resolve_peer(manifest["destination"]["organization"],root)
-        destination_service=peer.get("addressed_service") or kernel.organization_slug(peer["organization"])+".org-control"
+        destination_service,payload=destination_address(manifest,peer)
         packet=kernel.build_packet(origin_org=ORG,origin_service=CONTROL,destination_org=peer["organization"],
-                                   destination_service=destination_service,payload={"manifest":manifest},
+                                   destination_service=destination_service,payload=payload,
                                    standing=standing,transition_reference=manifest["manifest_id"],
                                    packet_id=SLUG+"-"+sha(manifest)[7:31])
         published=kernel.publish_packet(packet,root=mesh_root,now_ns=now_ns)
