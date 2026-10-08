@@ -67,7 +67,7 @@ jobs:
         run: python -m unittest discover -s org-runtime/tests -p 'test_org_ledger_compatibility_and_custody.py' -v
       - name: Validate the mesh and the ledgers are written only where supplied
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_supplied_mesh_and_ledger_locations.py' -v
-      - name: Validate kernel parity with StegVerse-org PRs 93-97: processing selection, recorded crossings, supplied node state
+      - name: "Validate kernel parity with StegVerse-org PRs 93-97: processing selection, recorded crossings, supplied node state"
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_kernel_crossing_parity.py' -v
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
         run: python -B resident-runtime/reference_adoption.py verify
