@@ -61,7 +61,7 @@ jobs:
         run: python org-runtime/tests/test_org_crossing.py
       - name: Validate organization ledger predecessor resolution, explicit genesis and source retention
         run: python -m unittest discover -s org-runtime/tests -p 'test_org_ledger_predecessor_resolution.py' -v
-      - name: Validate the SV-LLM compatibility wrapper and per-transition custody
+      - name: Validate the SV-LLM compatibility wrapper and per-transition organization record
         run: python -m unittest discover -s org-runtime/tests -p 'test_org_ledger_compatibility_and_custody.py' -v
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
         run: python -B resident-runtime/reference_adoption.py verify
