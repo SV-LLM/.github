@@ -233,12 +233,7 @@ class ConsumedCrossingsAreRecorded(SVLLMNode):
         self.assertIs(answer["frame"]["heartbeat_reference"]["derived_from_clock"], False)
 
     def test_consuming_the_same_frame_again_reproduces_rather_than_repeats(self):
-        """A node that lost its consumption marker consumes the frame again.
-
-        A communication, because a monitor answer carries a status sample read
-        from the host clock (resident_status, marked derived_from_clock) and so
-        differs on every pass -- as it does in the reference kernel.
-        """
+        """A node that lost its consumption marker consumes the frame again."""
         self.send("sv-llm.org-control", {"message_class": "ecosystem.communication", "communication_id": "c1",
                                          "subject": "s", "body": {}}, packet_id="parity-communication-1")
         first, = self.consume()
@@ -247,6 +242,33 @@ class ConsumedCrossingsAreRecorded(SVLLMNode):
         self.assertEqual(first["response_publication"]["frame"], again["response_publication"]["frame"])
         self.assertEqual(len(self.by_class(self.k.CROSSING_CONSUMED_CLASS)), 1)
         self.assertEqual(len(self.answers()), 1)
+
+    def mesh_frames(self):
+        return sorted(str(path.relative_to(self.mesh)) for path in self.mesh.rglob("*.json"))
+
+    def test_a_monitor_answer_carries_the_frame_epoch_and_replays_as_a_no_op(self):
+        """N-CLOCK: the status a monitor answer embeds used to sample the host
+        clock, so every re-answer was a different frame and a second answer."""
+        sent = self.monitor()
+        epoch = sent["frame"]["heartbeat_reference"]["epoch"]
+        first, = self.consume()
+        status = first["result"]["execution_result"]["application_result"]["monitor_status"]
+        self.assertEqual(status["heartbeat_reference"]["epoch"], epoch)
+        self.assertIs(status["heartbeat_reference"]["derived_from_clock"], False)
+        self.assertNotIn("sampled_unix_ns", status["heartbeat_reference"])
+        answer = first["response_publication"]["frame"]
+        before = self.mesh_frames()
+        again, = self.consume(node_state_root=self.base / "fresh-node")
+        self.assertEqual(again["response_publication"]["frame"], answer)
+        self.assertEqual(self.mesh_frames(), before)
+        self.assertEqual(len(self.answers()), 1)
+
+    def test_a_local_status_read_is_labelled_as_a_clock_sample(self):
+        status = self.k.resident_status(self.sv.root)
+        self.assertIs(status["heartbeat_reference"]["derived_from_clock"], True)
+        self.assertIn("sampled_unix_ns", status["heartbeat_reference"])
+        self.assertEqual(self.k.resident_status(self.sv.root, epoch=self.k.HB_ANCHOR_EPOCH + 1)
+                         ["heartbeat_reference"]["derived_from_clock"], False)
 
     def test_without_both_ledger_locations_or_node_state_nothing_is_consumed(self):
         self.monitor()
