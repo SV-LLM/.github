@@ -13,6 +13,7 @@ predecessor standing is defaulted.
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,11 +69,24 @@ def main():
     p.add_argument("--successor-ecosystem-state-sha256", required=True)
     p.add_argument("--relation-evidence-json", default="{}")
     p.add_argument("--standing", required=True, help="JSON file declaring mode, node_ref and the predecessor key")
+    # The mesh this node was materialized with; the kernel refuses without one.
+    p.add_argument("--mesh-root", type=Path, required=True)
     a = p.parse_args()
     packet = build_organization_record_packet(load(a.org_receipt), a.predecessor_ecosystem_state_sha256,
                                               a.successor_ecosystem_state_sha256, json.loads(a.relation_evidence_json),
                                               load(a.standing))
-    published = K.publish_packet(packet)
+    # The submission is an emission of this organization, so it is recorded on
+    # both ledgers its materializer supplied (STEGVERSE_REPO_LEDGER_ROOT and
+    # STEGVERSE_ORG_LEDGER_ROOT) before the frame is written; without them the
+    # kernel refuses and nothing is published. Stamped with the epoch of the
+    # receipt it carries, so submitting the same receipt again publishes the
+    # same frame -- a write-once no-op -- instead of a second record request
+    # stamped by the host clock.
+    custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
+                                 org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
+    receipt = load(a.org_receipt)
+    published = K.publish_packet(packet, root=a.mesh_root, custody=custody,
+                                 epoch=(receipt.get("hb_reference") or {}).get("epoch"))
     print(json.dumps({"status": "PUBLISHED_FOR_ORGANIZATION_RECORD", "packet_id": packet["packet_id"],
                       "frame_sha256": published["frame"]["frame_sha256"], "authority_effect": "NONE"}, sort_keys=True))
 

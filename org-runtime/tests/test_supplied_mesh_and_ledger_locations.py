@@ -72,13 +72,19 @@ class Scratch(unittest.TestCase):
 class KernelMeshIsSupplied(Scratch):
     def setUp(self):
         super().setUp()
+        # Publishing is a recorded emission, so it needs this organization's
+        # custody: both supplied ledgers, on a chain opened by declared genesis.
+        self.supply_ledgers()
+        self.crossing("svllm_crossing_kernel_genesis").open_organization_ledger(root=self.root)
         self.k = load("svllm_kernel_supplied", self.root / "org-kernel/kernel.py")
+        self.custody = self.k.crossing_custody(self.root, repo_ledger_root=self.base / "repo-ledger",
+                                               org_ledger_root=self.base / "org-ledger")
         self.packet = self.k.build_packet(origin_org="SV-LLM", origin_service="sv-llm.org-control",
                                           destination_org=PEER, destination_service="stegverse-org.org-control",
                                           payload={"probe": 1}, standing=STANDING, packet_id="supplied-probe")
 
     def test_an_unsupplied_mesh_fails_closed_and_the_host_is_untouched(self):
-        for call in (lambda: self.k.publish_packet(self.packet, now_ns=self.k.HB_ANCHOR_UNIX_NS),
+        for call in (lambda: self.k.publish_packet(self.packet, now_ns=self.k.HB_ANCHOR_UNIX_NS, custody=self.custody),
                      lambda: self.k.scan_addressed_frames(PEER),
                      lambda: self.k.resolve_federation_root(None)):
             with self.assertRaisesRegex(ValueError, "mesh_location_required_from_materializer"):
@@ -93,7 +99,8 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_a_supplied_mesh_keeps_the_frame_layout(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS)
+        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+                                          custody=self.custody)
         frame = published["frame"]
         import hashlib
         expected = mesh / "frames.d" / (hashlib.sha256(
@@ -123,12 +130,31 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_node_markers_stay_in_the_node_state_root(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS)
-        marker = self.k.mark_federation_frame_seen(self.root, published["path"], published["frame"], {"status": "X"})
-        self.assertTrue(str(marker).startswith(str(self.root / "resident-runtime/federation/seen.d")))
-        self.assertEqual(self.k.federation_seen_frame_names(self.root), {Path(published["path"]).name})
+        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+                                          custody=self.custody)
+        # There is no default node state: the checkout is not node state.
+        with self.assertRaisesRegex(ValueError, "node_state_location_required_from_materializer"):
+            self.k.mark_federation_frame_seen(self.root, published["path"], published["frame"], {"status": "X"})
+        with self.assertRaisesRegex(ValueError, "node_state_location_required_from_materializer"):
+            self.k.federation_seen_frame_names(self.root)
+        node = self.k.addressed_node_state_store(self.base / "node")
+        marker = self.k.mark_federation_frame_seen(self.root, published["path"], published["frame"], {"status": "X"},
+                                                   store=node)
+        self.assertTrue(str(marker).startswith(str((self.base / "node/federation/seen.d").resolve())))
+        self.assertFalse((self.root / "resident-runtime/federation").exists())
+        self.assertEqual(self.k.federation_seen_frame_names(self.root, store=node), {Path(published["path"]).name})
         self.assertEqual(self.k.scan_addressed_frames(PEER, root=mesh,
-                                                      seen=self.k.federation_seen_frame_names(self.root)), [])
+                                                      seen=self.k.federation_seen_frame_names(self.root, store=node)), [])
+
+    def test_publishing_without_custody_is_refused_before_any_frame(self):
+        mesh = self.base / "mesh"
+        for call in (lambda: self.k.publish_packet(self.packet, root=mesh, epoch=40),
+                     lambda: self.k.carry_packet(self.packet, custody=None, root=mesh, epoch=40),
+                     lambda: self.k.carry_packet(self.packet, custody={"schema": "forged"}, root=mesh, epoch=40)):
+            with self.assertRaisesRegex(ValueError, "crossing_custody_required_from_recording_operation"):
+                call()
+        self.assertFalse(mesh.exists())
+        self.assertHostUntouched()
 
 
 class CrossingMeshIsSupplied(Scratch):
@@ -155,6 +181,17 @@ class CrossingMeshIsSupplied(Scratch):
         self.assertEqual(out["retry_entrypoint"], "org-runtime/crossing.py::ingress")
         self.assertHostUntouched()
 
+    def test_ingress_without_supplied_node_state_is_fail_closed_and_recorded(self):
+        mesh = self.base / "mesh"
+        mesh.mkdir()
+        [out] = self.c.ingress(mesh_root=mesh, root=self.root)
+        self.assertEqual((out["transition_class"], out["disposition"], out["failed_predicate"]),
+                         ("ORGANIZATION_INGRESS_REFUSED", "FAIL_CLOSED", "NODE_STATE_LOCATION_REQUIRED_FROM_MATERIALIZER"))
+        self.assertEqual(out["retry_entrypoint"], "org-runtime/crossing.py::ingress")
+        self.assertTrue(out["org_receipt_sha256"].startswith("sha256:"))
+        self.assertFalse((self.root / "resident-runtime/federation").exists())
+        self.assertHostUntouched()
+
     def test_a_denied_crossing_names_its_retry_edge(self):
         out = self.c.egress({"manifest_id": "nowhere", "destination": {"organization": "Not-A-Peer"}},
                             standing=STANDING, mesh_root=self.base / "mesh", root=self.root)
@@ -166,6 +203,7 @@ class CrossingMeshIsSupplied(Scratch):
                                    capture_output=True, text=True, env=dict(os.environ), cwd=self.base, timeout=120)
         self.assertEqual(completed.returncode, 2)
         self.assertIn("--mesh-root", completed.stderr)
+        self.assertIn("--node-state-root", completed.stderr)
         self.assertHostUntouched()
 
 
@@ -228,7 +266,7 @@ class CarrierIsDeclared(unittest.TestCase):
         self.assertIs(report["valid"], True)
         egress = self.document["egress"]["emitting_operation"]
         self.assertEqual((egress["transport"], egress["carrier"], egress["github_token_runtime_authority"]),
-                         ("INTERLOCK_INTR", "org-kernel/kernel.py::publish_packet", "NONE"))
+                         ("INTERLOCK_INTR", "org-kernel/kernel.py::carry_packet", "NONE"))
         self.assertEqual(self.document["ingress"]["receiving_operation"]["carrier"],
                          "org-kernel/kernel.py::scan_addressed_frames")
 

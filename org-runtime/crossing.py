@@ -24,7 +24,12 @@ is located. An absence is not recorded: no frame means nothing crossed.
 Locations are supplied, never derived from the host. The mesh is the
 `mesh_root` argument; there is no environment, home-directory or hosted
 transport fallback. A crossing attempted without one is FAIL_CLOSED
-MESH_LOCATION_REQUIRED_FROM_MATERIALIZER and recorded. The ledgers are
+MESH_LOCATION_REQUIRED_FROM_MATERIALIZER and recorded. This node's own state
+-- consumption markers, work intake and ingress materializations -- is the
+`node_state_root` argument, written once by key through org-kernel/node_store.py;
+an ingress pass without one is FAIL_CLOSED
+NODE_STATE_LOCATION_REQUIRED_FROM_MATERIALIZER and recorded, and nothing is
+written under the repository checkout. The ledgers are
 STEGVERSE_REPO_LEDGER_ROOT and STEGVERSE_ORG_LEDGER_ROOT; without both nothing
 is appended to either and the attempt is FAIL_CLOSED
 LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER.
@@ -61,10 +66,18 @@ INGRESS_REFUSED="ORGANIZATION_INGRESS_REFUSED"
 ALLOW,DENY,FAIL_CLOSED="ALLOW","DENY","FAIL_CLOSED"
 MESH_LOCATION_REQUIRED="MESH_LOCATION_REQUIRED_FROM_MATERIALIZER"
 LEDGER_LOCATION_REQUIRED="LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER"
+NODE_STATE_LOCATION_REQUIRED="NODE_STATE_LOCATION_REQUIRED_FROM_MATERIALIZER"
+MATERIALIZATION_PREFIX="ingress/materialized/"
 EGRESS_RETRY="org-runtime/crossing.py::egress"
 INGRESS_RETRY="org-runtime/crossing.py::ingress"
 SDK_MANIFEST_CROSSING_PAYLOAD="stegverse.sdk-manifest-crossing-payload/v1"
 CAPABILITY_PROFILE_ID=re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+#: How processing was selected, carried on every admitted inbound outcome.
+SELECTION_FIELDS=("processing_selection","declared_capability","declared_route_id",
+                  "declared_capability_processed","route_admissibility")
+#: Materialization is a boundary-local surface: it hands the manifest to an
+#: existing repository and selects no processor.
+MATERIALIZATION_ROW={"service_id":CONTROL+"#materialization","boundary_role":"BOUNDARY_LOCAL_MATERIALIZATION"}
 
 class Refused(Exception):
     disposition=DENY
@@ -150,6 +163,26 @@ def open_organization_ledger(root:Path=ROOT)->dict[str,Any]:
     return {"transition_class":LEDGER_OPENED,**outcome,
             **record(LEDGER_OPENED,subject=subject,outcome=outcome,root=root,genesis=True)}
 
+def carrier_custody(root:Path)->dict[str,Any]:
+    """This organization's custody over its supplied ledgers, which the kernel requires.
+
+    The kernel's carrier and dispatch refuse a caller that cannot record what
+    they do on both ledgers of the kernel's own organization. Egress records
+    its own emission (EGRESS_EMITTED) and ingress every disposition it reaches,
+    so each holds that custody.
+    Resolved before the frame is published: an organization chain with no
+    declared genesis is refused here, exactly as its record would be, rather
+    than after a frame has already left.
+    """
+    require_ledger_locations()
+    try:
+        return kernel.crossing_custody(root,repo_ledger_root=Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]),
+                                       org_ledger_root=organization_ledger.ledger_root())
+    except ValueError as refused:
+        if "org_ledger_genesis_not_declared" in str(refused):
+            raise organization_ledger.OrgLedgerAppendRefused(FAIL_CLOSED,"ORG_LEDGER_GENESIS_NOT_DECLARED") from None
+        raise
+
 def resolve_peer(organization:str, root:Path=ROOT)->dict[str,Any]:
     if organization==ORG: raise Refused("DESTINATION_IS_THIS_ORGANIZATION","an intra-organization manifest does not cross the boundary")
     rows=[r for r in kernel.load_federation_directory(root)["organizations"] if r.get("organization")==organization]
@@ -194,7 +227,7 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
                                    packet_id=SLUG+"-"+sha(manifest)[7:31])
         if mesh_root is None:
             raise FailClosed(MESH_LOCATION_REQUIRED,"the declared carrier publishes only to a mesh supplied as mesh_root")
-        published=kernel.publish_packet(packet,root=mesh_root,now_ns=now_ns)
+        published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,now_ns=now_ns)
     except Refused as refused:
         outcome=refusal_outcome(refused,EGRESS_RETRY,manifest_sha256=sha(manifest))
         return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
@@ -206,17 +239,23 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
     return {"transition_class":EGRESS_EMITTED,**outcome,"spool_path":published["path"],
             **record(EGRESS_EMITTED,subject=subject,outcome=outcome,root=root)}
 
-def _materialize(root:Path, repository:str, packet:dict[str,Any])->Path:
-    directory=root/"resident-runtime/materialized"/repository; directory.mkdir(parents=True,exist_ok=True)
-    path=directory/(packet["packet_id"]+".json")
-    body=json.dumps({"schema":"stegverse.organization-ingress-materialization/v1","organization":ORG,
-                     "repository":ORG+"/"+repository,"packet":packet,"authority_effect":"NONE"},indent=2,sort_keys=True)+"\n"
-    if path.exists():
-        if path.read_text()!=body: raise Refused("MATERIALIZATION_WRITE_ONCE_COLLISION")
-    else: path.write_text(body)
-    return path
+def _materialize(node_state:Any, repository:str, packet:dict[str,Any])->tuple[str,dict[str,Any]]:
+    """Materialize a manifest for an existing repository, once, in this node's own state.
 
-def _ingest(root:Path, frame:dict[str,Any])->dict[str,Any]:
+    It used to be a bare write_text under resident-runtime/ in the repository
+    checkout, so an ingress pass mutated committed space and a reader could see
+    a partial file. It is now one put_once at a key in the node state the
+    materializer supplied: atomic, write-once, and a different document at the
+    same key is a collision rather than an overwrite.
+    """
+    key=MATERIALIZATION_PREFIX+repository+"/"+hashlib.sha256(packet["packet_id"].encode()).hexdigest()+".json"
+    record={"schema":"stegverse.organization-ingress-materialization/v1","organization":ORG,
+            "repository":ORG+"/"+repository,"packet":packet,"authority_effect":"NONE"}
+    try: node_state.put_once(key,record)
+    except kernel.node_store_module.WriteOnceCollision: raise Refused("MATERIALIZATION_WRITE_ONCE_COLLISION")
+    return node_state.locator(key),record
+
+def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any])->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND","frame_sha256":frame.get("frame_sha256")}
     try:
         try: packet=kernel.recover_packet(frame)
@@ -224,10 +263,13 @@ def _ingest(root:Path, frame:dict[str,Any])->dict[str,Any]:
         manifest=packet.get("payload",{}).get("manifest")
         repository=(manifest or {}).get("destination",{}).get("repository") if isinstance(manifest,dict) else None
         if repository is None:
-            try: result=kernel.dispatch(root,packet)
+            # Dispatch resolves how processing was selected before any receipt,
+            # and refuses a selection the addressed service does not admit.
+            try: result=kernel.dispatch(root,packet,custody=custody,node_state=node_state)
             except ValueError as exc: raise Refused("BOUNDARY_DISPATCH_REFUSED",str(exc))
             outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
-                     "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"]}
+                     "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"],
+                     **{key:result[key] for key in SELECTION_FIELDS}}
             return {"transition_class":INGRESS_CONSUMED,**outcome,**record(INGRESS_CONSUMED,subject=subject,outcome=outcome,root=root)}
         manifest=require_manifest(manifest)
         if manifest["destination"]["organization"]!=ORG: raise Refused("MANIFEST_DESTINATION_ORGANIZATION_MISMATCH")
@@ -236,34 +278,49 @@ def _ingest(root:Path, frame:dict[str,Any])->dict[str,Any]:
         except SystemExit as refused: raise Refused("NODE_STANDING_REFUSED",str(refused))
         name=repository.split("/",1)[1] if repository.startswith(ORG+"/") else repository
         if name not in organization_repositories(root): raise Refused("DESTINATION_REPOSITORY_DOES_NOT_EXIST")
-        path=_materialize(root,name,packet)
+        # Materialization hands the manifest to an existing repository; nothing
+        # here processes it. A declared capability is carried, and the outcome
+        # says it was not processed at this boundary.
+        selected=kernel.manifest_selection(root).select_processing(MATERIALIZATION_ROW,manifest)
+        path,materialized=_materialize(node_state,name,packet)
     except Refused as refused:
         outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=frame.get("packet_id"),
                                 origin_organization=frame.get("origin_org"))
         return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
     outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
              "manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),"destination_repository":ORG+"/"+name,
-             "materialization_sha256":sha(path.read_bytes())}
-    return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":str(path),
+             "materialization_sha256":sha(materialized),**{key:selected[key] for key in SELECTION_FIELDS}}
+    return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":path,
             **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root)}
 
-def ingress(*, mesh_root:Path|None=None, root:Path=ROOT)->list[dict[str,Any]]:
+def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Path=ROOT)->list[dict[str,Any]]:
     """Consume every frame addressed to SV-LLM not already consumed. Never waits for one.
 
-    Without a supplied mesh there is nothing this boundary may scan, so the
-    attempt is FAIL_CLOSED and recorded rather than resolved against the host.
+    Without a supplied mesh there is nothing this boundary may scan, and
+    without supplied node state there is nowhere to remember what was
+    consumed, so either attempt is FAIL_CLOSED and recorded rather than
+    resolved against the host or the checkout. Nothing is consumed then.
     """
     require_ledger_locations()  # before any frame is consumed or marked seen
-    if mesh_root is None:
-        refused=FailClosed(MESH_LOCATION_REQUIRED,"frames are scanned only from a mesh supplied as mesh_root")
-        subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND","mesh_location":None}
-        outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=None,origin_organization=None)
-        return [{"transition_class":INGRESS_REFUSED,**outcome,
-                 **record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}]
+    for location,predicate,reason,field in (
+            (mesh_root,MESH_LOCATION_REQUIRED,"frames are scanned only from a mesh supplied as mesh_root","mesh_location"),
+            (node_state_root,NODE_STATE_LOCATION_REQUIRED,
+             "markers, work intake and materializations are written only to node state supplied as node_state_root",
+             "node_state_location")):
+        if location is None:
+            refused=FailClosed(predicate,reason)
+            subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND",field:None}
+            outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=None,origin_organization=None)
+            return [{"transition_class":INGRESS_REFUSED,**outcome,
+                     **record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}]
+    node_state=kernel.addressed_node_state_store(node_state_root)
+    # Dispatch processes nothing for a caller that cannot record it; this pass
+    # records every disposition below, so it holds the organization's custody.
+    custody=carrier_custody(root)
     results=[]
-    for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root)):
-        result=_ingest(root,item["frame"])
-        kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]})
+    for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state)):
+        result=_ingest(root,item["frame"],node_state,custody)
+        kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)
     return results
 
@@ -272,6 +329,7 @@ def main()->int:
     e=sub.add_parser("egress"); e.add_argument("--manifest",required=True); e.add_argument("--standing",required=True)
     e.add_argument("--mesh-root",type=Path,required=True)
     i=sub.add_parser("ingress"); i.add_argument("--mesh-root",type=Path,required=True)
+    i.add_argument("--node-state-root",type=Path,required=True)
     sub.add_parser("open-ledger")
     ns=p.parse_args()
     if ns.cmd=="open-ledger":
@@ -280,7 +338,7 @@ def main()->int:
         out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
                    mesh_root=ns.mesh_root)
     else:
-        out=ingress(mesh_root=ns.mesh_root)
+        out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root)
     print(json.dumps(out,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())
