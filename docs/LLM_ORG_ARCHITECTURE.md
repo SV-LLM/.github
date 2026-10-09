@@ -29,10 +29,12 @@ TASK
  -> cross-ecosystem drift analysis
  -> existing governance
  -> authorized execution/publication if admitted
- -> authentic observation
- -> organization receipts / Master Records organization records
+ -> organization-ledger transition receipt (closure)
+ -> Master Records organization records
  -> future work context
 ```
+
+The organization-ledger transition receipt is the closure of an admitted transition. Any observation of the result is evidence only; it is never a step, predicate or gate after closure, and its absence does not hold a transition open.
 
 ## Foundational invariant
 
@@ -89,7 +91,7 @@ Disposition D
 
 The forward plane cannot rewrite the historical plane.
 
-After an authorized transition, authentic observations may create new receipts, which become part of the historical plane used by future work.
+An authorized transition closes when its transition receipt is appended to the organization ledger; that receipt becomes part of the historical plane used by future work. An observation made afterwards is evidence that later work may cite, never a gate on the closed transition and never a substitute for its receipt.
 
 ## Capability marketplace without authority hierarchy
 

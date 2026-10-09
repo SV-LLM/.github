@@ -42,6 +42,18 @@ def text(value) -> bytes:
     return json.dumps(value, indent=2).encode()
 
 
+ACTIONABLE_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                     "owning_existing_goal", "next_attempt")
+
+
+def assert_actionable(test: unittest.TestCase, result: dict) -> None:
+    """A non-ALLOW result carries all six actionable fields, each a non-empty string."""
+    for field in ACTIONABLE_FIELDS:
+        test.assertIsInstance(result.get(field), str, (field, result))
+        test.assertTrue(result[field], (field, result))
+    test.assertEqual(result["owning_existing_goal"], "SVORG-LLM-ORG-FOUNDATION-001")
+
+
 class Vendor(unittest.TestCase):
     def test_vendored_contracts_match_manifest(self):
         manifest = reg.verify_vendor()
@@ -82,6 +94,7 @@ class CanonicalTree(unittest.TestCase):
             else:
                 expected = "CAPABILITY_DECLARATION_REF_PRESENT"
             self.assertEqual(result["failed_predicate"], expected, row["name"])
+            assert_actionable(self, result)
 
     def test_existing_consumer_unaffected(self):
         import crossing
@@ -99,6 +112,19 @@ class Registration(unittest.TestCase):
         self.assertEqual(result["disposition"], reg.DENY, result)
         self.assertEqual(result["failed_predicate"], predicate, result)
         self.assertEqual(result["authority_effect"], "NONE")
+        assert_actionable(self, result)
+        self.seen.add(predicate)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.seen = set()
+
+    @classmethod
+    def tearDownClass(cls):
+        # Every refusal path in register() was exercised through denied().
+        missing = set(reg._REFUSALS) - cls.seen
+        if missing:
+            raise AssertionError(f"refusal paths not exercised: {sorted(missing)}")
 
     def test_two_fixture_entities_allow(self):
         for name in FIXTURES:
@@ -139,6 +165,8 @@ class Registration(unittest.TestCase):
     def test_content_not_supplied(self):
         result = reg.register("FixtureEntityA", declaration=None, tree=self.tree)
         self.assertEqual(result["failed_predicate"], "DECLARATION_CONTENT_SUPPLIED")
+        assert_actionable(self, result)
+        self.seen.add("DECLARATION_CONTENT_SUPPLIED")
 
     def test_declaration_not_canonical_json(self):
         good = json.dumps(declaration("FixtureEntityA"))

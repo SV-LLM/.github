@@ -10,7 +10,7 @@ This `.github` is the SV-LLM organization boundary, deployed here per the global
 
 ## Standard
 
-Every action is a manifest-bound attempted state transition (`data/task-registry-global-invariants.json`):
+Every action is a manifest-bound attempted state transition (`StegVerse-org/.github:orchestration/task-registry.json`, task `SVORG-LLM-ORG-FOUNDATION-001`):
 
 - the manifest determines the destination, and an existing destination is sufficient for ingress and egress;
 - destination liveness, an always-on receiver, an external machine, a second device and a post-closure observer are never predicates;
