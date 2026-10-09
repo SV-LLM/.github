@@ -16,7 +16,9 @@ evaluated in order:
   DECLARATION_REPOSITORY_MATCHES         (ref.repository == entry name == declaration.repository)
 
 Every evaluation returns a disposition: ALLOW, or DENY naming the first failed
-predicate. A DENY is a result, not an exception.
+predicate. A DENY is a result, not an exception, and carries failure_code,
+failed_predicate, required_evidence_or_repair, retry_entrypoint,
+owning_existing_goal and next_attempt.
 
 The caller supplies the declaration content. This module never reads another
 repository: the digest binds the content, so where the bytes came from is not
@@ -76,8 +78,60 @@ def load_tree(path: Path = TREE_PATH) -> Any:
     return CANON.parse(path.read_bytes())
 
 
+OWNING_EXISTING_GOAL = "SVORG-LLM-ORG-FOUNDATION-001"
+RETRY_ENTRYPOINT = "python -B org-runtime/sandbox_registration.py ENTITY [DECLARATION_FILE]"
+# failed_predicate -> (failure_code, required_evidence_or_repair, next_attempt)
+_REFUSALS = {
+    "ORGANIZATION_TREE_SCHEMA_VALID": (
+        "SANDBOX_REGISTRATION_ORGANIZATION_TREE_SCHEMA_INVALID",
+        "repair data/organization-tree.json to validate against data/organization-tree.schema.json",
+        "re-evaluate registration after the organization tree validates"),
+    "ORGANIZATION_TREE_NAMES_UNIQUE": (
+        "SANDBOX_REGISTRATION_ORGANIZATION_TREE_NAMES_DUPLICATED",
+        "remove duplicate repository names from data/organization-tree.json",
+        "re-evaluate registration after organization tree names are unique"),
+    "ENTITY_IS_IN_CANONICAL_ORGANIZATION_TREE": (
+        "SANDBOX_REGISTRATION_ENTITY_NOT_IN_ORGANIZATION_TREE",
+        "add the entity to data/organization-tree.json, or name an entity already in it",
+        "re-evaluate registration with an entity present in the canonical organization tree"),
+    "ENTITY_CLASS_IS_SANDBOX_ELIGIBLE": (
+        "SANDBOX_REGISTRATION_ENTITY_CLASS_NOT_ELIGIBLE",
+        "entity class must be one of " + ", ".join(ELIGIBLE_CLASSES) + "; other classes are not Sandbox entities",
+        "re-evaluate registration only for an entity of an eligible class"),
+    "CAPABILITY_DECLARATION_REF_PRESENT": (
+        "SANDBOX_REGISTRATION_CAPABILITY_DECLARATION_REF_ABSENT",
+        "bind capability_declaration_ref (repository, path, declaration_sha256) on the entity's organization tree entry",
+        "re-evaluate registration after the entity's capability_declaration_ref is bound"),
+    "DECLARATION_CONTENT_SUPPLIED": (
+        "SANDBOX_REGISTRATION_DECLARATION_CONTENT_NOT_SUPPLIED",
+        "supply the capability declaration bytes named by capability_declaration_ref",
+        "re-evaluate registration with DECLARATION_FILE supplied"),
+    "DECLARATION_IS_CANONICAL_JSON": (
+        "SANDBOX_REGISTRATION_DECLARATION_NOT_CANONICAL_JSON",
+        "supply declaration bytes that satisfy SV_LLM_CANONICAL_JSON_V1 parser input rules (see detail)",
+        "re-evaluate registration with canonical JSON declaration bytes"),
+    "CAPABILITY_DECLARATION_IS_SCHEMA_VALID": (
+        "SANDBOX_REGISTRATION_DECLARATION_SCHEMA_INVALID",
+        "repair the declaration to validate against sv-llm.entity-capability/v0.1 (see detail)",
+        "re-evaluate registration with a schema-valid declaration"),
+    "DECLARATION_DIGEST_MATCHES": (
+        "SANDBOX_REGISTRATION_DECLARATION_DIGEST_MISMATCH",
+        "supply the declaration whose canonical digest equals capability_declaration_ref.declaration_sha256, "
+        "or rebind the ref to the supplied declaration's digest (see detail)",
+        "re-evaluate registration with digest-matching declaration bytes"),
+    "DECLARATION_REPOSITORY_MATCHES": (
+        "SANDBOX_REGISTRATION_DECLARATION_REPOSITORY_MISMATCH",
+        "make capability_declaration_ref.repository, the tree entry name and declaration.repository identical",
+        "re-evaluate registration after the repository names agree"),
+}
+
+
 def _deny(predicate: str, entity: str, detail: str = "") -> dict[str, Any]:
-    out = {"disposition": DENY, "failed_predicate": predicate, "entity": entity, "authority_effect": "NONE"}
+    failure_code, repair, next_attempt = _REFUSALS[predicate]
+    out = {"disposition": DENY, "failure_code": failure_code, "failed_predicate": predicate,
+           "required_evidence_or_repair": repair, "retry_entrypoint": RETRY_ENTRYPOINT,
+           "owning_existing_goal": OWNING_EXISTING_GOAL, "next_attempt": next_attempt,
+           "entity": entity, "authority_effect": "NONE"}
     if detail:
         out["detail"] = detail
     return out
