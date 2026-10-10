@@ -1,0 +1,27 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "authority_effect": "NONE",
+    "disposition": "ALLOW",
+    "organization": "SV-LLM"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": true,
+    "epoch": 414811789,
+    "frequency_hz": 100,
+    "generation": 414811789,
+    "heartbeat_id": "HB:414811789",
+    "phase_offset_ns": 4803968,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "sampled_unix_ns": 1791659717574803968
+  },
+  "predecessor_state_sha256": "sha256:5a2ff052846886437196bba460fe8ce5a285e803e993e0d64ae814003c421b63",
+  "previous_receipt_sha256": null,
+  "receipt_sha256": "sha256:af13e3ca15790dab9928bfe2b4695b7ff2f0811f6d6e95e73572929633377b77",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:c1b3688bac593b3d54c6f5a7ffc1149b809824083c5dafba83dd3b3e12b79996",
+  "transition_class": "ORGANIZATION_LEDGER_OPENED",
+  "transition_id": "ORGANIZATION_LEDGER_OPENED:c1b3688bac593b3d54c6f5a7"
+}
