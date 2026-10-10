@@ -472,7 +472,7 @@ class EmissionsAreRecordedOrRefused(SVLLMNode):
             self.assertIn(primitive, exemption["surface"])
         self.assertIn("no longer exempt", exemption["surface"])
 
-    def test_the_master_records_submission_needs_a_mesh_and_publishes_one_frame_per_receipt(self):
+    def test_the_master_records_release_needs_a_mesh_and_publishes_one_frame_per_released_batch(self):
         env = {k: v for k, v in os.environ.items() if not k.startswith("STEGVERSE_")}
         env.update(STEGVERSE_REPO_LEDGER_ROOT=str(self.sv.repo_ledger), STEGVERSE_ORG_LEDGER_ROOT=str(self.sv.org_ledger),
                    PYTHONDONTWRITEBYTECODE="1")

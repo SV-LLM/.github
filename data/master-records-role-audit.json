@@ -1,0 +1,604 @@
+{
+  "schema": "sv-llm.master-records-role-audit/v1",
+  "organization": "SV-LLM",
+  "refs": [
+    "StegVerse-Labs/hybrid-collab-bridge#39",
+    "StegVerse-org/LLM-adapter#368"
+  ],
+  "owning_existing_goal": "SVORG-LLM-ORG-FOUNDATION-001",
+  "canonical_role": {
+    "source": "StegVerse-org/.github docs/ORGANIZATION_ROLE_RUNTIME_REALITY_DEPLOYMENT.md",
+    "role": "RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER",
+    "statement": "Master Records is the recorder of released organization batch receipts: downstream evidence preservation. It is not an authority, not a gate, not custody and not runtime reality; nothing awaits it."
+  },
+  "pattern": "(?i)master[-_ ]?records",
+  "measured_over": "every tracked file (paths and contents), excluding this audit file",
+  "authority_effect": "NONE_AUDIT_ONLY",
+  "baseline_commit": "441aee628e0f58ecb18a4e7678bb79b9e751b1e9",
+  "counts": {
+    "before": {
+      "PROPER": 13,
+      "IMPROPER_CODE": 3,
+      "IMPROPER_DOC": 2,
+      "HISTORICAL_EVIDENCE": 3,
+      "NAMING_ONLY": 11,
+      "TOTAL": 32
+    },
+    "after": {
+      "PROPER": 20,
+      "IMPROPER_CODE": 0,
+      "IMPROPER_DOC": 0,
+      "HISTORICAL_EVIDENCE": 3,
+      "NAMING_ONLY": 24,
+      "TOTAL": 47
+    }
+  },
+  "not_changed_with_reason": {
+    "resident-runtime/submit_org_transition_to_master_records.py (filename)": "Kept: the same path is the StegVerse-org reference entrypoint and is named by mirror handoffs; renaming is a cross-organization naming migration, not a role correction.",
+    "transition_reference ecosystem.transition.organization-record.v1 / destination_service organization.ecosystem-transition-ledger": "Kept: the destination's own identifiers; they assert no role.",
+    ".stegverse/transition-ledger/org-contract.json": "Already canonical (propagation_role RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER, propagation_gates_organization_runtime_reality false) and digest-pinned to the StegVerse-org reference by data/organization-role-reference-adoption.json; unchanged, so no pinned digest moves.",
+    "mirror handoffs": "HISTORICAL_EVIDENCE: never edited, including the ORG_RESIDENT_RUNTIME handoff line describing the earlier per-receipt epoch."
+  },
+  "before": [
+    {
+      "file": ".stegverse/transition-ledger/org-contract.json",
+      "line": 13,
+      "text": "\"propagation_target\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "propagation_target of the reference-pinned ledger contract, whose propagation_role is RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER and which declares it non-gating."
+    },
+    {
+      "file": "ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md",
+      "line": 65,
+      "text": "- **Epochs.** `publish_packet(epoch=)`; an answer is stamped with the epoch of the frame it answers, so consuming the frame again reproduces the same answer frame (a write-once no-op). A monitor answer still carries `resident_status`'s host",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Mirror handoff: a dated record of a past change; never edited."
+    },
+    {
+      "file": "README.md",
+      "line": 120,
+      "text": "- receipts and Master Records organization-record references;",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "README.md",
+      "line": 228,
+      "text": "- **Master Records** — organization records and reconstruction;",
+      "classification": "IMPROPER_DOC",
+      "rationale": "Listed under 'Existing authority boundaries', presenting Master Records as an authority.",
+      "remediation": "Restated as not an authority, gate or custodian: the downstream recorder of released organization batch receipts."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 16,
+      "text": "\"previous_value\": \"Master Records\",",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Records the superseded runtime_reality_authority value the declaration moved to the Organization."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 25,
+      "text": "\"master_records_restated_role\": {",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 36,
+      "text": "\"propagation_target\": \"master-records/.github\"",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 72,
+      "text": "\"rule\": \"A_STATEMENT_THAT_MASTER_RECORDS_RELATES_ONLY_TO_ORGANIZATION_RECORDS_AND_RECONSTRUCTION_REMAINS_CORRECT_AND_IS_NOT_SUPERSEDED\",",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 73,
+      "text": "\"reason\": \"THIS_DECLARATION_MOVES_RUNTIME_REALITY_TO_THE_ORGANIZATION_AND_LEAVES_MASTER_RECORDS_ORGANIZATION_RECORDS_AND_RECONSTRUCTION_UNCHANGED\",",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-tree.json",
+      "line": 103,
+      "text": "\"Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher and SDK authorities, and Master Records organization records and reconstruction, are not duplicated in SV-LLM.\"",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 33,
+      "text": "-> Master Records organization records",
+      "classification": "IMPROPER_DOC",
+      "rationale": "Placed Master Records as a step of the work cycle after closure, i.e. something the cycle proceeds through.",
+      "remediation": "Removed from the work cycle; added a paragraph stating downstream, non-gating released-batch recording that nothing awaits."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 59,
+      "text": "├── receipt / Master Records organization-record references",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 118,
+      "text": "- replace Master Records;",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_FOUNDATION_MIRROR_HANDOFF.md",
+      "line": 27,
+      "text": "12. Existing Task Registry, WorkerCoordinator, Interlock/InTr, SDK, TV/TVC and Publisher authorities, and Master Records organization records and reconstruction, remain unchanged.",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Mirror handoff: a dated record of a past change; never edited."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 21,
+      "text": "- **Master Records** relates only to organization records and reconstruction, and has no role in this protocol.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 68,
+      "text": "- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made to rely on a Master Records organization record or reconstruction.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 68,
+      "text": "- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made to rely on a Master Records organization record or reconstruction.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 62,
+      "text": "\"organization\": \"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 63,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 64,
+      "text": "\"org_control_service\": \"master-records.org-control\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-kernel/tests/test_kernel.py",
+      "line": 15,
+      "text": "\"formalism-tests\",\"GCAT-BCAT-Engine\",\"Infrastructure-Continuity-Ventures\",\"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_kernel_crossing_parity.py",
+      "line": 475,
+      "text": "def test_the_master_records_submission_needs_a_mesh_and_publishes_one_frame_per_receipt(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_kernel_crossing_parity.py",
+      "line": 482,
+      "text": "command = [sys.executable, \"-B\", str(REPO / \"resident-runtime/submit_org_transition_to_master_records.py\"),",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 26,
+      "text": "record = load(\"svllm_organization_record\", \"resident-runtime/submit_org_transition_to_master_records.py\")",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 102,
+      "text": "self.assertNotIn(\"master-records.ecosystem-transition-ledger\", text)",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 118,
+      "text": "text = (ROOT / \"resident-runtime/submit_org_transition_to_master_records.py\").read_text()",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "profile/README.md",
+      "line": 64,
+      "text": "Master Records relates only to organization records and reconstruction, and has no role in this protocol. Organization Records owns custody of the organization action and acquisition receipts. LLM-adapter remains provider transport only and",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": null,
+      "text": "<path>",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 2,
+      "text": "\"\"\"Publish one organization transition receipt to the Master Records organization record for reconstruction.",
+      "classification": "IMPROPER_CODE",
+      "rationale": "Submitter shipped each single organization transition receipt to Master Records, unverified and unreleased, as an 'organization record for reconstruction'. Canonical role: recorder of released organization batch receipts whose release predecessor is a verified organization receipt-chain segment.",
+      "remediation": "Submitter now releases a verified organization receipt-chain segment (one or more --org-receipt in chain order; schema, owner, self-digest and linkage verified) as payload operation RECORD_RELEASED_ORGANIZATION_BATCH with recorder_role RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER, gates_organization_runtime_reality false and awaited_by_organization false; every refusal is a DENY carrying the six fields. Tests updated and extended."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 5,
+      "text": "(StegVerse-org/.github resident-runtime/submit_org_transition_to_master_records.py)",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 9,
+      "text": "Master Records relates only to organization records and reconstruction.",
+      "classification": "IMPROPER_CODE",
+      "rationale": "Submitter shipped each single organization transition receipt to Master Records, unverified and unreleased, as an 'organization record for reconstruction'. Canonical role: recorder of released organization batch receipts whose release predecessor is a verified organization receipt-chain segment.",
+      "remediation": "Submitter now releases a verified organization receipt-chain segment (one or more --org-receipt in chain order; schema, owner, self-digest and linkage verified) as payload operation RECORD_RELEASED_ORGANIZATION_BATCH with recorder_role RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER, gates_organization_runtime_reality false and awaited_by_organization false; every refusal is a DENY carrying the six fields. Tests updated and extended."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 24,
+      "text": "DESTINATION_ORG = \"master-records\"",
+      "classification": "IMPROPER_CODE",
+      "rationale": "Submitter shipped each single organization transition receipt to Master Records, unverified and unreleased, as an 'organization record for reconstruction'. Canonical role: recorder of released organization batch receipts whose release predecessor is a verified organization receipt-chain segment.",
+      "remediation": "Submitter now releases a verified organization receipt-chain segment (one or more --org-receipt in chain order; schema, owner, self-digest and linkage verified) as payload operation RECORD_RELEASED_ORGANIZATION_BATCH with recorder_role RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER, gates_organization_runtime_reality false and awaited_by_organization false; every refusal is a DENY carrying the six fields. Tests updated and extended."
+    }
+  ],
+  "after": [
+    {
+      "file": ".stegverse/transition-ledger/org-contract.json",
+      "line": 13,
+      "text": "\"propagation_target\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "propagation_target of the reference-pinned ledger contract, whose propagation_role is RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER and which declares it non-gating."
+    },
+    {
+      "file": "ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md",
+      "line": 65,
+      "text": "- **Epochs.** `publish_packet(epoch=)`; an answer is stamped with the epoch of the frame it answers, so consuming the frame again reproduces the same answer frame (a write-once no-op). A monitor answer still carries `resident_status`'s host",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Mirror handoff: a dated record of a past change; never edited."
+    },
+    {
+      "file": "README.md",
+      "line": 120,
+      "text": "- receipts and Master Records organization-record references;",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "README.md",
+      "line": 228,
+      "text": "- **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "README.md",
+      "line": 228,
+      "text": "- **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 16,
+      "text": "\"previous_value\": \"Master Records\",",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Records the superseded runtime_reality_authority value the declaration moved to the Organization."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 25,
+      "text": "\"master_records_restated_role\": {",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 36,
+      "text": "\"propagation_target\": \"master-records/.github\"",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 72,
+      "text": "\"rule\": \"A_STATEMENT_THAT_MASTER_RECORDS_RELATES_ONLY_TO_ORGANIZATION_RECORDS_AND_RECONSTRUCTION_REMAINS_CORRECT_AND_IS_NOT_SUPERSEDED\",",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-role-runtime-reality-deployment.json",
+      "line": 73,
+      "text": "\"reason\": \"THIS_DECLARATION_MOVES_RUNTIME_REALITY_TO_THE_ORGANIZATION_AND_LEAVES_MASTER_RECORDS_ORGANIZATION_RECORDS_AND_RECONSTRUCTION_UNCHANGED\",",
+      "classification": "PROPER",
+      "rationale": "Canonical role declaration adopted from the organization role standard."
+    },
+    {
+      "file": "data/organization-tree.json",
+      "line": 103,
+      "text": "\"Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher and SDK authorities, and Master Records organization records and reconstruction, are not duplicated in SV-LLM.\"",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 38,
+      "text": "Master Records is not a step of this cycle. Once the organization has verified and released a batch of its receipts, Master Records may record that released batch downstream as organization records for reconstruction. That recording is evid",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 38,
+      "text": "Master Records is not a step of this cycle. Once the organization has verified and released a batch of its receipts, Master Records may record that released batch downstream as organization records for reconstruction. That recording is evid",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 60,
+      "text": "├── receipt / Master Records organization-record references",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_ARCHITECTURE.md",
+      "line": 119,
+      "text": "- replace Master Records;",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/LLM_ORG_FOUNDATION_MIRROR_HANDOFF.md",
+      "line": 27,
+      "text": "12. Existing Task Registry, WorkerCoordinator, Interlock/InTr, SDK, TV/TVC and Publisher authorities, and Master Records organization records and reconstruction, remain unchanged.",
+      "classification": "HISTORICAL_EVIDENCE",
+      "rationale": "Mirror handoff: a dated record of a past change; never edited."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 21,
+      "text": "- **Master Records** relates only to organization records and reconstruction, and has no role in this protocol.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 68,
+      "text": "- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made to rely on a Master Records organization record or reconstruction.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "docs/SCHEMA_INTR_RECEIPTED_ECOSYSTEM_REVIEW.md",
+      "line": 68,
+      "text": "- `MASTER_RECORDS_REVIEW_DEPENDENCY_PROHIBITED`: this protocol is made to rely on a Master Records organization record or reconstruction.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 62,
+      "text": "\"organization\": \"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 63,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-boundary/registry/federation.json",
+      "line": 64,
+      "text": "\"org_control_service\": \"master-records.org-control\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-kernel/tests/test_kernel.py",
+      "line": 15,
+      "text": "\"formalism-tests\",\"GCAT-BCAT-Engine\",\"Infrastructure-Continuity-Ventures\",\"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_kernel_crossing_parity.py",
+      "line": 475,
+      "text": "def test_the_master_records_release_needs_a_mesh_and_publishes_one_frame_per_released_batch(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_kernel_crossing_parity.py",
+      "line": 482,
+      "text": "command = [sys.executable, \"-B\", str(REPO / \"resident-runtime/submit_org_transition_to_master_records.py\"),",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 28,
+      "text": "record = load(\"svllm_organization_record\", \"resident-runtime/submit_org_transition_to_master_records.py\")",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 113,
+      "text": "self.assertNotIn(\"master-records.ecosystem-transition-ledger\", text)",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 120,
+      "text": "def test_master_records_receives_a_released_batch_as_downstream_non_gating_evidence(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 166,
+      "text": "text = (ROOT / \"resident-runtime/submit_org_transition_to_master_records.py\").read_text()",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 172,
+      "text": "class MasterRecordsRoleAudit(unittest.TestCase):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 173,
+      "text": "\"\"\"data/master-records-role-audit.json is re-measured, so an occurrence added later fails here.\"\"\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_org_ledger_compatibility_and_custody.py",
+      "line": 175,
+      "text": "AUDIT = \"data/master-records-role-audit.json\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "profile/README.md",
+      "line": 64,
+      "text": "Master Records relates only to organization records and reconstruction, and has no role in this protocol. Organization Records owns custody of the organization action and acquisition receipts. LLM-adapter remains provider transport only and",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": null,
+      "text": "<path>",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 2,
+      "text": "\"\"\"Release one verified organization receipt batch to Master Records as downstream evidence.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 4,
+      "text": "Master Records is the recorder of released organization batch receipts: it",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 18,
+      "text": "(StegVerse-org/.github resident-runtime/submit_org_transition_to_master_records.py)",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 41,
+      "text": "DESTINATION_ORG = \"master-records\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 47,
+      "text": "RETRY_ENTRYPOINT = \"python -B resident-runtime/submit_org_transition_to_master_records.py\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 53,
+      "text": "\"MASTER_RECORDS_RELEASE_ORIGIN_SERVICE_UNRESOLVED\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 57,
+      "text": "\"MASTER_RECORDS_RELEASE_BATCH_EMPTY\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 61,
+      "text": "\"MASTER_RECORDS_RELEASE_RECEIPT_SCHEMA_MISMATCH\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 65,
+      "text": "\"MASTER_RECORDS_RELEASE_RECEIPT_OWNER_MISMATCH\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 69,
+      "text": "\"MASTER_RECORDS_RELEASE_RECEIPT_DIGEST_MISMATCH\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 73,
+      "text": "\"MASTER_RECORDS_RELEASE_SEGMENT_NOT_CONTIGUOUS\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 77,
+      "text": "\"MASTER_RECORDS_RELEASE_STANDING_UNDECLARED\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": 181,
+      "text": "# answer is requested and nothing waits for Master Records to record it.",
+      "classification": "PROPER",
+      "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    }
+  ]
+}
