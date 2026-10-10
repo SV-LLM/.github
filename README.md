@@ -225,7 +225,7 @@ SV-LLM reuses and does not supersede:
 - **StegVerse SDK** — manifest construction/validation and SDK-side contracts;
 - **LLM-adapter** — provider-neutral access, provider transport, distributed workload and contribution provenance;
 - **TV/TVC** — credential/provider-operation and applicable route authority;
-- **Master Records** — organization records and reconstruction;
+- **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master Records;
 - **Publisher** — governed publication/output continuation where applicable.
 
 ## Organization Interlock/InTr boundary

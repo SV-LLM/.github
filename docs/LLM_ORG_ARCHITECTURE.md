@@ -30,11 +30,12 @@ TASK
  -> existing governance
  -> authorized execution/publication if admitted
  -> organization-ledger transition receipt (closure)
- -> Master Records organization records
  -> future work context
 ```
 
 The organization-ledger transition receipt is the closure of an admitted transition. Any observation of the result is evidence only; it is never a step, predicate or gate after closure, and its absence does not hold a transition open.
+
+Master Records is not a step of this cycle. Once the organization has verified and released a batch of its receipts, Master Records may record that released batch downstream as organization records for reconstruction. That recording is evidence preservation only: it is not an authority, gate, custodian or runtime-reality locus, nothing in the cycle awaits it, and an unrecorded batch holds nothing open.
 
 ## Foundational invariant
 

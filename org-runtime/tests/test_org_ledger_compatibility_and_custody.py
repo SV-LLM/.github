@@ -7,6 +7,8 @@ organization transition, with this organization's identity only.
 """
 import importlib.util
 import json
+import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -88,11 +90,20 @@ class Wrapper(unittest.TestCase):
 
 
 class OrganizationRecord(unittest.TestCase):
-    def test_T6_organization_record_packet_carries_only_this_organizations_identity(self):
+    STANDING = {"mode": "GENESIS", "node_ref": "sv-llm-test", "predecessor": None}
+
+    def segment(self, count):
         with tempfile.TemporaryDirectory() as root:
-            receipt = agg.aggregate_transition(repo_receipt(1), genesis=True, store=ledger.PosixLedgerStore(root))
-        packet = record.build_organization_record_packet(receipt, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},
-                                                         {"mode": "GENESIS", "node_ref": "sv-llm-test", "predecessor": None})
+            store = ledger.PosixLedgerStore(root)
+            first = agg.aggregate_transition(repo_receipt(1), genesis=True, store=store)
+            return [first] + [agg.aggregate_transition(repo_receipt(n), store=store) for n in range(2, count + 1)]
+
+    def build(self, receipts, standing=None):
+        return record.build_released_batch_packet(receipts, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},
+                                                  self.STANDING if standing is None else standing)
+
+    def test_T6_organization_record_packet_carries_only_this_organizations_identity(self):
+        packet = self.build(self.segment(1))
         text = json.dumps(packet)
         self.assertEqual(record.organization(), "SV-LLM")
         self.assertEqual(record.origin_service("SV-LLM"), "sv-llm.org-control")
@@ -102,22 +113,98 @@ class OrganizationRecord(unittest.TestCase):
         self.assertNotIn("master-records.ecosystem-transition-ledger", text)
         self.assertNotIn("StegVerse-org", text)
         self.assertNotIn("stegverse-org", text)
-        self.assertIn('"ORGANIZATION_RECORD_ORGANIZATION_TRANSITION"', text)
+        self.assertIn('"RECORD_RELEASED_ORGANIZATION_BATCH"', text)
         self.assertIn('"ecosystem.transition.organization-record.v1"', text)
         self.assertNotIn("custody", text.lower())
+
+    def test_master_records_receives_a_released_batch_as_downstream_non_gating_evidence(self):
+        receipts = self.segment(3)
+        payload = self.build(receipts)["payload"]
+        self.assertEqual(payload["recorder_role"], "RELEASED_ORGANIZATION_BATCH_RECEIPT_RECORDER")
+        self.assertIs(payload["gates_organization_runtime_reality"], False)
+        self.assertIs(payload["awaited_by_organization"], False)
+        self.assertIs(payload["authority_transfer"], False)
+        batch = payload["released_batch"]
+        self.assertEqual(batch["release_predecessor"], "VERIFIED_ORGANIZATION_RECEIPT_CHAIN_SEGMENT")
+        self.assertEqual(batch["receipt_count"], 3)
+        self.assertEqual(batch["receipts"], receipts)
+        self.assertEqual(batch["segment_first_receipt_sha256"], receipts[0]["receipt_sha256"])
+        self.assertEqual(batch["segment_head_receipt_sha256"], receipts[-1]["receipt_sha256"])
+        self.assertIsNone(batch["segment_base_previous_receipt_sha256"])
+
+    def assertDenied(self, predicate, call):
+        with self.assertRaises(record.ReleaseRefused) as refused:
+            call()
+        refusal = refused.exception.refusal
+        self.assertEqual(refusal["disposition"], "DENY")
+        self.assertEqual(refusal["failed_predicate"], predicate)
+        for field in ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                      "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
+        self.assertIs(refusal["gates_organization_runtime_reality"], False)
+
+    def test_an_unverified_segment_is_refused_with_the_six_fields(self):
+        receipts = self.segment(3)
+        self.assertDenied("RELEASED_BATCH_IS_NOT_EMPTY", lambda: self.build([]))
+        self.assertDenied("ORGANIZATION_RECEIPT_CHAIN_SEGMENT_IS_CONTIGUOUS",
+                          lambda: self.build([receipts[0], receipts[2]]))
+        self.assertDenied("ORGANIZATION_RECEIPT_CHAIN_SEGMENT_IS_CONTIGUOUS",
+                          lambda: self.build([receipts[1], receipts[0]]))
+        tampered = {**receipts[1], "successor_org_state_sha256": "sha256:" + "f" * 64}
+        self.assertDenied("ORGANIZATION_RECEIPT_SELF_DIGEST_MATCHES", lambda: self.build([receipts[0], tampered]))
+        self.assertDenied("ORGANIZATION_RECEIPT_SCHEMA_MATCHES",
+                          lambda: self.build([{**receipts[0], "schema": "stegverse.repo-transition-receipt/v1"}]))
 
     def test_organization_record_refuses_foreign_receipt_and_defaulted_standing(self):
         foreign = {"schema": "stegverse.organization-transition-receipt/v1", "organization": "StegVerse-org"}
         with self.assertRaisesRegex(SystemExit, "owner mismatch"):
-            record.build_organization_record_packet(foreign, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {"predecessor": None})
-        own = {"schema": "stegverse.organization-transition-receipt/v1", "organization": "SV-LLM"}
+            self.build([foreign], {"predecessor": None})
         with self.assertRaisesRegex(SystemExit, "standing must declare"):
-            record.build_organization_record_packet(own, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {}, {})
+            self.build(self.segment(1), {})
 
     def test_source_names_no_other_organization(self):
         text = (ROOT / "resident-runtime/submit_org_transition_to_master_records.py").read_text()
         self.assertNotIn('"StegVerse-org"', text)
         self.assertNotIn("stegverse-org.", text)
+
+
+
+class MasterRecordsRoleAudit(unittest.TestCase):
+    """data/master-records-role-audit.json is re-measured, so an occurrence added later fails here."""
+
+    AUDIT = "data/master-records-role-audit.json"
+    PATTERN = re.compile(r"master[-_ ]?records", re.I)
+
+    def measured(self):
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True)
+        counts = {}
+        for name in tracked.stdout.split():
+            if name == self.AUDIT:
+                continue
+            hits = 1 if self.PATTERN.search(name) else 0
+            try:
+                hits += len(self.PATTERN.findall((ROOT / name).read_text()))
+            except (UnicodeDecodeError, FileNotFoundError):
+                pass
+            if hits:
+                counts[name] = hits
+        return counts
+
+    def test_the_audit_matches_the_tree_and_leaves_nothing_improper(self):
+        audit = json.loads((ROOT / self.AUDIT).read_text())
+        after = audit["after"]
+        recorded = {}
+        for row in after:
+            recorded[row["file"]] = recorded.get(row["file"], 0) + 1
+        self.assertEqual(recorded, self.measured())
+        self.assertEqual(audit["counts"]["after"]["TOTAL"], len(after))
+        self.assertEqual([row for row in after if row["classification"].startswith("IMPROPER")], [])
+        self.assertEqual(audit["counts"]["after"]["IMPROPER_CODE"] + audit["counts"]["after"]["IMPROPER_DOC"], 0)
+        allowed = {"PROPER", "IMPROPER_CODE", "IMPROPER_DOC", "HISTORICAL_EVIDENCE", "NAMING_ONLY"}
+        for row in audit["before"]:
+            self.assertIn(row["classification"], allowed)
+            if row["classification"].startswith("IMPROPER"):
+                self.assertTrue(row.get("remediation"), row)
 
 
 if __name__ == "__main__":
