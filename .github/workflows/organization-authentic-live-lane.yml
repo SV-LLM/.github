@@ -5,18 +5,24 @@ name: SV-LLM Organization Authentic Live Lane (manual)
 #
 #   1. reference adoption parity (offline) before the ledger is opened;
 #   2. the pinned SV-LLM/sandbox checkout;
-#   3. open the organization ledger with the manifested genesis transition and
+#   3. open the organization ledger with the manifested genesis transition
+#      (first run only; a later run continues from the published HEAD) and
 #      append one authentic parent (org-runtime/authentic_live_lane.py);
 #   4. the Sandbox authentic lane in this same run and ledger root, gated
 #      before any browser install;
-#   5. the execution-scoped ledgers, report and digests as one 90-day evidence
-#      artifact (an evidence copy, never state; nothing crosses runs).
+#   5. publish the ledger ref fast-forward only, read both chains back from a
+#      fresh fetch, and retain the report, readback and digests as one 90-day
+#      evidence artifact (an evidence copy; the ledger itself is the ref).
 #
 # The organization ledger is the StegVerse-org reference ledger bound exactly
-# as the reference binds it (PosixLedgerStore at STEGVERSE_ORG_LEDGER_ROOT):
-# ledger_persistence EXECUTION_SCOPED_SAME_AS_REFERENCE, no durability claimed
-# beyond this run. Every non-ALLOW ends the run red with a typed disposition.
-# SV-LLM/sandbox is private: its checkout reads with the
+# as the reference binds it: a GitLedgerStore on the designated ref
+# (org-contract.json organization_ledger_ref, refs/stegverse/organization-ledger
+# in this repository), with the repository chain in its own subtree
+# (contract.json repository_ledger_location). The push below is the
+# compare-and-swap against the published ref, so a writer that lost a race
+# fails closed instead of overwriting; ledger_persistence
+# DURABLE_GIT_REF_SAME_AS_REFERENCE. Every non-ALLOW ends the run red with a
+# typed disposition. SV-LLM/sandbox is private: its checkout reads with the
 # SV_LLM_SANDBOX_READ_TOKEN secret when present, otherwise this repository's
 # token, and an unreadable source is FAIL_CLOSED
 # AUTHENTIC_LANE_SOURCE_UNAVAILABLE before the ledger is opened.
@@ -25,7 +31,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+# ORGANIZATION_LEDGER_LOCK: one appender at a time.
+concurrency:
+  group: organization-ledger
+  cancel-in-progress: false
 
 jobs:
   authentic:
@@ -35,10 +46,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: One execution-scoped ledger root for the whole run
+      - name: Bind the designated organization ledger ref and the repository ledger subtree within it
         run: |
-          echo "STEGVERSE_ORG_LEDGER_ROOT=$RUNNER_TEMP/sv-llm-org-ledger" >> "$GITHUB_ENV"
-          echo "STEGVERSE_REPO_LEDGER_ROOT=$RUNNER_TEMP/sv-llm-dotgithub-repo-ledger" >> "$GITHUB_ENV"
+          set -euo pipefail
+          ref=$(python -c 'import json; c=json.load(open(".stegverse/transition-ledger/org-contract.json")); assert c["organization_ledger_repository"]=="SV-LLM/.github", c; print(c["organization_ledger_ref"])')
+          namespace=$(python -c 'import json; l=json.load(open(".stegverse/transition-ledger/contract.json"))["repository_ledger_location"]; assert l["repository"]=="SV-LLM/.github" and l["new_ledger_root"] is False, l; print(l["namespace"])')
+          test "$ref" = "refs/stegverse/organization-ledger"
+          if git ls-remote --exit-code origin "$ref" >/dev/null; then
+            git fetch --no-tags origin "+$ref:$ref"
+            echo "ledger tip: $(git rev-parse "$ref")"
+          else
+            echo "ledger ref not yet materialized; this run opens it at genesis"
+          fi
+          echo "LEDGER_REF=$ref" >> "$GITHUB_ENV"
+          echo "REPO_LEDGER_NAMESPACE=$namespace" >> "$GITHUB_ENV"
+          echo "STEGVERSE_ORG_LEDGER_ROOT=git+$GITHUB_WORKSPACE#$ref" >> "$GITHUB_ENV"
+          echo "STEGVERSE_REPO_LEDGER_ROOT=git+$GITHUB_WORKSPACE#$ref:$namespace" >> "$GITHUB_ENV"
           echo "EVIDENCE_DIR=$RUNNER_TEMP/evidence" >> "$GITHUB_ENV"
       - name: Reference adoption parity (offline, before the ledger is opened)
         run: python -B resident-runtime/reference_adoption.py verify --out "$EVIDENCE_DIR/reference-adoption.json"
@@ -65,7 +88,7 @@ jobs:
                     "retry_entrypoint": "SV-LLM/.github:.github/workflows/organization-authentic-live-lane.yml (workflow_dispatch)",
                     "next_attempt": "Dispatch this workflow again once the Sandbox source is readable.",
                     "executed_by": os.environ.get("GITHUB_REPOSITORY"),
-                    "ledger_persistence": "EXECUTION_SCOPED_SAME_AS_REFERENCE",
+                    "ledger_persistence": "DURABLE_GIT_REF_SAME_AS_REFERENCE",
                     "authoritative_organization_runtime_reality": False, "authority_effect": "NONE"}
           path = pathlib.Path(os.environ["EVIDENCE_DIR"]) / "report.json"
           path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,13 +118,56 @@ jobs:
           SV_LLM_DOTGITHUB_ROOT: ${{ github.workspace }}
           PARENT_ORG_RECEIPT_SHA256: ${{ steps.organization.outputs.parent }}
         run: python -B sandbox/live/run_live_llm.py
-      - name: Copy the execution-scoped ledgers into the evidence and digest it
+      # Every receipt this run appended, ALLOW or refusal, is published; a
+      # lost compare-and-swap publishes nothing and is a typed refusal.
+      - name: Publish the ledger ref (fast-forward only)
         if: always()
         run: |
-          mkdir -p "$EVIDENCE_DIR/ledgers"
-          for root in "$STEGVERSE_ORG_LEDGER_ROOT" "$STEGVERSE_REPO_LEDGER_ROOT"; do
-            if [ -d "$root" ]; then cp -r "$root" "$EVIDENCE_DIR/ledgers/"; fi
-          done
+          if ! git rev-parse --verify --quiet "$LEDGER_REF" >/dev/null; then
+            echo "nothing appended; ledger ref not materialized"; exit 0
+          fi
+          if ! git push origin "$LEDGER_REF:$LEDGER_REF"; then
+            echo '{"disposition":"FAIL_CLOSED","failure_code":"ORGANIZATION_LEDGER_PUBLISH_RACE","failed_predicate":"PUBLISHED_REF_FAST_FORWARDS","required_evidence_or_repair":"another append moved the ref first; this run published nothing","retry_entrypoint":".github/workflows/organization-authentic-live-lane.yml (workflow_dispatch)","owning_existing_goal":"SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001","next_attempt":"dispatch again; the next run continues from the published HEAD"}'
+            exit 1
+          fi
+          echo "published $LEDGER_REF at $(git rev-parse "$LEDGER_REF")"
+      - name: Read the organization and repository ledgers back from a fresh fetch
+        if: always()
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --exit-code origin "$LEDGER_REF" >/dev/null; then
+            echo "no published ledger ref to read back"; exit 0
+          fi
+          fresh="$RUNNER_TEMP/readback.git"
+          git init -q --bare "$fresh"
+          auth_header=$(git config --local --get http.https://github.com/.extraheader || true)
+          test -n "$auth_header"
+          git --git-dir="$fresh" -c http.https://github.com/.extraheader="$auth_header" fetch -q "$(git remote get-url origin)" "+$LEDGER_REF:$LEDGER_REF"
+          mkdir -p "$EVIDENCE_DIR"
+          python -B resident-runtime/organization_ledger_readback.py \
+            --location "git+$fresh#$LEDGER_REF" --repository-namespace "$REPO_LEDGER_NAMESPACE" \
+            --out "$EVIDENCE_DIR/readback.json"
+          python - <<'PY'
+          import json, os
+          evidence = os.environ["EVIDENCE_DIR"]
+          readback = json.load(open(evidence + "/readback.json"))
+          assert readback["disposition"] == "ALLOW", readback
+          chain = {r["receipt_sha256"] for r in readback["chain"]}
+          report_path = evidence + "/report.json"
+          if os.path.exists(report_path):
+              report = json.load(open(report_path))
+              for digest in report.get("org_receipts", []):
+                  assert digest in chain, "lane receipt not read back from the published ref: " + digest
+          steps = json.load(open(evidence + "/organization-steps.json"))
+          assert steps["parent_org_receipt_sha256"] in chain
+          print("ORGANIZATION_LEDGER_FRESH_FETCH_READBACK=PASS", readback["head_receipt_sha256"],
+                "organization chain", readback["chain_length"],
+                "repository chain", readback["repository_ledger"]["chain_length"])
+          PY
+      - name: Digest the evidence
+        if: always()
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
           python - <<'PY'
           import hashlib, json, os, pathlib
           root = pathlib.Path(os.environ["EVIDENCE_DIR"])
