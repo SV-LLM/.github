@@ -71,7 +71,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SV-LLM/sandbox
-          ref: a4f2cfb0a3677e9c21920d6c42a8352928b2a913
+          ref: 743f20a081c55451cfcd3207bb678bd2255f2202
           path: sandbox
           token: ${{ secrets.SV_LLM_SANDBOX_READ_TOKEN || github.token }}
           persist-credentials: false
