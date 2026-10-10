@@ -1,0 +1,27 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "disposition": "ALLOW",
+    "intended_action": "STEGBROWSER_LIVE_PATH_CONFORMANCE",
+    "target_id": "stegverse.integration.llm-browser-test.v1"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": true,
+    "epoch": 414811802,
+    "frequency_hz": 100,
+    "generation": 414811802,
+    "heartbeat_id": "HB:414811802",
+    "phase_offset_ns": 3468032,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "sampled_unix_ns": 1791659717703468032
+  },
+  "predecessor_state_sha256": "sha256:e5b7a3648643ea96a88e0404614c0d80c003c13ef1f54b619faf18e9128ece44",
+  "previous_receipt_sha256": "sha256:af13e3ca15790dab9928bfe2b4695b7ff2f0811f6d6e95e73572929633377b77",
+  "receipt_sha256": "sha256:bc7808ad47ed2af3a94fbd2753df9651f03a1cad0c385cad8bd3f83605153083",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:a2aa961ec346b9a568a8660124a8e905d27bbd2cdb1b3b93bae69b9d720d0f35",
+  "transition_class": "ORGANIZATION_INGRESS_MATERIALIZED",
+  "transition_id": "ORGANIZATION_INGRESS_MATERIALIZED:a2aa961ec346b9a568a86601"
+}
