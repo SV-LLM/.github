@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 20,
+      "PROPER": 21,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
       "NAMING_ONLY": 24,
-      "TOTAL": 47
+      "TOTAL": 48
     }
   },
   "not_changed_with_reason": {
@@ -599,6 +599,13 @@
       "text": "# answer is requested and nothing waits for Master Records to record it.",
       "classification": "PROPER",
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/organization_ledger_readback.py",
+      "line": 118,
+      "text": "\"master_records_awaited\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted byte-identical from the StegVerse-org reference (2bacf5c9): the ledger readback states that Master Records is not awaited, non-authorizing and non-gating."
     }
   ]
 }

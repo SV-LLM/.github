@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: StegVerse-org/.github
-          ref: 66749948a6535bc097fc257a7bbf3d18193282e6
+          ref: 2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c
           path: stegverse-org-reference
           persist-credentials: false
       - name: Recorded digests are the reference commit's

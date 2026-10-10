@@ -2,39 +2,46 @@
   "schema": "sv-llm.organization-role-reference-adoption/v1",
   "reference": {
     "repository": "StegVerse-org/.github",
-    "commit": "66749948a6535bc097fc257a7bbf3d18193282e6"
+    "commit": "2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c"
   },
   "adopted_by": "SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001",
   "files": {
     "resident-runtime/ledger_store.py": {
       "rule": "byte_identical",
-      "reference_sha256": "sha256:a3c52fb8a8f28bd0cd56135eecef19e469b8b23513650c6c0cf9dfa870e67db3"
+      "reference_sha256": "sha256:d38bdac9c50b9fb6c00e9d8ff98be36c700b8c159125261f307af91a09e075d0"
     },
     ".stegverse/transition-ledger/emit.py": {
       "rule": "byte_identical",
-      "reference_sha256": "sha256:869b3ccd68a71f8fc0cbae090955d2d317ac9afa5fb58e71d2c9ead123ad9d4c"
+      "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e"
+    },
+    "resident-runtime/organization_ledger_readback.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:a281d7cb1e7d484dc89b302a70930deac6ddc7803a2b774e9408f34f4a6f4ad9"
     },
     "resident-runtime/aggregate_repo_transition.py": {
       "rule": "declared_insertion",
-      "reference_sha256": "sha256:a15bc4153fbbd5fe830546a1043ab9dcbee4d0716499e78702f28c263d88cb97",
+      "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 15916,
-      "insertion_bytes": 2403,
-      "insertion_sha256": "sha256:57a9cadd19d7b100afb071455cc0a5e241ddc0c7a4c665d86f1a6428e5290faa"
+      "insertion_offset": 16759,
+      "insertion_bytes": 2402,
+      "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c"
     }
   },
   "contracts": {
     ".stegverse/transition-ledger/org-contract.json": {
       "rule": "contract",
       "excluded_keys": [
-        "organization"
+        "organization",
+        "organization_ledger_repository",
+        "organization_ledger_ref_designation_source"
       ],
-      "reference_sha256": "sha256:1416ca10ba278566d5461266ff648f3f88df409a29a785825347c3182c5e91e9"
+      "reference_sha256": "sha256:3bb14dabc568c5fcfcf5cac9ff2a75622512559f86e7a94567eb043cbec88135"
     },
     ".stegverse/transition-ledger/contract.json": {
       "rule": "contract",
       "excluded_keys": [
-        "repository"
+        "repository",
+        "repository_ledger_location"
       ],
       "reference_sha256": "sha256:59900260090513fba1bf3f486128358c7a8299eb72cccf18602858411f10921d"
     }

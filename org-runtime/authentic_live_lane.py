@@ -33,20 +33,35 @@ PARENT_CLASS = "ORGANIZATION_INGRESS_MATERIALIZED"
 INTENDED_ACTION = "STEGBROWSER_LIVE_PATH_CONFORMANCE"
 
 
+def ledger_persistence(store) -> str:
+    """What outlives this run: the reference's git-ref store does, a POSIX root under the runner does not."""
+    return "DURABLE_GIT_REF_SAME_AS_REFERENCE" if getattr(store, "kind", None) == "GIT_REF" \
+        else "EXECUTION_SCOPED_SAME_AS_REFERENCE"
+
+
 def prepare(target: dict, root: Path = ROOT) -> dict:
     target_id = target.get("target_id")
     if not isinstance(target_id, str) or not target_id:
         raise SystemExit("LIVE_TARGET_ID_REQUIRED")
-    opened = crossing.open_organization_ledger(root)
+    # Genesis is declared once, on an empty ledger. On the designated git ref
+    # (org-contract.json organization_ledger_ref) the chain outlives the run,
+    # so a later run continues from the published HEAD rather than declaring
+    # genesis again, which the reference would refuse.
+    ledger = crossing.organization_ledger
+    store = ledger.open_store(ledger.ledger_root())
+    head = store.get(ledger.HEAD_KEY)
+    opened = crossing.open_organization_ledger(root) if head is None else None
     outcome = {"disposition": "ALLOW", "intended_action": INTENDED_ACTION, "target_id": target_id}
     parent = crossing.record(PARENT_CLASS, subject={"intended_action": "AUTHENTIC_PARENT", "for": INTENDED_ACTION},
                              outcome=outcome, root=root)
     return {"schema": "sv-llm.authentic-live-lane-organization-steps/v1", "organization": crossing.ORG,
-            "ledger_opened_org_receipt_sha256": opened["org_receipt_sha256"],
+            "ledger_opened_org_receipt_sha256": opened["org_receipt_sha256"] if opened else None,
+            "continued_from_org_receipt_sha256": None if opened else head["receipt_sha256"],
             "parent_transition_class": PARENT_CLASS, "parent_outcome": outcome,
             "parent_repo_receipt_sha256": parent["repo_receipt_sha256"],
             "parent_org_receipt_sha256": parent["org_receipt_sha256"],
-            "ledger_persistence": "EXECUTION_SCOPED_SAME_AS_REFERENCE", "authority_effect": "NONE"}
+            "ledger_location": str(ledger.ledger_root()),
+            "ledger_persistence": ledger_persistence(store), "authority_effect": "NONE"}
 
 
 def main() -> int:

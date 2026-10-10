@@ -50,7 +50,8 @@ class ReferenceAdoption(unittest.TestCase):
     def test_every_adopted_surface_is_recorded(self):
         record = json.loads(adoption.RECORD.read_text())
         self.assertEqual(set(record["files"]), {"resident-runtime/ledger_store.py", ".stegverse/transition-ledger/emit.py",
-                                                "resident-runtime/aggregate_repo_transition.py"})
+                                                "resident-runtime/aggregate_repo_transition.py",
+                                                "resident-runtime/organization_ledger_readback.py"})
         self.assertEqual(set(record["contracts"]), {".stegverse/transition-ledger/org-contract.json",
                                                     ".stegverse/transition-ledger/contract.json"})
 
@@ -92,7 +93,9 @@ class ReferenceAdoption(unittest.TestCase):
     def test_the_repository_ledger_is_the_reference_emitter(self):
         receipt_fields = json.loads((ROOT / ".stegverse/transition-ledger/contract.json").read_text())
         self.assertNotIn("observed_at", json.dumps(receipt_fields))
-        self.assertIn("ledger_store.PosixLedgerStore", (ROOT / ".stegverse/transition-ledger/emit.py").read_text())
+        # The reference emitter opens whatever store the supplied location names
+        # (a POSIX root, or the designated git ref), never one of its own.
+        self.assertIn("ledger_store.open_store(lr())", (ROOT / ".stegverse/transition-ledger/emit.py").read_text())
 
 
 class OrganizationSteps(unittest.TestCase):
@@ -108,7 +111,7 @@ class OrganizationSteps(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.steps = load("svllm_authentic_steps", "org-runtime/authentic_live_lane.py")
         self.agg = load("svllm_steps_agg", "resident-runtime/aggregate_repo_transition.py")
-        self.store = self.agg.PosixLedgerStore(self.agg.ledger_root())
+        self.store = self.agg.open_store(self.agg.ledger_root())
 
     def test_open_then_parent_in_one_execution_scoped_root(self):
         result = self.steps.prepare(TARGET)
@@ -126,14 +129,51 @@ class OrganizationSteps(unittest.TestCase):
         self.assertEqual(source["repository"], "SV-LLM/.github")
         self.assertEqual(result["ledger_persistence"], "EXECUTION_SCOPED_SAME_AS_REFERENCE")
 
-    def test_a_second_opening_in_the_same_root_is_denied_and_writes_nothing(self):
-        self.steps.prepare(TARGET)
+    def test_a_second_run_on_the_same_root_continues_the_chain_without_a_second_genesis(self):
+        first = self.steps.prepare(TARGET)
         before = sorted(self.store.list_prefix(self.agg.RECEIPT_PREFIX))
-        with self.assertRaises(SystemExit) as refused:  # OrgLedgerAppendRefused, from crossing's own module load
-            self.steps.prepare(TARGET)
-        self.assertEqual((refused.exception.disposition, refused.exception.failed_predicate),
-                         ("DENY", "ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER"))
-        self.assertEqual(sorted(self.store.list_prefix(self.agg.RECEIPT_PREFIX)), before)
+        second = self.steps.prepare(TARGET)
+        self.assertIsNone(second["ledger_opened_org_receipt_sha256"])
+        self.assertEqual(second["continued_from_org_receipt_sha256"], first["parent_org_receipt_sha256"])
+        parent = self.store.get(self.agg.receipt_key(second["parent_org_receipt_sha256"]))
+        self.assertNotIn("chain_genesis", parent)
+        self.assertEqual(parent["predecessor_org_state_sha256"], first["parent_org_receipt_sha256"])
+        # Exactly one receipt was added, and the chain still has one genesis.
+        self.assertEqual(len(self.store.list_prefix(self.agg.RECEIPT_PREFIX)), len(before) + 1)
+        chain, cursor = [], self.store.get(self.agg.HEAD_KEY)["receipt_sha256"]
+        while cursor:
+            receipt = self.store.get(self.agg.receipt_key(cursor))
+            chain.append(receipt)
+            cursor = receipt.get("predecessor_org_state_sha256") if not receipt.get("chain_genesis") else None
+        self.assertEqual([bool(r.get("chain_genesis")) for r in chain], [False, False, True])
+
+    def test_on_the_designated_git_ref_the_chain_is_durable_across_runs(self):
+        # The organization ledger bound as org-contract.json designates it: a
+        # git ref, with the repository chain in its own subtree (contract.json).
+        contract = json.loads((ROOT / ".stegverse/transition-ledger/org-contract.json").read_text())
+        location = json.loads((ROOT / ".stegverse/transition-ledger/contract.json").read_text())["repository_ledger_location"]
+        self.assertEqual(contract["organization_ledger_repository"], "SV-LLM/.github")
+        self.assertEqual(location["ref"], contract["organization_ledger_ref"])
+        self.assertEqual(location["namespace"], "repository-ledger/SV-LLM/.github")
+        organization = "git+" + str(self.tmp / "ledger.git") + "#" + contract["organization_ledger_ref"]
+        with mock.patch.dict(os.environ, {"STEGVERSE_ORG_LEDGER_ROOT": organization,
+                                          "STEGVERSE_REPO_LEDGER_ROOT": organization + ":" + location["namespace"]}):
+            first = self.steps.prepare(TARGET)   # one run: genesis, then the parent
+            second = self.steps.prepare(TARGET)  # the next run: continues from the published HEAD
+            store = self.agg.open_store(self.agg.ledger_root())
+        self.assertEqual(store.kind, "GIT_REF")
+        self.assertEqual(first["ledger_persistence"], "DURABLE_GIT_REF_SAME_AS_REFERENCE")
+        self.assertTrue(first["ledger_opened_org_receipt_sha256"])
+        self.assertEqual(second["continued_from_org_receipt_sha256"], first["parent_org_receipt_sha256"])
+        self.assertEqual(store.get(self.agg.HEAD_KEY)["receipt_sha256"], second["parent_org_receipt_sha256"])
+        # The repository chain lives in the subtree and links across the two runs.
+        repository = self.agg.open_store(self.agg.parse_locator(organization + ":" + location["namespace"]))
+        head = repository.get(self.agg.HEAD_KEY)
+        self.assertEqual(head["receipt_sha256"], second["parent_repo_receipt_sha256"])
+        self.assertEqual(repository.get(self.agg.receipt_key(head["receipt_sha256"]))["previous_receipt_sha256"],
+                         first["parent_repo_receipt_sha256"])
+        # Nothing was written under the POSIX roots this case does not use.
+        self.assertFalse((self.tmp / "org").exists())
 
     def test_a_target_without_an_id_is_refused_before_any_write(self):
         with self.assertRaisesRegex(SystemExit, "LIVE_TARGET_ID_REQUIRED"):
