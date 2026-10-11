@@ -14,6 +14,12 @@ name: SV-LLM Organization Authentic Live Lane (manual)
 #      fresh fetch, and retain the report, readback and digests as one 90-day
 #      evidence artifact (an evidence copy; the ledger itself is the ref).
 #
+# SV-LLM/sandbox keeps its own repository chain in the subtree its contract
+# declares (repository_ledger_location, repository-ledger/SV-LLM/sandbox) of
+# the same ref, supplied to the lane as SANDBOX_REPO_LEDGER_ROOT. It is
+# published by the same push and read back from the same fresh fetch, so the
+# next run continues it instead of starting a new chain.
+#
 # The organization ledger is the StegVerse-org reference ledger bound exactly
 # as the reference binds it: a GitLedgerStore on the designated ref
 # (org-contract.json organization_ledger_ref, refs/stegverse/organization-ledger
@@ -71,10 +77,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SV-LLM/sandbox
-          ref: 743f20a081c55451cfcd3207bb678bd2255f2202
+          ref: 5e99f1d5436302b68a9b8579e04ba04188ea5510
           path: sandbox
           token: ${{ secrets.SV_LLM_SANDBOX_READ_TOKEN || github.token }}
           persist-credentials: false
+      - name: Bind the Sandbox repository ledger subtree its contract declares
+        if: steps.sandbox.outcome == 'success'
+        run: |
+          set -euo pipefail
+          sandbox_namespace=$(LEDGER_REF="$LEDGER_REF" python -c 'import json, os; l=json.load(open("sandbox/.stegverse/transition-ledger/contract.json"))["repository_ledger_location"]; assert l["repository"]=="SV-LLM/sandbox" and l["ref_repository"]=="SV-LLM/.github" and l["ref"]==os.environ["LEDGER_REF"] and l["new_ledger_root"] is False, l; print(l["namespace"])')
+          test "$sandbox_namespace" = "repository-ledger/SV-LLM/sandbox"
+          echo "SANDBOX_REPO_LEDGER_NAMESPACE=$sandbox_namespace" >> "$GITHUB_ENV"
+          echo "SANDBOX_REPO_LEDGER_ROOT=git+$GITHUB_WORKSPACE#$LEDGER_REF:$sandbox_namespace" >> "$GITHUB_ENV"
       - name: An unreadable Sandbox source is FAIL_CLOSED
         if: steps.sandbox.outcome != 'success'
         run: |
@@ -163,6 +177,34 @@ jobs:
           print("ORGANIZATION_LEDGER_FRESH_FETCH_READBACK=PASS", readback["head_receipt_sha256"],
                 "organization chain", readback["chain_length"],
                 "repository chain", readback["repository_ledger"]["chain_length"])
+          PY
+          # The Sandbox's own chain, from the same fresh fetch. Absent only when
+          # the lane appended nothing to it.
+          if [ -z "${SANDBOX_REPO_LEDGER_NAMESPACE:-}" ]; then
+            echo "SANDBOX_REPOSITORY_CHAIN_READBACK=NOT_BOUND (Sandbox source unavailable)"; exit 0
+          fi
+          if git --git-dir="$fresh" cat-file -e "$LEDGER_REF:$SANDBOX_REPO_LEDGER_NAMESPACE/HEAD.json" 2>/dev/null; then
+            python -B resident-runtime/organization_ledger_readback.py \
+              --location "git+$fresh#$LEDGER_REF" --repository-namespace "$SANDBOX_REPO_LEDGER_NAMESPACE" \
+              --out "$EVIDENCE_DIR/readback-sandbox.json"
+          fi
+          python - <<'PY'
+          import json, os
+          evidence = os.environ["EVIDENCE_DIR"]
+          report_path = evidence + "/report.json"
+          appended = json.load(open(report_path)).get("repo_receipts", []) if os.path.exists(report_path) else []
+          if not os.path.exists(evidence + "/readback-sandbox.json"):
+              assert not appended, "Sandbox receipts were appended but the Sandbox chain is not on the published ref"
+              print("SANDBOX_REPOSITORY_CHAIN_READBACK=NOTHING_APPENDED")
+              raise SystemExit(0)
+          sandbox = json.load(open(evidence + "/readback-sandbox.json"))
+          assert sandbox["disposition"] == "ALLOW", sandbox
+          repository = sandbox["repository_ledger"]
+          chain = [r["receipt_sha256"] for r in repository["chain"]]
+          assert all(digest in chain for digest in appended), "Sandbox receipt not read back from the published ref"
+          assert repository["every_receipt_retained_in_organization_ledger"] is True
+          print("SANDBOX_REPOSITORY_CHAIN_READBACK=PASS", repository["head_receipt_sha256"],
+                "sandbox chain", repository["chain_length"], "appended this run", len(appended))
           PY
       - name: Digest the evidence
         if: always()
