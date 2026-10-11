@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -179,6 +180,37 @@ class OrganizationSteps(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "LIVE_TARGET_ID_REQUIRED"):
             self.steps.prepare({})
         self.assertIsNone(self.store.get(self.agg.HEAD_KEY))
+
+
+class AuthenticLaneWorkflowKeepsTheSandboxChain(unittest.TestCase):
+    """The workflow supplies the Sandbox chain's declared subtree and reads it back (StegVerse-org/.github#120)."""
+
+    def setUp(self):
+        self.workflow = (ROOT / ".github/workflows/organization-authentic-live-lane.yml").read_text()
+
+    def test_the_sandbox_is_pinned_to_a_commit(self):
+        pins = re.findall(r"repository: SV-LLM/sandbox\n\s+ref: (\S+)", self.workflow)
+        self.assertEqual(len(pins), 1)
+        self.assertRegex(pins[0], r"^[0-9a-f]{40}$")
+
+    def test_the_subtree_is_read_from_the_sandbox_contract_on_this_ref(self):
+        bind = self.workflow.split("Bind the Sandbox repository ledger subtree its contract declares")[1].split("- name:")[0]
+        self.assertIn("sandbox/.stegverse/transition-ledger/contract.json", bind)
+        self.assertIn('l["ref"]==os.environ["LEDGER_REF"]', bind)
+        self.assertIn('l["new_ledger_root"] is False', bind)
+        self.assertIn('test "$sandbox_namespace" = "repository-ledger/SV-LLM/sandbox"', bind)
+        self.assertIn('SANDBOX_REPO_LEDGER_ROOT=git+$GITHUB_WORKSPACE#$LEDGER_REF:$sandbox_namespace', bind)
+
+    def test_the_sandbox_chain_is_bound_before_the_lane_and_read_back_after_the_push(self):
+        steps = re.findall(r"- name: (.+)", self.workflow)
+        bind = steps.index("Bind the Sandbox repository ledger subtree its contract declares")
+        self.assertLess(bind, steps.index("Authentic lane gate (organization execution, ledger opened, parent and subject present)"))
+        self.assertLess(steps.index("Publish the ledger ref (fast-forward only)"),
+                        steps.index("Read the organization and repository ledgers back from a fresh fetch"))
+        readback = self.workflow.split("Read the organization and repository ledgers back from a fresh fetch")[1].split("- name:")[0]
+        self.assertIn('--repository-namespace "$SANDBOX_REPO_LEDGER_NAMESPACE"', readback)
+        self.assertIn('every_receipt_retained_in_organization_ledger"] is True', readback)
+        self.assertIn("Sandbox receipts were appended but the Sandbox chain is not on the published ref", readback)
 
 
 if __name__ == "__main__":
