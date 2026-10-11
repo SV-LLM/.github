@@ -1,0 +1,34 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "authority_effect": "NONE",
+    "disposition": "ALLOW",
+    "lineage": [
+      {
+        "disposition": "ALLOW",
+        "failed_predicate": null,
+        "kind": "TOOL_OBSERVATION",
+        "observation_digest": "sha256:9a89250cf3e655f61fc6a5084aded0bcbe63aa2f254c75b5adb04f98f3e4408f",
+        "observation_id": "obs-4cd567ac9ee99398478d0261",
+        "repo_receipt_sha256": "sha256:32c6b673806bcf0b1a217b7201ae532e14d8f968abf33397ed63af85630f3ba1",
+        "tool": "StegBrowser",
+        "tool_profile": "llm.v1"
+      }
+    ],
+    "synthesis": {
+      "summary": "AT-04 Stage 1 StegBrowser live-path conformance; no provider attribution"
+    },
+    "synthesis_digest": "sha256:48b2d6bada02d195ae12b06213a3f5f35256a492024ec0071feec1a153f0e695",
+    "work_id": "live-llm-7817d8aa7fc4"
+  },
+  "hb_reference": null,
+  "observed_at": "2026-10-11T15:58:56.196361+00:00",
+  "predecessor_state_sha256": "sha256:b7f27863c556a503ddaceb6efae5cc5a331b1727c56b6f54f0e99e2c288e130e",
+  "previous_receipt_sha256": "sha256:32c6b673806bcf0b1a217b7201ae532e14d8f968abf33397ed63af85630f3ba1",
+  "receipt_sha256": "sha256:681fac8262a5542b82b1416ddf32a4172596e3012663f6f4a98225ec5d9d6c58",
+  "repository": "SV-LLM/sandbox",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:74180601cc2a928ca811133ead3558bdd3a27d94eca7c1f1c1930e3c6477a68d",
+  "transition_class": "SANDBOX_SYNTHESIS_RECORDED",
+  "transition_id": "SANDBOX_SYNTHESIS_RECORDED:74180601cc2a928ca811133e"
+}
