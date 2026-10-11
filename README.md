@@ -250,3 +250,7 @@ Ecosystem Chat
 This organization foundation does not claim that consumer loop is implemented merely because the architecture is documented.
 
 See `docs/LLM_ORG_ARCHITECTURE.md` and `docs/LLM_ORG_FOUNDATION_MIRROR_HANDOFF.md`.
+
+## Provider installation coordination (2026-10-11)
+
+The 16 provider repository paths and staged installation contract are tracked in [the provider installation mirror handoff](docs/SV_LLM_PROVIDER_INSTALLATION_MIRROR_HANDOFF.md). Provider-specific source must remain capability-only; execution and governance remain in their existing authoritative components. Registry installation identity and runtime certification are separately reconciled.
