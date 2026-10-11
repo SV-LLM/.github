@@ -1,0 +1,37 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "source": "SV-LLM/sandbox",
+    "state_digest_rule": "SV_LLM_LEGACY_RECEIPT_CHAIN",
+    "state_digest_rule_fields": [
+      "predecessor_org_state_sha256",
+      "successor_org_state_sha256"
+    ]
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": true,
+    "epoch": 422273457,
+    "frequency_hz": 100,
+    "generation": 422273457,
+    "heartbeat_id": "HB:422273457",
+    "phase_offset_ns": 8882048,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "sampled_unix_ns": 1791734334258882048
+  },
+  "org_transition_class": "SANDBOX_WORK_ADMITTED",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:3a829b9c75e103b8954e0d0b7c59170beeb0ee280197bf78aeb2edf10f47b516",
+  "previous_receipt_sha256": "sha256:3a829b9c75e103b8954e0d0b7c59170beeb0ee280197bf78aeb2edf10f47b516",
+  "receipt_sha256": "sha256:a942ea94a95bcd075d72c725ba6a40c1c81a2d0a057b3798be78bafb05d6d95b",
+  "repo_receipt_sha256": "sha256:bde62cc067ad041420ccc64f04f8d5a9f7991aef6bcab48dba8236463a588acc",
+  "repo_transition_id": "SANDBOX_WORK_ADMITTED:05fe044135051c271a2c90da",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/sandbox",
+  "source_transition_id": "SANDBOX_WORK_ADMITTED:05fe044135051c271a2c90da",
+  "source_transition_sha256": "sha256:bde62cc067ad041420ccc64f04f8d5a9f7991aef6bcab48dba8236463a588acc",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:bde62cc067ad041420ccc64f04f8d5a9f7991aef6bcab48dba8236463a588acc"
+}
