@@ -1,0 +1,22 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "authority_effect": "NONE",
+    "disposition": "ALLOW",
+    "expected_output_or_handoff": {
+      "successor_transition_class": "SANDBOX_SYNTHESIS_RECORDED"
+    },
+    "synthesis_receipt_sha256": "sha256:30aa40d200a5ffd3dc995806f0701835b0ed3ea7b494061f4f9ac1611160eb4b",
+    "work_id": "live-llm-a6e7a6f653a8"
+  },
+  "hb_reference": null,
+  "observed_at": "2026-10-11T15:54:48.830012+00:00",
+  "predecessor_state_sha256": "sha256:cb84695174144cd4cf14a0ce24069b641921fcfe19da66d97e4f3f9e1016b978",
+  "previous_receipt_sha256": "sha256:30aa40d200a5ffd3dc995806f0701835b0ed3ea7b494061f4f9ac1611160eb4b",
+  "receipt_sha256": "sha256:466f2010308ea91ffa40d2e887b187d0503e651f38cd68e7697b8dbc5e7e4657",
+  "repository": "SV-LLM/sandbox",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:68a844e245dbd288ef34e20c0c9fc06cd37ca3900c972c414a3fcf605e2a18bd",
+  "transition_class": "SANDBOX_WORK_COMPLETED",
+  "transition_id": "SANDBOX_WORK_COMPLETED:68a844e245dbd288ef34e20c"
+}
