@@ -14,11 +14,11 @@ class ProviderInventoryTests(unittest.TestCase):
     def setUp(self):
         self.tree = json.loads((ROOT / "data" / "organization-tree.json").read_text(encoding="utf-8"))
 
-    def test_current_inventory_is_18_with_16_missing(self):
+    def test_current_inventory_is_18_with_all_references(self):
         result = module.inspect(self.tree)
         self.assertEqual(result["provider_count"], 18)
-        self.assertEqual(result["declared_reference_count"], 2)
-        self.assertEqual(result["missing_reference_count"], 16)
+        self.assertEqual(result["declared_reference_count"], 18)
+        self.assertEqual(result["missing_reference_count"], 0)
         self.assertEqual(result["invalid_reference_count"], 0)
         self.assertFalse(result["runtime_observation"])
 
