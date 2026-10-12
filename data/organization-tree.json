@@ -92,6 +92,66 @@
       "class": "INTELLIGENCE_PROVIDER",
       "role": "xAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
       "authority_effect": "NONE"
+    },
+    {
+      "name": "Mistral",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Mistral AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "MiniMax",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "MiniMax-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Perplexity_AI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Perplexity AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Cohere",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Cohere-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "IBM",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "IBM-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Z_AI",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Z.ai-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Alibaba_Cloud",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Alibaba Cloud-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "NVIDIA",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "NVIDIA-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "Amazon_Web_Services",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "Amazon Web Services-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "AI21_Labs",
+      "class": "INTELLIGENCE_PROVIDER",
+      "role": "AI21 Labs-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
+      "authority_effect": "NONE"
     }
   ],
   "invariants": [
@@ -103,7 +163,7 @@
     "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher and SDK authorities, and Master Records organization records and reconstruction, are not duplicated in SV-LLM."
   ],
   "completeness_assessment": {
-    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eight provider capability surfaces.",
+    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eighteen provider capability surfaces.",
     "implementation_state": "Repository existence does not establish implementation or integration completeness. Empty/uninitialized repositories require their role contracts and implementations to be established before runtime completeness can be claimed."
   }
 }

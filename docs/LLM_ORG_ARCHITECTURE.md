@@ -129,7 +129,8 @@ The topology below is derived from the repositories actually enumerated in the c
 - `schemas` — shared provider-neutral machine-readable contracts;
 - `sandbox` — provider-neutral multi-entity collaboration;
 - `StegVerse_AI` — StegVerse ecosystem orchestration/evidence-matching entity;
-- `OpenAI`, `Anthropic`, `Google`, `Microsoft`, `Meta`, `DeepSeek`, `MoonShot_AI`, and `xAI` — peer provider capability repositories.
+- `Ecosystem_Chat` — Ecosystem Chat participant entity (declared capabilities, Sandbox participation, SDK return path);
+- `OpenAI`, `Anthropic`, `Google`, `Microsoft`, `Meta`, `DeepSeek`, `MoonShot_AI`, `xAI`, `Mistral`, `MiniMax`, `Perplexity_AI`, `Cohere`, `IBM`, `Z_AI`, `Alibaba_Cloud`, `NVIDIA`, `Amazon_Web_Services` and `AI21_Labs` — peer provider capability repositories.
 
 The machine-readable source for this inventory and role map is `data/organization-tree.json`.
 

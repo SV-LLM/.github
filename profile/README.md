@@ -10,6 +10,7 @@ SV-LLM/
 ├── schemas/        provider-neutral machine-readable contracts
 ├── sandbox/        multi-entity collaboration plane
 ├── StegVerse_AI/   ecosystem orchestration/evidence-matching entity
+├── Ecosystem_Chat/ Ecosystem Chat participant entity
 ├── OpenAI/
 ├── Anthropic/
 ├── Google/
@@ -17,10 +18,20 @@ SV-LLM/
 ├── Meta/
 ├── DeepSeek/
 ├── MoonShot_AI/
-└── xAI/
+├── xAI/
+├── Mistral/
+├── MiniMax/
+├── Perplexity_AI/
+├── Cohere/
+├── IBM/
+├── Z_AI/
+├── Alibaba_Cloud/
+├── NVIDIA/
+├── Amazon_Web_Services/
+└── AI21_Labs/
 ```
 
-The eight provider repositories are peer capability surfaces. `schemas` owns shared provider-neutral contracts; `sandbox` owns collaboration/session structure; `StegVerse_AI` owns its distinct ecosystem-entity capability surface; `.github` documents organization architecture and boundaries.
+The eighteen provider repositories are peer capability surfaces. `schemas` owns shared provider-neutral contracts; `sandbox` owns collaboration/session structure; `StegVerse_AI` owns its distinct ecosystem-entity capability surface; `.github` documents organization architecture and boundaries.
 
 Knowledge, inference, governance and execution remain distinct. Canonical ecosystem truth remains in its authoritative StegVerse repositories and is resolved through InTr as relevant context rather than duplicated here.
 
