@@ -49,11 +49,11 @@ Initialization: each `main` received one README-only commit so the package could
 | Amazon_Web_Services | no refs | `61e8641` | [#1](https://github.com/SV-LLM/Amazon_Web_Services/pull/1) | `30cab6d82c03` | 5/9 | yes | yes | `c990257` | no |
 | AI21_Labs | no refs | `b111a26` | [#1](https://github.com/SV-LLM/AI21_Labs/pull/1) | `dabb33afed26` | 5/9 | yes | yes | `0848651` | no |
 
-Each package: `capability.json`, `README.md`, `tests/test_capability.py` (35 offline tests), `.github/workflows/capability-validation.yml`, `docs/PROVIDER_INTERFACE.md`, `docs/EVIDENCE.md`, vendored validator pinned by sha256. Operations are DOCUMENTED only where the term appears in a fetched official page (URL, redirect, HTTP status, body sha256 recorded); all others are UNVERIFIED. Consumer interfaces (Meta AI, Microsoft Copilot) are `NO_APPROVED_AUTOMATION_SURFACE`.
+Each package: `capability.json`, `README.md`, `tests/test_capability.py` (34 offline tests), `.github/workflows/capability-validation.yml`, `docs/PROVIDER_INTERFACE.md`, `docs/EVIDENCE.md`, vendored validator pinned by sha256. Operations are DOCUMENTED only where the term appears in a fetched official page (URL, redirect, HTTP status, body sha256 recorded); all others are UNVERIFIED. Consumer interfaces (Meta AI, Microsoft Copilot) are `DOCUMENTED_NOT_INVOKED`. Each provider's published access policies are recorded under `access-policy/` as stated awareness, with no gating effect.
 
 ## Open predicates (non-ALLOW until satisfied)
 - Installation task / COSV: canonical Registry assignment; the Registry is not reachable from the executing session.
-- RUNTIME_OBSERVED: an approved provider-interaction contract, TV/TVC-held credentials and admissible runtime evidence. None exist; none claimed.
+- RUNTIME_OBSERVED: an admitted Sandbox tool run, TV/TVC-held credentials and admissible runtime evidence. None exist; none claimed.
 
 ## Evidence
 Repository inventory verified on 2026-10-11; no provider runtime certification inferred. This handoff is evidence, not state-transition authority.
