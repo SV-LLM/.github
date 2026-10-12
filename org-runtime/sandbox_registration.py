@@ -59,18 +59,27 @@ def _canonical(vendor: Path = VENDOR):
     return module
 
 
+def _schema_evaluator(vendor: Path = VENDOR):
+    """The authoritative SV-LLM schema evaluator (standard library only), vendored by digest."""
+    spec = importlib.util.spec_from_file_location("sv_llm_schema", vendor / "tools/sv_llm_schema.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _validators(vendor: Path = VENDOR):
-    from jsonschema import Draft202012Validator
-    from referencing import Registry, Resource
     schemas = [json.loads((vendor / n).read_text()) for n in ("entity-capability.schema.json", "capability-id.schema.json")]
     tree_schema = json.loads(TREE_SCHEMA_PATH.read_text())
-    registry = Registry().with_resources((s["$id"], Resource.from_contents(s)) for s in schemas + [tree_schema])
-    return (Draft202012Validator(tree_schema, registry=registry),
-            Draft202012Validator(schemas[0], registry=registry))
+    for schema in schemas + [tree_schema]:
+        SCHEMA.check_schema(schema)
+    registry = SCHEMA.Registry(schemas + [tree_schema])
+    return (SCHEMA.Validator(tree_schema, registry=registry),
+            SCHEMA.Validator(schemas[0], registry=registry))
 
 
 verify_vendor()
 CANON = _canonical()
+SCHEMA = _schema_evaluator()
 TREE_VALIDATOR, DECLARATION_VALIDATOR = _validators()
 
 

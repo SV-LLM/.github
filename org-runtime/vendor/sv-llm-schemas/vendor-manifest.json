@@ -8,6 +8,9 @@
   "files": {
     "entity-capability.schema.json": "sha256:b5850f9ae149811910b136ce5913f8841293537940187ae8daffd9e4c6fe384e",
     "capability-id.schema.json": "sha256:2c57c766dc0ed7b6393665b6d48f0ef630eab613c3c2d9441f713ff38e5ae8a7",
-    "tools/sv_llm_canonical_json.py": "sha256:a9a3077ea0dc5b4eaf735fcf3f95d196e18f6c5eb79d70824036d6186f640129"
-  }
+    "tools/sv_llm_canonical_json.py": "sha256:a9a3077ea0dc5b4eaf735fcf3f95d196e18f6c5eb79d70824036d6186f640129",
+    "tools/sv_llm_schema.py": "sha256:241b64971f086698c1b17c07bd327e689e4f94e79d55d0913a63f0e44df2d3d9"
+  },
+  "evaluator_source_commit": "eae3cdbaba22c3f6a011641fee48f17f8a20364b",
+  "evaluator_source_commit_status": "HEAD OF SV-LLM/schemas branch claude/native-schema-evaluator; re-vendor from the main merge commit after merge if squash-merged"
 }

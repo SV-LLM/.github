@@ -3,7 +3,7 @@
 Fixture entities live only in this file's fixture tree. The canonical
 data/organization-tree.json never contains them.
 
-Run: python -B org-runtime/tests/test_sandbox_registration.py   (requires jsonschema)
+Run: python -B org-runtime/tests/test_sandbox_registration.py   (standard library only)
 """
 from __future__ import annotations
 import copy, hashlib, json, sys, unittest
@@ -59,7 +59,11 @@ class Vendor(unittest.TestCase):
         manifest = reg.verify_vendor()
         self.assertEqual(manifest["canonical_source"], "SV-LLM/schemas")
         self.assertEqual(set(manifest["files"]), {"entity-capability.schema.json", "capability-id.schema.json",
-                                                  "tools/sv_llm_canonical_json.py"})
+                                                  "tools/sv_llm_canonical_json.py", "tools/sv_llm_schema.py"})
+
+    def test_schemas_are_evaluated_by_the_vendored_native_evaluator(self):
+        self.assertEqual(Path(reg.SCHEMA.__file__).resolve(), (reg.VENDOR / "tools/sv_llm_schema.py").resolve())
+        self.assertNotIn("jsonschema", (ROOT / "org-runtime/sandbox_registration.py").read_text())
 
     def test_vendor_drift_is_detected(self):
         import tempfile, shutil
