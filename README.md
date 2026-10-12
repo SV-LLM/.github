@@ -4,18 +4,29 @@
 
 ```text
 SV-LLM/
-├── .github/        organization architecture, topology and shared policy documentation
-├── schemas/        provider-neutral machine-readable SV-LLM contracts
-├── sandbox/        provider-neutral multi-entity collaboration plane
-├── StegVerse_AI/   StegVerse ecosystem orchestration/evidence-matching entity
-├── OpenAI/         OpenAI capability surface
-├── Anthropic/      Anthropic capability surface
-├── Google/         Google capability surface
-├── Microsoft/      Microsoft capability surface
-├── Meta/           Meta capability surface
-├── DeepSeek/       DeepSeek capability surface
-├── MoonShot_AI/    Moonshot AI capability surface
-└── xAI/            xAI capability surface
+├── .github/              organization architecture, topology and shared policy documentation
+├── schemas/              provider-neutral machine-readable SV-LLM contracts
+├── sandbox/              provider-neutral multi-entity collaboration plane
+├── StegVerse_AI/         StegVerse ecosystem orchestration/evidence-matching entity
+├── Ecosystem_Chat/       Ecosystem Chat participant entity
+├── OpenAI/               OpenAI capability surface
+├── Anthropic/            Anthropic capability surface
+├── Google/               Google capability surface
+├── Microsoft/            Microsoft capability surface
+├── Meta/                 Meta capability surface
+├── DeepSeek/             DeepSeek capability surface
+├── MoonShot_AI/          Moonshot AI capability surface
+├── xAI/                  xAI capability surface
+├── Mistral/              Mistral AI capability surface
+├── MiniMax/              MiniMax capability surface
+├── Perplexity_AI/        Perplexity AI capability surface
+├── Cohere/               Cohere capability surface
+├── IBM/                  IBM capability surface
+├── Z_AI/                 Z.ai capability surface
+├── Alibaba_Cloud/        Alibaba Cloud capability surface
+├── NVIDIA/               NVIDIA capability surface
+├── Amazon_Web_Services/  Amazon Web Services capability surface
+└── AI21_Labs/            AI21 Labs capability surface
 ```
 
 ### Repository roles
@@ -26,6 +37,7 @@ SV-LLM/
 | `schemas` | Shared contract | Provider-neutral schemas for work objects, capability declarations, contributions, provenance, epistemic state, Inference Window projections and governance handoff references. |
 | `sandbox` | Collaboration plane | Provider-neutral bounded multi-entity sessions; preserves attributable contributions, disagreement, refusal, uncertainty, synthesis lineage and handoff packaging. |
 | `StegVerse_AI` | Ecosystem entity | Reconstructs ecosystem purpose, matches evidence against receipted history, recognizes capability gaps and orchestrates intelligence requests without becoming governance authority. |
+| `Ecosystem_Chat` | Ecosystem entity | Ecosystem Chat participant: declared capabilities, Sandbox participation and the SDK return path; its implementation lives outside SV-LLM. |
 | `OpenAI` | Provider capability | OpenAI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 | `Anthropic` | Provider capability | Anthropic-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 | `Google` | Provider capability | Google-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
@@ -34,6 +46,16 @@ SV-LLM/
 | `DeepSeek` | Provider capability | DeepSeek-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 | `MoonShot_AI` | Provider capability | Moonshot AI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 | `xAI` | Provider capability | xAI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Mistral` | Provider capability | Mistral AI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `MiniMax` | Provider capability | MiniMax-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Perplexity_AI` | Provider capability | Perplexity AI-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Cohere` | Provider capability | Cohere-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `IBM` | Provider capability | IBM-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Z_AI` | Provider capability | Z.ai-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Alibaba_Cloud` | Provider capability | Alibaba Cloud-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `NVIDIA` | Provider capability | NVIDIA-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `Amazon_Web_Services` | Provider capability | Amazon Web Services-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
+| `AI21_Labs` | Provider capability | AI21 Labs-specific interfaces, capability declarations, invocation constraints, attributable outputs and provider-specific evaluation history. |
 
 ### Dependency shape
 
