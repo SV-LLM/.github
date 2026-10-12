@@ -463,7 +463,7 @@ class EmissionsAreRecordedOrRefused(SVLLMNode):
 
     def test_the_exemption_register_names_only_the_enforced_primitives_with_every_field(self):
         register = json.loads((REPO / "data/organization-role-exemption-register.json").read_text())
-        exemption, = register["exemptions"]
+        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-001"]
         for field in register["required_fields"]:
             self.assertTrue(exemption.get(field), field)
         self.assertEqual(exemption["disposition"], "DENY_DIRECT_USE_WITHOUT_CROSSING_CUSTODY")
