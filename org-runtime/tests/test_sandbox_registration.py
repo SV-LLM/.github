@@ -77,6 +77,16 @@ class Vendor(unittest.TestCase):
 
 
 class CanonicalTree(unittest.TestCase):
+    def test_every_intelligence_provider_carries_a_digest_bound_declaration_ref(self):
+        tree = reg.load_tree()
+        providers = [row for row in tree["repositories"] if row["class"] == "INTELLIGENCE_PROVIDER"]
+        self.assertEqual(len(providers), 18)
+        for row in providers:
+            ref = row.get("capability_declaration_ref")
+            self.assertIsNotNone(ref, row["name"])
+            self.assertEqual((ref["repository"], ref["path"]), (row["name"], "contracts/entity-capability.json"))
+            self.assertRegex(ref["declaration_sha256"], r"^sha256:[0-9a-f]{64}$")
+
     def test_canonical_tree_is_valid_and_has_no_fixtures(self):
         tree = reg.load_tree()
         self.assertEqual(list(reg.TREE_VALIDATOR.iter_errors(tree)), [])
@@ -87,7 +97,8 @@ class CanonicalTree(unittest.TestCase):
         # R1(a): only entries whose migrated declarations are bound carry a ref.
         tree = reg.load_tree()
         with_ref = {row["name"] for row in tree["repositories"] if "capability_declaration_ref" in row}
-        self.assertEqual(with_ref, {"Anthropic", "OpenAI", "Ecosystem_Chat"})
+        providers = {row["name"] for row in tree["repositories"] if row["class"] == "INTELLIGENCE_PROVIDER"}
+        self.assertEqual(with_ref, providers | {"Ecosystem_Chat"})
         for row in tree["repositories"]:
             result = reg.register(row["name"], declaration=None)
             self.assertEqual(result["disposition"], reg.DENY)
