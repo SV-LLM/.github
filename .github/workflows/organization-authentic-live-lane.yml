@@ -1,4 +1,10 @@
-name: SV-LLM Organization Authentic Live Lane (manual)
+name: SV-LLM Organization Authentic Live Lane Proof of Concept (manual)
+
+# AT-04 Stage 1 PROOF OF CONCEPT. It runs on a GitHub-hosted runner, which the
+# ecosystem invariants do not admit as a runtime surface (GitHub/CI holds no
+# runtime authority). Its results are CI-class evidence at most, never
+# SANDBOX_RUNTIME_OBSERVED, and it is not the manifest-bound execution path.
+# Registered as SV-LLM-EXEMPTION-002 in data/organization-role-exemption-register.json.
 
 # SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001: the only
 # authentic entrypoint. One organization-owned execution, one ledger root:

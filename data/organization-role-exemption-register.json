@@ -42,6 +42,21 @@
       "next_attempt": "On the next canonical org-kernel release",
       "expires_or_review_on": "2026-11-06",
       "exemption_grants_authority": false
+    },
+    {
+      "exemption_id": "SV-LLM-EXEMPTION-002",
+      "surface": "AT-04 Stage 1 proof-of-concept workflows: this repository's .github/workflows/organization-authentic-live-lane.yml (with org-runtime/authentic_live_lane.py) and SV-LLM/sandbox .github/workflows/sandbox-live-llm.yml (with live/run_live_llm.py). Both are manual only and labelled proof of concept.",
+      "owning_existing_goal": "AT-04 Stage 1 live StegBrowser llm.v1 path (SV-LLM/sandbox)",
+      "failure_code": "PROOF_OF_CONCEPT_ON_CI_RUNNER",
+      "failed_predicate": "ACTIONS_BY_MANIFEST_ON_A_CANONICAL_RUNTIME_SUBSTRATE",
+      "why_manifest_bound_state_transition_is_not_yet_possible": "Both workflows run the lane on a GitHub-hosted runner and take the lane's organization-execution identity from GITHUB_REPOSITORY. GitHub/CI holds no runtime authority, so these runs are a proof of concept: CI-class evidence only, never SANDBOX_RUNTIME_OBSERVED, and not the manifest-bound execution path. No manifest-bound admission of the lane on a substrate from the canonical runtime substrate order exists yet.",
+      "disposition": "PROOF_OF_CONCEPT_CI_CLASS_EVIDENCE_ONLY",
+      "enforcement": "Both workflows are workflow_dispatch only and carry the proof-of-concept label: org-runtime/tests/test_reference_adoption_and_authentic_steps.py::AuthenticLaneIsARegisteredProofOfConcept and SV-LLM/sandbox tests/test_live_lanes.py::test_sandbox_workflow_offers_conformance_only.",
+      "required_evidence_or_repair": "Interlock/InTr admission of the manifest-bound lane on a substrate from the canonical runtime substrate order (STEG-BROWSER-RETAINED-RESIDENT-NODE first), with the organization ledger append performed by that admitted execution; then this exemption is removed.",
+      "retry_entrypoint": "SV-LLM/sandbox live/run_live_llm.py::main once invoked by an admitted substrate",
+      "next_attempt": "When a canonical runtime substrate admits the AT-04 lane manifest",
+      "expires_or_review_on": "2026-11-12",
+      "exemption_grants_authority": false
     }
   ],
   "authority_effect": "NONE_REGISTER_ONLY"

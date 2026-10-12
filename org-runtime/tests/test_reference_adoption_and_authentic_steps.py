@@ -213,5 +213,28 @@ class AuthenticLaneWorkflowKeepsTheSandboxChain(unittest.TestCase):
         self.assertIn("Sandbox receipts were appended but the Sandbox chain is not on the published ref", readback)
 
 
+class AuthenticLaneIsARegisteredProofOfConcept(unittest.TestCase):
+    """GitHub/CI holds no runtime authority (StegVerse-Labs/.github
+    data/task-registry-global-invariants.json): the workflow is a manual,
+    labelled proof of concept held under SV-LLM-EXEMPTION-002."""
+
+    def test_the_workflow_is_manual_and_labelled_a_proof_of_concept(self):
+        text = (ROOT / ".github/workflows/organization-authentic-live-lane.yml").read_text()
+        self.assertIn("Proof of Concept", text.splitlines()[0])
+        self.assertEqual(text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0].strip(), "workflow_dispatch:")
+        self.assertIn("never\n# SANDBOX_RUNTIME_OBSERVED", text)
+        self.assertIn("SV-LLM-EXEMPTION-002", text)
+
+    def test_the_lane_holds_a_registered_exemption(self):
+        register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
+        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-002"]
+        for field in register["required_fields"]:
+            self.assertTrue(exemption.get(field), field)
+        self.assertEqual(exemption["disposition"], "PROOF_OF_CONCEPT_CI_CLASS_EVIDENCE_ONLY")
+        self.assertIs(exemption["exemption_grants_authority"], False)
+        for justification in register["prohibited_justifications"]:
+            self.assertNotIn(justification, json.dumps(exemption))
+
+
 if __name__ == "__main__":
     unittest.main()
