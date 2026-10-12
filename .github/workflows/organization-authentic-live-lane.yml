@@ -83,7 +83,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SV-LLM/sandbox
-          ref: 5e99f1d5436302b68a9b8579e04ba04188ea5510
+          ref: 30ee2dd3d386ca1d91487dd7d881fb9b06489742
           path: sandbox
           token: ${{ secrets.SV_LLM_SANDBOX_READ_TOKEN || github.token }}
           persist-credentials: false
@@ -130,7 +130,7 @@ jobs:
         run: python -B sandbox/live/run_live_llm.py --preflight
       - name: Install dependencies and Chromium
         run: |
-          python -m pip install "jsonschema==4.26.0" "playwright==1.52.0"
+          python -m pip install "playwright==1.52.0"
           python -m playwright install --with-deps chromium
       - name: Authentic lane
         env:
