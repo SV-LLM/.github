@@ -61,97 +61,177 @@
       "name": "Google",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Google-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Google",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:d25c9657dd25173b5259ef086e51b1cf5c00e78a5a987ed21f99ac075e91944e"
+      }
     },
     {
       "name": "Microsoft",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Microsoft-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Microsoft",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:150df00cf6e0b78a95ccfff09a5e79ab61b2c6049813789f2ea837e762ee10ce"
+      }
     },
     {
       "name": "Meta",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Meta-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Meta",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:52ccde7698f25e05ab844985bbada5b666d96ac2913ddfa27d20090bf24ed9bc"
+      }
     },
     {
       "name": "DeepSeek",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "DeepSeek-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "DeepSeek",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:059af9351bfa235228fda69d8602cd8c717b99246ad8a23591662e719dc25806"
+      }
     },
     {
       "name": "MoonShot_AI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "MoonShot_AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "MoonShot_AI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:c0c3395cdf772f9ad1aacf979c8ccd7644e8713240e5768f6e746870aab4fe9d"
+      }
     },
     {
       "name": "xAI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "xAI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "xAI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:28ddf79561137281fa9a77cd45e68dda59a45d973d83ac2ff6568e9ea85bf6ed"
+      }
     },
     {
       "name": "Mistral",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Mistral AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Mistral",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:7e0a9a2bf1fcd17f8eb7ec3801af9d4e27f6b79762909f96953ab77bcb99f7e3"
+      }
     },
     {
       "name": "MiniMax",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "MiniMax-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "MiniMax",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:25d29d71609577bdc0ec44feccec73bb0a484cb9a6ee0079c8911d8c2c3dc100"
+      }
     },
     {
       "name": "Perplexity_AI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Perplexity AI-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Perplexity_AI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:ff0907c930f935df83ff077c907e93ca316db0668ffa16d978ce3312832f1e34"
+      }
     },
     {
       "name": "Cohere",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Cohere-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Cohere",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:db2d62454a5bb47e935c85840588e136438267fa6b32fd0e79464b8b36d28c50"
+      }
     },
     {
       "name": "IBM",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "IBM-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "IBM",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:f20c6eb05aa2eb0c2e9b8d57ee1685d3a4d7a87218ede8679f99748622481f5b"
+      }
     },
     {
       "name": "Z_AI",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Z.ai-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Z_AI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:7b7c37cc7346e5280afe97e690a77e7b7d4aad755ef0c30461c1bedef9a2e9f0"
+      }
     },
     {
       "name": "Alibaba_Cloud",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Alibaba Cloud-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Alibaba_Cloud",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:fb8b4ff03df54c377fe38a19a867dc415298a67b2ffb26a85007450e3fd0a768"
+      }
     },
     {
       "name": "NVIDIA",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "NVIDIA-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "NVIDIA",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:9e9a9fff8b8a3eb56b049ca3e71ba0f1a0e69cc1860eb6d1987ff7cabdb1f0e8"
+      }
     },
     {
       "name": "Amazon_Web_Services",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "Amazon Web Services-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "Amazon_Web_Services",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:2e24bacdc45b9244f25337dfce00949a634871d6087f3ada102095e9c91ebe80"
+      }
     },
     {
       "name": "AI21_Labs",
       "class": "INTELLIGENCE_PROVIDER",
       "role": "AI21 Labs-specific capability surface, interfaces, constraints, attributable outputs and provider-specific evaluation history.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "AI21_Labs",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:391028f5554c980f33665b564ce85d96c682ff538177b0041c803148c270cf55"
+      }
     }
   ],
   "invariants": [
