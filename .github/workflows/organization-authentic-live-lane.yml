@@ -130,7 +130,7 @@ jobs:
         run: python -B sandbox/live/run_live_llm.py --preflight
       - name: Install dependencies and Chromium
         run: |
-          python -m pip install "jsonschema==4.26.0" "playwright==1.52.0"
+          python -m pip install "playwright==1.52.0"
           python -m playwright install --with-deps chromium
       - name: Authentic lane
         env:
