@@ -3,7 +3,6 @@ name: Validate Organization Resident Runtime and Interlock-InTr Boundary
 on:
   pull_request:
     paths:
-      - '.github/workflows/organization-authentic-live-lane.yml'
       - 'org-runtime/**'
       - 'org-boundary/**'
       - 'org-kernel/**'
@@ -16,7 +15,6 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/organization-authentic-live-lane.yml'
       - 'org-runtime/**'
       - 'org-boundary/**'
       - 'org-kernel/**'
