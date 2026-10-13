@@ -182,70 +182,34 @@ class OrganizationSteps(unittest.TestCase):
         self.assertIsNone(self.store.get(self.agg.HEAD_KEY))
 
 
-class AuthenticLaneWorkflowKeepsTheSandboxChain(unittest.TestCase):
-    """The workflow supplies the Sandbox chain's declared subtree and reads it back (StegVerse-org/.github#120)."""
+class LiveLanesHaveNoExternalMachine(unittest.TestCase):
+    """GitHub-hosted runners are external machines (StegVerse-Labs/.github
+    data/task-registry-global-invariants.json): no workflow runs a live lane,
+    and the lanes that remain as code hold SV-LLM-EXEMPTION-002."""
 
-    def setUp(self):
-        self.workflow = (ROOT / ".github/workflows/organization-authentic-live-lane.yml").read_text()
+    def test_no_workflow_runs_a_live_lane_or_installs_a_browser(self):
+        workflows = sorted((ROOT / ".github/workflows").glob("*.y*ml"))
+        self.assertTrue(workflows)
+        for path in workflows:
+            text = path.read_text()
+            for needle in ("authentic_live_lane", "run_live_llm", "playwright"):
+                self.assertNotIn(needle, text.lower(), path.name)
 
-    def test_the_sandbox_is_pinned_to_a_commit(self):
-        pins = re.findall(r"repository: SV-LLM/sandbox\n\s+ref: (\S+)", self.workflow)
-        self.assertEqual(len(pins), 1)
-        self.assertRegex(pins[0], r"^[0-9a-f]{40}$")
-
-    def test_the_subtree_is_read_from_the_sandbox_contract_on_this_ref(self):
-        bind = self.workflow.split("Bind the Sandbox repository ledger subtree its contract declares")[1].split("- name:")[0]
-        self.assertIn("sandbox/.stegverse/transition-ledger/contract.json", bind)
-        self.assertIn('l["ref"]==os.environ["LEDGER_REF"]', bind)
-        self.assertIn('l["new_ledger_root"] is False', bind)
-        self.assertIn('test "$sandbox_namespace" = "repository-ledger/SV-LLM/sandbox"', bind)
-        self.assertIn('SANDBOX_REPO_LEDGER_ROOT=git+$GITHUB_WORKSPACE#$LEDGER_REF:$sandbox_namespace', bind)
-
-    def test_the_sandbox_chain_is_bound_before_the_lane_and_read_back_after_the_push(self):
-        steps = re.findall(r"- name: (.+)", self.workflow)
-        bind = steps.index("Bind the Sandbox repository ledger subtree its contract declares")
-        self.assertLess(bind, steps.index("Authentic lane gate (organization execution, ledger opened, parent and subject present)"))
-        self.assertLess(steps.index("Publish the ledger ref (fast-forward only)"),
-                        steps.index("Read the organization and repository ledgers back from a fresh fetch"))
-        readback = self.workflow.split("Read the organization and repository ledgers back from a fresh fetch")[1].split("- name:")[0]
-        self.assertIn('--repository-namespace "$SANDBOX_REPO_LEDGER_NAMESPACE"', readback)
-        self.assertIn('every_receipt_retained_in_organization_ledger"] is True', readback)
-        self.assertIn("Sandbox receipts were appended but the Sandbox chain is not on the published ref", readback)
-
-
-class AuthenticLaneIsARegisteredProofOfConcept(unittest.TestCase):
-    """GitHub/CI holds no runtime authority (StegVerse-Labs/.github
-    data/task-registry-global-invariants.json): the workflow is a manual,
-    labelled proof of concept held under SV-LLM-EXEMPTION-002."""
-
-    def test_the_workflow_is_manual_and_labelled_a_proof_of_concept(self):
-        text = (ROOT / ".github/workflows/organization-authentic-live-lane.yml").read_text()
-        self.assertIn("Proof of Concept", text.splitlines()[0])
-        self.assertEqual(text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0].strip(), "workflow_dispatch:")
-        self.assertIn("never\n# SANDBOX_RUNTIME_OBSERVED", text)
-        self.assertIn("SV-LLM-EXEMPTION-002", text)
-
-    def test_the_lane_holds_a_registered_exemption(self):
+    def test_the_lane_code_holds_a_registered_exemption(self):
         register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
         exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-002"]
         for field in register["required_fields"]:
             self.assertTrue(exemption.get(field), field)
-        self.assertEqual(exemption["disposition"], "PROOF_OF_CONCEPT_CI_CLASS_EVIDENCE_ONLY")
+        self.assertNotEqual(exemption["disposition"], "ALLOW")
         self.assertIs(exemption["exemption_grants_authority"], False)
+        self.assertIn("org-runtime/authentic_live_lane.py", exemption["surface"])
+        self.assertIn("no workflow", exemption["surface"])
         for justification in register["prohibited_justifications"]:
             self.assertNotIn(justification, json.dumps(exemption))
 
-    def test_the_llm_v1_provider_wait_holds_a_registered_exemption(self):
+    def test_the_llm_v1_provider_wait_is_gone_and_its_exemption_retired(self):
         register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
-        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-003"]
-        for field in register["required_fields"]:
-            self.assertTrue(exemption.get(field), field)
-        self.assertEqual(exemption["failed_predicate"], "NO_EXTERNAL_MACHINE_AWAITING_AS_TRANSITION_PREDICATE")
-        self.assertNotEqual(exemption["disposition"], "ALLOW")
-        self.assertIs(exemption["exemption_grants_authority"], False)
-        self.assertIn("SV-LLM-EXEMPTION-002", exemption["surface"])
-        for justification in register["prohibited_justifications"]:
-            self.assertNotIn(justification, json.dumps(exemption))
+        self.assertNotIn("SV-LLM-EXEMPTION-003", [e["exemption_id"] for e in register["exemptions"]])
 
 
 if __name__ == "__main__":
