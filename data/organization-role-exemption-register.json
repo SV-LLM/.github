@@ -57,6 +57,21 @@
       "next_attempt": "When a canonical runtime substrate admits the AT-04 lane manifest",
       "expires_or_review_on": "2026-11-12",
       "exemption_grants_authority": false
+    },
+    {
+      "exemption_id": "SV-LLM-EXEMPTION-003",
+      "surface": "SV-LLM/sandbox runtime/stegbrowser_tool.py (StegBrowserTool, profile llm.v1) executing the vendored StegBrowser runtime/vendor/stegbrowser_llm/llm_browser_execution.py steps wait_for and read_text, which hold the browser open for up to timeout_ms (default 60000) until the provider's page shows an answer. Its only runtime caller is live/run_live_llm.py, the lane held under SV-LLM-EXEMPTION-002. page_load.v1 (runtime/page_load_tool.py) no longer waits and is not exempt.",
+      "owning_existing_goal": "AT-04 Stage 1 live StegBrowser llm.v1 path (SV-LLM/sandbox)",
+      "failure_code": "PROVIDER_RESPONSE_AWAITED_WITHIN_ONE_LEASE",
+      "failed_predicate": "NO_EXTERNAL_MACHINE_AWAITING_AS_TRANSITION_PREDICATE",
+      "why_manifest_bound_state_transition_is_not_yet_possible": "The llm.v1 profile submits a prompt and reads the answer in one browser lease, so the attempt holds until the provider page renders a response. Making submission and read two manifest-bound transitions (submit recorded at once; the answer read by a later work-cycle pass, never awaited) changes the vendored StegBrowser llm.v1 profile, whose bytes are vendored byte-for-byte and owned upstream by StegVerse-Labs/StegBrowser.",
+      "disposition": "PROOF_OF_CONCEPT_CI_CLASS_EVIDENCE_ONLY",
+      "enforcement": "SV-LLM/sandbox tests/test_live_lanes.py::test_llm_v1_tool_has_one_runtime_caller_the_registered_lane and tests/test_conformance_proposal.py::test_sandbox_runtime_itself_neither_schedules_nor_waits; org-runtime/tests/test_reference_adoption_and_authentic_steps.py::AuthenticLaneIsARegisteredProofOfConcept::test_the_llm_v1_provider_wait_holds_a_registered_exemption.",
+      "required_evidence_or_repair": "Upstream StegVerse-Labs/StegBrowser splits llm.v1 into a submit transition and a separate read transition with no wait_for or timeout on the provider; SV-LLM/sandbox re-vendors those bytes, records the submission as its own SANDBOX_TOOL_OBSERVATION_RECORDED, and reads the answer on a later work-cycle pass; then this exemption is removed.",
+      "retry_entrypoint": "SV-LLM/sandbox runtime.stegbrowser_tool.StegBrowserTool.invoke after the re-vendor",
+      "next_attempt": "When StegVerse-Labs/StegBrowser publishes a non-waiting llm.v1 submit/read split",
+      "expires_or_review_on": "2026-11-12",
+      "exemption_grants_authority": false
     }
   ],
   "authority_effect": "NONE_REGISTER_ONLY"

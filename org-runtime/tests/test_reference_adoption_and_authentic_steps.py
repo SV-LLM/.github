@@ -235,6 +235,18 @@ class AuthenticLaneIsARegisteredProofOfConcept(unittest.TestCase):
         for justification in register["prohibited_justifications"]:
             self.assertNotIn(justification, json.dumps(exemption))
 
+    def test_the_llm_v1_provider_wait_holds_a_registered_exemption(self):
+        register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
+        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-003"]
+        for field in register["required_fields"]:
+            self.assertTrue(exemption.get(field), field)
+        self.assertEqual(exemption["failed_predicate"], "NO_EXTERNAL_MACHINE_AWAITING_AS_TRANSITION_PREDICATE")
+        self.assertNotEqual(exemption["disposition"], "ALLOW")
+        self.assertIs(exemption["exemption_grants_authority"], False)
+        self.assertIn("SV-LLM-EXEMPTION-002", exemption["surface"])
+        for justification in register["prohibited_justifications"]:
+            self.assertNotIn(justification, json.dumps(exemption))
+
 
 if __name__ == "__main__":
     unittest.main()
