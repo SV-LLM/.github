@@ -57,6 +57,21 @@
       "next_attempt": "When a canonical runtime substrate admits the AT-04 lane manifest",
       "expires_or_review_on": "2026-11-12",
       "exemption_grants_authority": false
+    },
+    {
+      "exemption_id": "SV-LLM-EXEMPTION-004",
+      "surface": "Runtime observation of SV-LLM organization transitions named by SV-LLM/.github#30: W4 (Sandbox runtime observation), W5 (TV/TVC-held invocation), W7 (Sandbox work-cycle delivery to provider entities) and W13 (the work cycle's conformance-proposal check invocation). This repository has no committed transition-request surface (.stegverse/transition-requests/) and no workflow that builds a committed request into a manifest, receives it on this organization's ingress and appends its organization receipt to the designated ledger ref (.stegverse/transition-ledger/org-contract.json organization_ledger_ref). No SV-LLM organization receipt for any of these transitions exists.",
+      "owning_existing_goal": "SVORG-LLM-ORG-FOUNDATION-001 (SV-LLM/.github#30 W4/W5/W7/W13; the federation-frame half of W4 is ORG-FED-SV-LLM-001)",
+      "failure_code": "NO_MANIFEST_DIRECTED_APPEND_PATH_FOR_RUNTIME_OBSERVATION",
+      "failed_predicate": "RUNTIME_REALITY_IS_AN_ORGANIZATION_RECEIPT_APPENDED_BY_MANIFEST_DIRECTED_APPEND",
+      "why_manifest_bound_state_transition_is_not_yet_possible": "The reference path (StegVerse-org/.github .github/workflows/organization-ledger-transition.yml) builds each committed request with the StegVerse-SDK manifest builder, installed from a separate checkout, and receives it through resident-runtime/organization_manifest_ingress.py. Neither exists in this repository, and adopting the SDK install would add a dependency, which is forbidden. org-runtime/crossing.py::record appends receipts only inside a run that is supplied both ledger locations; no committed manifest directs such a run here. The Sandbox work cycle's W7 delivery and W13 check (SV-LLM/sandbox#37) are source and CI evidence only.",
+      "disposition": "NO_RUNTIME_OBSERVATION_CLAIM_UNTIL_ORGANIZATION_RECEIPT_READ_BACK",
+      "enforcement": "org-runtime/tests/test_reference_adoption_and_authentic_steps.py::RuntimeObservationHoldsARegisteredExemption",
+      "required_evidence_or_repair": "A manifest-directed append path for this organization that adds no dependency (a committed request under .stegverse/transition-requests/, received on this organization's ingress, appended to refs/stegverse/organization-ledger and read back from a fresh fetch), then one committed request per W4/W5/W7/W13 transition; each workstream's SANDBOX_RUNTIME_OBSERVED class is claimed only from its read-back receipt. Until then these workstreams carry at most CI_VALIDATED.",
+      "retry_entrypoint": "SV-LLM/.github#30 (W4); StegVerse-org/.github#151",
+      "next_attempt": "When a dependency-free manifest-directed append path is adopted into this repository",
+      "expires_or_review_on": "2026-11-12",
+      "exemption_grants_authority": false
     }
   ],
   "authority_effect": "NONE_REGISTER_ONLY"

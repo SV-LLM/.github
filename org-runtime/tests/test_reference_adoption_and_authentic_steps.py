@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -210,6 +211,73 @@ class LiveLanesHaveNoExternalMachine(unittest.TestCase):
     def test_the_llm_v1_provider_wait_is_gone_and_its_exemption_retired(self):
         register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
         self.assertNotIn("SV-LLM-EXEMPTION-003", [e["exemption_id"] for e in register["exemptions"]])
+
+
+class NoBrowserEngineOrTestFramework(unittest.TestCase):
+    """SV-LLM/.github#30 W1/W2: no surface of this repository depends on a
+    browser engine or on pytest; every suite runs on the standard library."""
+
+    def tracked(self):
+        # This repository's own files only: CI checks other repositories out
+        # inside the workspace (stegverse-org-reference), and they are not ours.
+        listed = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"], check=True,
+                                capture_output=True).stdout.decode().split("\0")
+        return [ROOT / name for name in listed if name]
+
+    def surfaces(self):
+        this = Path(__file__).resolve()
+        for path in self.tracked():
+            if not path.is_file() or path.resolve() == this:
+                continue
+            try:
+                yield path, path.read_text()
+            except UnicodeDecodeError:
+                continue
+
+    def test_no_surface_names_a_browser_engine(self):
+        checked = 0
+        for path, text in self.surfaces():
+            checked += 1
+            for needle in ("playwright", "chromium"):
+                self.assertNotIn(needle, text.lower(), str(path.relative_to(ROOT)))
+        self.assertGreater(checked, 0)
+
+    def test_no_surface_imports_or_installs_pytest(self):
+        pattern = re.compile(r"^\s*(import pytest|from pytest\b)|pip install[^\n]*\bpytest\b|\bpytest\s+-", re.M)
+        for path, text in self.surfaces():
+            self.assertIsNone(pattern.search(text), str(path.relative_to(ROOT)))
+
+    def test_no_dependency_manifest_exists(self):
+        for name in ("requirements*.txt", "pyproject.toml", "setup.py", "setup.cfg", "Pipfile*",
+                     "package.json", "*.lock", "conftest.py", "pytest.ini", "tox.ini"):
+            found = [p for p in self.tracked() if p.match(name)]
+            self.assertEqual(found, [], name)
+
+
+class RuntimeObservationHoldsARegisteredExemption(unittest.TestCase):
+    """Runtime reality is an organization receipt appended by manifest-directed
+    append. This repository has no committed transition-request path to its
+    organization ledger, so W4/W5/W7/W13 runtime observation holds
+    SV-LLM-EXEMPTION-004 and is never claimed from source or CI."""
+
+    def test_without_a_transition_request_path_the_exemption_is_registered(self):
+        register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
+        has_path = (ROOT / ".stegverse/transition-requests").is_dir() and any(
+            "transition-requests" in p.read_text() for p in (ROOT / ".github/workflows").glob("*.y*ml"))
+        ids = [e["exemption_id"] for e in register["exemptions"]]
+        # The exemption is retired only by a path whose receipt is read back.
+        self.assertTrue(has_path or "SV-LLM-EXEMPTION-004" in ids)
+        if "SV-LLM-EXEMPTION-004" not in ids:
+            return
+        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-004"]
+        for field in register["required_fields"]:
+            self.assertTrue(exemption.get(field), field)
+        self.assertNotEqual(exemption["disposition"], "ALLOW")
+        self.assertIs(exemption["exemption_grants_authority"], False)
+        for justification in register["prohibited_justifications"]:
+            self.assertNotIn(justification, json.dumps(exemption))
+        for workstream in ("W4", "W5", "W7", "W13"):
+            self.assertIn(workstream, exemption["surface"])
 
 
 if __name__ == "__main__":
