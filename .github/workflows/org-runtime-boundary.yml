@@ -41,7 +41,7 @@ jobs:
       - name: Validate activation request generation
         run: |
           python org-runtime/runtime_boundary.py activation-request --runtime-id validation-resident | tee /tmp/activation.json
-          python -c 'import json; x=json.load(open("/tmp/activation.json")); assert x["state"]=="REQUESTED"; assert x["request_granted_authority"] is False; assert x["github_token_runtime_authority"]=="NONE"'
+          python -c 'import json; x=json.load(open("/tmp/activation.json")); assert x["state"]=="REQUESTED"; assert x["request_authority_constraint"]=="CONSTRAINT_VARIABLE"; assert x["time_constraint"]=="CONSTRAINT_VARIABLE"; assert x["disposition_role"]=="TRANSITION_EVIDENCE_ONLY"; assert x["github_token_runtime_authority"]=="NONE"'
       - name: Validate Interlock/InTr ingress generation
         run: |
           python org-runtime/runtime_boundary.py ingress --peer-org validation-peer --interlock-id validation-interlock --payload-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --transition-elements-ref validation-transition-elements | tee /tmp/ingress.json
