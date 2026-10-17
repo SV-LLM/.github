@@ -1,0 +1,250 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "canonical_manifest_json": "{\"attestation\":null,\"canonicalization_profile\":\"steggate.jcs.v1\",\"completion\":{\"direction\":\"SOUTH\",\"egress\":{\"far_side_transition_required\":true,\"final_stegverse_transition_surface\":\"BOUNDARY_DIAGNOSTIC\",\"transport\":\"INTERLOCK_INTR\"},\"initiator\":{\"class\":\"external_framework\",\"ref\":\"SV-LLM/.github\"}},\"context_refs\":[],\"created_at\":\"2026-10-17T00:00:00Z\",\"declared_intent\":\"Disclose this organization's adopted manifest-directed append path to its boundary diagnostic\",\"extensions\":{\"capability_resolution\":{\"authority_effect\":\"NONE_CLASSIFICATION_ONLY\",\"capability\":\"ecosystem_diagnostic\",\"next_action\":\"BUILD_AND_SUBMIT_MANIFEST\",\"route_id\":\"stegverse.route.ecosystem-diagnostic.v1\",\"schema\":\"stegverse.manifest-capability-resolution.v1\",\"solution_required\":false,\"status\":\"ONLINE\"},\"manifest_builder\":{\"builder_grants_authority\":false,\"capability_status\":\"ONLINE\",\"external_review_requested\":false,\"processing_capability\":\"ecosystem_diagnostic\",\"profile\":\"stegverse.manifest-builder.v1\",\"publisher_required_by_review_default\":false,\"publisher_selected_by_destination\":false,\"return_depth\":\"full-trace\",\"route_id\":\"stegverse.route.ecosystem-diagnostic.v1\",\"source_semantic_custody\":\"EXTERNAL\"},\"source_data_class\":\"sv.organization.reference-adoption-disclosure.v1\",\"stegverse_ecosystem_diagnostic_request\":{\"diagnostic_request_id\":\"SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001\",\"expected_evidence_fields\":[\"reference\",\"files\",\"contracts\"],\"mutation_permitted\":false,\"schema\":\"stegverse.ecosystem-diagnostic-request.v1\",\"scope\":\"repository\",\"tests\":[{\"authority_owner\":\"SV-LLM/.github\",\"component_id\":\"SV-LLM/.github:data/organization-role-reference-adoption.json\",\"observation\":null,\"predicate_id\":\"ADOPTED_FILES_MATCH_THE_RECORDED_REFERENCE_DIGESTS\",\"test_id\":\"MANIFEST_DIRECTED_APPEND_PATH_IS_ADOPTED\"}]},\"stegverse_route\":{\"containment\":\"READ_ONLY_DIAGNOSTIC\",\"external_consequence_enabled\":false,\"lane_class\":\"DIAGNOSTIC_OBSERVATION\",\"route_id\":\"stegverse.route.ecosystem-diagnostic.v1\",\"routing_surface\":\"ECOSYSTEM_DIAGNOSTIC\",\"sandbox_required\":false}},\"freshness\":{},\"hashes\":{\"payload_sha256\":\"5abc145054a1cafa90191136e9edf6981ff86f85023699d6fa45124606c220e4\"},\"manifest_labels\":{\"mode\":\"NONE\"},\"manifest_profile\":\"stegverse.ingress-manifest.v1\",\"manifest_profile_version\":\"1\",\"payload\":{\"adoption_record\":\"data/organization-role-reference-adoption.json\",\"external_side_effect\":false,\"purpose\":\"manifest-directed organization ledger append path adopted from StegVerse-org/.github@10d141041fd0fa3b8bd696f6c6236bef199845b8 with StegVerse-SDK@74d9b473aa415b06a9d550c28b2779a691b4ba32: disclose the adoption record; admit nothing\",\"request_id\":\"SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001\"},\"processing\":{\"capability\":\"ecosystem_diagnostic\",\"route_id\":\"stegverse.route.ecosystem-diagnostic.v1\"},\"requested_consequence\":\"Record the received manifest on this organization's ledger; admit nothing\",\"return_projection\":{\"mode\":\"ALL\",\"transition_classes\":[]},\"source_framework\":\"SV-LLM/.github\",\"source_instance\":null,\"source_output_id\":\"SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001\"}",
+    "canonical_manifest_sha256": "bbd4ebaca0ec56a7325f804b51387b3008b1efaf09d3ce351d36011eec7cf957",
+    "crossing": {
+      "application_result": {
+        "echo": {
+          "declared_transition_surface": "BOUNDARY_DIAGNOSTIC",
+          "manifest": {
+            "attestation": null,
+            "canonicalization_profile": "steggate.jcs.v1",
+            "completion": {
+              "direction": "SOUTH",
+              "egress": {
+                "far_side_transition_required": true,
+                "final_stegverse_transition_surface": "BOUNDARY_DIAGNOSTIC",
+                "transport": "INTERLOCK_INTR"
+              },
+              "initiator": {
+                "class": "external_framework",
+                "ref": "SV-LLM/.github"
+              }
+            },
+            "context_refs": [],
+            "created_at": "2026-10-17T00:00:00Z",
+            "declared_intent": "Disclose this organization's adopted manifest-directed append path to its boundary diagnostic",
+            "extensions": {
+              "capability_resolution": {
+                "authority_effect": "NONE_CLASSIFICATION_ONLY",
+                "capability": "ecosystem_diagnostic",
+                "next_action": "BUILD_AND_SUBMIT_MANIFEST",
+                "route_id": "stegverse.route.ecosystem-diagnostic.v1",
+                "schema": "stegverse.manifest-capability-resolution.v1",
+                "solution_required": false,
+                "status": "ONLINE"
+              },
+              "manifest_builder": {
+                "builder_grants_authority": false,
+                "capability_status": "ONLINE",
+                "external_review_requested": false,
+                "processing_capability": "ecosystem_diagnostic",
+                "profile": "stegverse.manifest-builder.v1",
+                "publisher_required_by_review_default": false,
+                "publisher_selected_by_destination": false,
+                "return_depth": "full-trace",
+                "route_id": "stegverse.route.ecosystem-diagnostic.v1",
+                "source_semantic_custody": "EXTERNAL"
+              },
+              "source_data_class": "sv.organization.reference-adoption-disclosure.v1",
+              "stegverse_ecosystem_diagnostic_request": {
+                "diagnostic_request_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001",
+                "expected_evidence_fields": [
+                  "reference",
+                  "files",
+                  "contracts"
+                ],
+                "mutation_permitted": false,
+                "schema": "stegverse.ecosystem-diagnostic-request.v1",
+                "scope": "repository",
+                "tests": [
+                  {
+                    "authority_owner": "SV-LLM/.github",
+                    "component_id": "SV-LLM/.github:data/organization-role-reference-adoption.json",
+                    "observation": null,
+                    "predicate_id": "ADOPTED_FILES_MATCH_THE_RECORDED_REFERENCE_DIGESTS",
+                    "test_id": "MANIFEST_DIRECTED_APPEND_PATH_IS_ADOPTED"
+                  }
+                ]
+              },
+              "stegverse_route": {
+                "containment": "READ_ONLY_DIAGNOSTIC",
+                "external_consequence_enabled": false,
+                "lane_class": "DIAGNOSTIC_OBSERVATION",
+                "route_id": "stegverse.route.ecosystem-diagnostic.v1",
+                "routing_surface": "ECOSYSTEM_DIAGNOSTIC",
+                "sandbox_required": false
+              }
+            },
+            "freshness": {},
+            "hashes": {
+              "payload_sha256": "5abc145054a1cafa90191136e9edf6981ff86f85023699d6fa45124606c220e4"
+            },
+            "manifest_labels": {
+              "mode": "NONE"
+            },
+            "manifest_profile": "stegverse.ingress-manifest.v1",
+            "manifest_profile_version": "1",
+            "payload": {
+              "adoption_record": "data/organization-role-reference-adoption.json",
+              "external_side_effect": false,
+              "purpose": "manifest-directed organization ledger append path adopted from StegVerse-org/.github@10d141041fd0fa3b8bd696f6c6236bef199845b8 with StegVerse-SDK@74d9b473aa415b06a9d550c28b2779a691b4ba32: disclose the adoption record; admit nothing",
+              "request_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001"
+            },
+            "processing": {
+              "capability": "ecosystem_diagnostic",
+              "route_id": "stegverse.route.ecosystem-diagnostic.v1"
+            },
+            "requested_consequence": "Record the received manifest on this organization's ledger; admit nothing",
+            "return_projection": {
+              "mode": "ALL",
+              "transition_classes": []
+            },
+            "source_framework": "SV-LLM/.github",
+            "source_instance": null,
+            "source_output_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001"
+          },
+          "manifest_sha256": "sha256:48e748bd9de99cabeb12e4711bdd1ccb4af61828a00a8c36b5e886055ac21a03",
+          "schema": "stegverse.sdk-manifest-crossing-payload/v1"
+        }
+      },
+      "authority_effect": "NONE",
+      "boundary_receipts": [
+        {
+          "evidence_hash": "09d7dd5f7b73a51dec76155658b2501cc85d37882d084fa291cd20317a925475",
+          "kind": "INGRESS_ACCEPTED",
+          "previous_receipt_id": null,
+          "receipt_id": "ingress_accepted-09d7dd5f7b73a51dec761556",
+          "subject": "sv-llm.boundary-diagnostic"
+        },
+        {
+          "evidence_hash": "d4faf8357ad49be8223cc1d45ac9e83c57591d555cdd430e87a816687df0e56a",
+          "kind": "DISPATCHED",
+          "previous_receipt_id": "ingress_accepted-09d7dd5f7b73a51dec761556",
+          "receipt_id": "dispatched-d4faf8357ad49be8223cc1d4",
+          "subject": "sv-llm.boundary-diagnostic"
+        },
+        {
+          "evidence_hash": "676d6328c4564b3695b04548d343e214e13406a9f0d3bd953ed5090b32add91d",
+          "kind": "CONSUMED",
+          "previous_receipt_id": "dispatched-d4faf8357ad49be8223cc1d4",
+          "receipt_id": "consumed-676d6328c4564b3695b04548",
+          "subject": "sv-llm.boundary-diagnostic"
+        },
+        {
+          "evidence_hash": "0cded9e6b26e295c9d24b0035390f455fd1a48b9bbf210a634389a04c6aac1de",
+          "kind": "RESULT_BOUND",
+          "previous_receipt_id": "consumed-676d6328c4564b3695b04548",
+          "receipt_id": "result_bound-0cded9e6b26e295c9d24b003",
+          "subject": "sv-llm.boundary-diagnostic"
+        },
+        {
+          "evidence_hash": "4428a96290b22d5a53da078c1bd93068ffe340fca61950b647add681e93800bf",
+          "kind": "EGRESS_EMITTED",
+          "previous_receipt_id": "result_bound-0cded9e6b26e295c9d24b003",
+          "receipt_id": "egress_emitted-4428a96290b22d5a53da078c",
+          "subject": "sv-llm.boundary-diagnostic"
+        }
+      ],
+      "consumed": true,
+      "crossing_completed": true,
+      "declared_capability": "ecosystem_diagnostic",
+      "declared_capability_processed": false,
+      "declared_route_id": "stegverse.route.ecosystem-diagnostic.v1",
+      "declared_transition_surface": "BOUNDARY_DIAGNOSTIC",
+      "egress_packet_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001:egress",
+      "ingress_packet_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001",
+      "manifest_sha256": "sha256:48e748bd9de99cabeb12e4711bdd1ccb4af61828a00a8c36b5e886055ac21a03",
+      "payload_hash": "2b83a373529d7dc840ea99dda5e1830a3e6942d6bba11c6d385d9eafde8e0597",
+      "processing_selection": "BOUNDARY_LOCAL_NO_PROCESSOR_SELECTED",
+      "receipts": [
+        "INGRESS_ACCEPTED",
+        "DISPATCHED",
+        "CONSUMED",
+        "RESULT_BOUND",
+        "EGRESS_EMITTED"
+      ],
+      "reconstruction": "RECONSTRUCTED",
+      "resolved_service_id": "sv-llm.boundary-diagnostic",
+      "route_admissibility": "NOT_RESOLVED_AT_BOUNDARY_ROUTE_OWNER_IS_SDK",
+      "schema": "stegverse.sdk-manifest-crossing-result/v1",
+      "terminal_receipt_id": "egress_emitted-4428a96290b22d5a53da078c"
+    },
+    "destination_resolution_source": "CANONICAL_CONNECTOR_CAPABILITY_OVERLAY",
+    "graph_id": "RTC-GOVERNED-PROCESSING-002:ECOSYSTEM_DIAGNOSTIC",
+    "operation": "SUBMIT_MANIFEST",
+    "processing_capability": "ecosystem_diagnostic",
+    "profile_id": "sdk-manifest-ingress",
+    "profile_name": "SDK:ManifestIngress",
+    "receiving_operation": "ORGANIZATION_SDK_MANIFEST_INGRESS",
+    "request_sha256": "d4f4a34b44c0aead3849245c0d174fff869986940f0b5b4ed4976fa099c0a644",
+    "route_id": "stegverse.route.ecosystem-diagnostic.v1",
+    "transition_closures": [
+      {
+        "receipt_sha256": "09d7dd5f7b73a51dec76155658b2501cc85d37882d084fa291cd20317a925475",
+        "reconstructed_receipt_sha256": "09d7dd5f7b73a51dec76155658b2501cc85d37882d084fa291cd20317a925475",
+        "reconstruction_status": "PASS",
+        "required_evidence_validation_status": "PASS",
+        "state": "RECORDED",
+        "transition_id": "INGRESS_ACCEPTED"
+      },
+      {
+        "predecessor_receipt_sha256": "09d7dd5f7b73a51dec76155658b2501cc85d37882d084fa291cd20317a925475",
+        "receipt_sha256": "d4faf8357ad49be8223cc1d45ac9e83c57591d555cdd430e87a816687df0e56a",
+        "reconstructed_receipt_sha256": "d4faf8357ad49be8223cc1d45ac9e83c57591d555cdd430e87a816687df0e56a",
+        "reconstruction_status": "PASS",
+        "required_evidence_validation_status": "PASS",
+        "state": "RECORDED",
+        "transition_id": "DISPATCHED"
+      },
+      {
+        "predecessor_receipt_sha256": "d4faf8357ad49be8223cc1d45ac9e83c57591d555cdd430e87a816687df0e56a",
+        "receipt_sha256": "676d6328c4564b3695b04548d343e214e13406a9f0d3bd953ed5090b32add91d",
+        "reconstructed_receipt_sha256": "676d6328c4564b3695b04548d343e214e13406a9f0d3bd953ed5090b32add91d",
+        "reconstruction_status": "PASS",
+        "required_evidence_validation_status": "PASS",
+        "state": "RECORDED",
+        "transition_id": "CONSUMED"
+      },
+      {
+        "predecessor_receipt_sha256": "676d6328c4564b3695b04548d343e214e13406a9f0d3bd953ed5090b32add91d",
+        "receipt_sha256": "0cded9e6b26e295c9d24b0035390f455fd1a48b9bbf210a634389a04c6aac1de",
+        "reconstructed_receipt_sha256": "0cded9e6b26e295c9d24b0035390f455fd1a48b9bbf210a634389a04c6aac1de",
+        "reconstruction_status": "PASS",
+        "required_evidence_validation_status": "PASS",
+        "state": "RECORDED",
+        "transition_id": "RESULT_BOUND"
+      },
+      {
+        "predecessor_receipt_sha256": "0cded9e6b26e295c9d24b0035390f455fd1a48b9bbf210a634389a04c6aac1de",
+        "receipt_sha256": "4428a96290b22d5a53da078c1bd93068ffe340fca61950b647add681e93800bf",
+        "reconstructed_receipt_sha256": "4428a96290b22d5a53da078c1bd93068ffe340fca61950b647add681e93800bf",
+        "reconstruction_status": "PASS",
+        "required_evidence_validation_status": "PASS",
+        "state": "RECORDED",
+        "transition_id": "EGRESS_EMITTED"
+      }
+    ],
+    "wire_manifest_sha256": "48e748bd9de99cabeb12e4711bdd1ccb4af61828a00a8c36b5e886055ac21a03"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": true,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 8583040,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "sampled_unix_ns": 1792247156538583040
+  },
+  "predecessor_state_sha256": "sha256:bbd4ebaca0ec56a7325f804b51387b3008b1efaf09d3ce351d36011eec7cf957",
+  "previous_receipt_sha256": "sha256:f4d9ed2581f692fee5d09dd5491888d02f84515689e4d158b59e8323710388f0",
+  "receipt_sha256": "sha256:ef9fc33f473f11ca4c8f88fd733c340379982028fbfcf5ec20b1cd53faf0af67",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:4428a96290b22d5a53da078c1bd93068ffe340fca61950b647add681e93800bf",
+  "transition_class": "ORGANIZATION_SDK_MANIFEST_INGRESS",
+  "transition_id": "ORGANIZATION-SDK-MANIFEST-INGRESS-d4f4a34b44c0aead"
+}
