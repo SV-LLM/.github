@@ -20,6 +20,10 @@ on:
         description: 'communication_id the closure correlates on'
         required: true
         type: string
+      hb_epoch:
+        description: 'supplied heartbeat epoch the receipts carry (non-negative integer); no clock is read for it'
+        required: true
+        type: string
       packet_id:
         description: 'packet id; the run id is used when this is empty'
         required: false
@@ -41,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LEDGER_REF: refs/stegverse/organization-ledger
+      HB_EPOCH: ${{ github.event.inputs.hb_epoch }}
     steps:
       - name: Checkout organization boundary
         uses: actions/checkout@v4
@@ -96,8 +101,15 @@ jobs:
           if [ -z "$packet_id" ]; then
             packet_id="intr-destination-self-closure-${GITHUB_RUN_ID}"
           fi
+          # Time is supplied with the dispatch. It is not sampled from a clock.
+          case "$HB_EPOCH" in
+            ''|*[!0-9]*)
+              echo '{"disposition":"FAIL_CLOSED","failure_code":"DISPATCH_HB_EPOCH_INVALID","failed_predicate":"HB_EPOCH_IS_SUPPLIED_AS_A_NON_NEGATIVE_INTEGER","retry_entrypoint":".github/workflows/organization-ledger-transition.yml","consequence_committed":false}'
+              exit 1 ;;
+          esac
           python resident-runtime/intr_destination_ingress.py \
             --self-close \
+            --hb-epoch "$HB_EPOCH" \
             --registry org-boundary/registry/services.json \
             --communication-id "$INPUT_COMMUNICATION_ID" \
             --packet-id "$packet_id" \
