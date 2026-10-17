@@ -1,0 +1,43 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "admission_authority_constraint": "CONSTRAINT_VARIABLE",
+    "authority_effect": "NONE_DIAGNOSTIC_ACK_ONLY",
+    "communication_id": "intr-selfclose-SV-LLM-20261017",
+    "disposition": "ALLOW",
+    "disposition_role": "TRANSITION_EVIDENCE_ONLY",
+    "execution_authority_constraint": "CONSTRAINT_VARIABLE",
+    "operation": "DIAGNOSTIC_CROSSING",
+    "owner_repository": "SV-LLM/.github",
+    "packet_id": "intr-destination-self-closure-38996787068",
+    "payload_schema": "stegverse.org-intr-destination-diagnostic/v1",
+    "payload_sha256": "sha256:4e29da3c6c4116c64c91abadb8d3d713a5e146f466163953b25267ebc455e5a5",
+    "profile_id": "intr-destination",
+    "profile_name": "InTr:Destination",
+    "purpose_specific_route": false,
+    "receiving_operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "routing_authority_constraint": "CONSTRAINT_VARIABLE",
+    "selects_processing": false,
+    "standing_rechecked_here": false,
+    "time_constraint": "CONSTRAINT_VARIABLE"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": true,
+    "epoch": 469412632,
+    "frequency_hz": 100,
+    "generation": 469412632,
+    "heartbeat_id": "HB:469412632",
+    "phase_offset_ns": 2157824,
+    "progression_dependency": "OSCILLATOR_ONLY",
+    "sampled_unix_ns": 1792205726002157824
+  },
+  "predecessor_state_sha256": "sha256:4e29da3c6c4116c64c91abadb8d3d713a5e146f466163953b25267ebc455e5a5",
+  "previous_receipt_sha256": "sha256:7b3f5746f9c158b804bfdda7003430510417a19829864612d12eb81f3b6f11da",
+  "receipt_sha256": "sha256:f4d9ed2581f692fee5d09dd5491888d02f84515689e4d158b59e8323710388f0",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:ad6272bc9ac450e4463cdc1b4150563a0a09bb652155fe0a5ada14c59759436d",
+  "transition_class": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+  "transition_id": "ORGANIZATION_INTR_DESTINATION_INGRESS:intr-destination-self-closure-38996787068"
+}
