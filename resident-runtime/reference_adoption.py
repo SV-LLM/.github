@@ -10,8 +10,19 @@ frozen reference commit and the digest of every adopted surface:
                      block inserted at a recorded offset (the temporary
                      SV_LLM_LEGACY_RECEIPT_CHAIN wrapper); removing it yields
                      the reference byte for byte
+  declared_substitutions
+                     the file is the reference file with each declared
+                     (reference -> local) substitution applied exactly the
+                     recorded number of times; reversing them yields the
+                     reference byte for byte, and the local file's own digest
+                     is recorded too
   contract           the JSON contract equals the reference apart from the
                      organization- or repository-specific keys named
+
+`adapted` entries name a reference file this repository adapted rather than
+duplicated (a workflow). Only its reference digest is recorded and checked
+against the reference checkout; the adaptation itself is described in the
+entry and is not claimed to be byte-identical.
 
 `verify` runs offline against the recorded digests. `verify --reference-root`
 additionally proves the recorded digests equal a checkout of the reference
@@ -43,6 +54,15 @@ def contract_digest(document: dict, excluded: list[str]) -> str:
 def adopted_reference_bytes(path: str, data: bytes, entry: dict) -> tuple[bytes, list[str]]:
     """The reference bytes this adopted file claims to be, and any mismatch found on the way."""
     problems = []
+    if "substitutions" in entry:
+        if digest(data) != entry.get("local_sha256"):
+            problems.append(path + ": local bytes are not the recorded adaptation")
+        text = data.decode("utf-8")
+        for substitution in entry["substitutions"]:
+            if text.count(substitution["local"]) != substitution["count"]:
+                problems.append(path + ": declared substitution missing or changed")
+            text = text.replace(substitution["local"], substitution["reference"])
+        return text.encode("utf-8"), problems
     if "insertion_offset" not in entry:
         return data, problems
     start, length = entry["insertion_offset"], entry["insertion_bytes"]
@@ -64,6 +84,11 @@ def verify(root: Path = ROOT, record: dict | None = None, reference_root: Path |
         problems += found
         if digest(reference_bytes) != entry["reference_sha256"]:
             problems.append(path + ": differs from the reference")
+        if reference_root is not None and digest((reference_root / path).read_bytes()) != entry["reference_sha256"]:
+            problems.append(path + ": recorded digest is not the reference commit's")
+    for path, entry in record.get("adapted", {}).items():
+        if not (root / path).is_file():
+            problems.append(path + ": missing")
         if reference_root is not None and digest((reference_root / path).read_bytes()) != entry["reference_sha256"]:
             problems.append(path + ": recorded digest is not the reference commit's")
     for path, entry in record["contracts"].items():

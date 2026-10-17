@@ -2,7 +2,7 @@
   "schema": "sv-llm.organization-role-reference-adoption/v1",
   "reference": {
     "repository": "StegVerse-org/.github",
-    "commit": "2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c"
+    "commit": "10d141041fd0fa3b8bd696f6c6236bef199845b8"
   },
   "adopted_by": "SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001",
   "files": {
@@ -16,7 +16,7 @@
     },
     "resident-runtime/organization_ledger_readback.py": {
       "rule": "byte_identical",
-      "reference_sha256": "sha256:a281d7cb1e7d484dc89b302a70930deac6ddc7803a2b774e9408f34f4a6f4ad9"
+      "reference_sha256": "sha256:fcb83f144291747d18cb91ec2eaeb7b028be7e04c3ede270bc89f972ad22c903"
     },
     "resident-runtime/aggregate_repo_transition.py": {
       "rule": "declared_insertion",
@@ -25,6 +25,55 @@
       "insertion_offset": 16759,
       "insertion_bytes": 2402,
       "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c"
+    },
+    "resident-runtime/sdk_manifest_crossing.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:c5398ab5538e4ed3f6b82bd02eb26a248681c830a8c8a4bf81833f092b094ccd"
+    },
+    "org-boundary/runtime/process_boundary.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:9feac39845071b8d20464122cd09238dda2b802d99309e73ccd1ef6835092197"
+    },
+    "org-boundary/runtime/intr_transport.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:849cf33f07cc910b662e56582f0735825f1f778d5df0da07345aad1198a35700"
+    },
+    "resident-runtime/manifest_directed_run_inputs.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:5c646d625e05aacb7aeb0f2b032f7bd8660ee8c21e5da9df33d45efec69b8064"
+    },
+    "org-boundary/runtime/capability_ingress.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:731dab382f43ff3321f6e039cee1be338099345bf4b0e8fec89e7de1a72bca44"
+    },
+    "org-boundary/runtime/node_standing.py": {
+      "rule": "byte_identical",
+      "reference_sha256": "sha256:a24b7d2cc546fa57e4467e55d075e717249e20c2624b4299b36dca08f307ac8e"
+    },
+    "resident-runtime/organization_manifest_ingress.py": {
+      "rule": "declared_substitutions",
+      "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
+      "local_sha256": "sha256:33542bfacf802e80fa2fdd2ffb5310e108d5fada207e947a6053b061c10cafbc",
+      "substitutions": [
+        {
+          "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
+          "local": "# SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n# the organization identity is read from this organization's own boundary\n# document instead of being written into the reference logic.\nOWNER_REPOSITORY = json.loads(BOUNDARY.read_text(encoding=\"utf-8\"))[\"owner_repository\"]\nORGANIZATION = json.loads(BOUNDARY.read_text(encoding=\"utf-8\"))[\"organization\"]",
+          "count": 1,
+          "why": "the reference names its own repository; SV-LLM reads owner_repository and organization from org-runtime/interlock-intr.json, which the SDK's resolve_organization_ingress already requires to agree (owner_repository == organization + '/.github')"
+        },
+        {
+          "reference": ": \"StegVerse-org\",",
+          "local": ": ORGANIZATION,",
+          "count": 5,
+          "why": "the five result and payload fields that name the receiving organization"
+        },
+        {
+          "reference": "boundary()[\"egress\"][\"capability_destination_bindings\"]",
+          "local": "(boundary()[\"egress\"].get(\"capability_destination_bindings\") or [])",
+          "count": 1,
+          "why": "SV-LLM declares no outbound destination binding (tests/test_intr_destination_capability.py); without one the reference raised KeyError after the refusal was recorded, so a NON-ALLOW now stays the six-field receipt with disposition_delivery NON_ALLOW_DISPOSITION_BINDING_ABSENT, the reference's own outcome for an absent binding"
+        }
+      ]
     }
   },
   "contracts": {
@@ -44,6 +93,40 @@
         "repository_ledger_location"
       ],
       "reference_sha256": "sha256:59900260090513fba1bf3f486128358c7a8299eb72cccf18602858411f10921d"
+    }
+  },
+  "previous_reference": {
+    "commit": "2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c",
+    "moved_by": "SVORG-LLM-ORG-FOUNDATION-001-W04-CANONICAL-RUNTIME-SUBSTRATE (SV-LLM/.github#30 W4)",
+    "changed_between": [
+      "resident-runtime/organization_ledger_readback.py"
+    ]
+  },
+  "sdk": {
+    "repository": "StegVerse-org/StegVerse-SDK",
+    "commit": "74d9b473aa415b06a9d550c28b2779a691b4ba32",
+    "pinned_by": "StegVerse-org/.github#179 (StegVerse-SDK#530, after #520 removed requests)",
+    "import_path": "PYTHONPATH=<checkout> (not installed; see adapted .github/workflows/organization-ledger-transition.yml)"
+  },
+  "adapted": {
+    ".github/workflows/organization-ledger-transition.yml": {
+      "rule": "adapted_not_byte_identical",
+      "reference_sha256": "sha256:93bf9f379133e633f735ea84b40c7f813bd65a8b9b031d0119828e46a2fc7086",
+      "kept": [
+        "committed-request selection and dispatch guards",
+        "manifest_directed_run_inputs.committed_manifest build",
+        "--recorded-for answer from the ledger",
+        "organization_manifest_ingress receive",
+        "fast-forward-only publish",
+        "fresh-fetch readback with organization_ledger_readback",
+        "self-closure mode"
+      ],
+      "deviations": [
+        "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
+        "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
+        "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
+        "identity checks name SV-LLM/.github"
+      ]
     }
   }
 }

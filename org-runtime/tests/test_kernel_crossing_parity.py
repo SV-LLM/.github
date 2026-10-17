@@ -135,7 +135,14 @@ class ProcessingSelection(unittest.TestCase):
         services = json.loads((REPO / "org-boundary/registry/services.json").read_text())["services"]
         self.assertTrue(all(s["boundary_role"].startswith("BOUNDARY_LOCAL_") for s in services))
         self.assertTrue(all("admits_processing" not in s for s in services))
-        self.assertFalse((REPO / "org-boundary/runtime/process_boundary.py").exists())
+        # process_boundary.py is the StegVerse-org reference processor adopted
+        # byte-identical for the SDK manifest crossing
+        # (data/organization-role-reference-adoption.json). Only that crossing
+        # runs it; the kernel's dispatch does not.
+        adopted = json.loads((REPO / "data/organization-role-reference-adoption.json").read_text())["files"]
+        self.assertEqual(adopted["org-boundary/runtime/process_boundary.py"]["rule"], "byte_identical")
+        self.assertNotIn("process_boundary", (REPO / "org-kernel/kernel.py").read_text())
+        self.assertNotIn("process_boundary", (REPO / "org-runtime/crossing.py").read_text())
 
 
 class DispatchSelects(SVLLMNode):
@@ -514,8 +521,12 @@ class IngressMaterializesInNodeState(unittest.TestCase):
         self.assertEqual(refused.exception.failed_predicate, "MATERIALIZATION_WRITE_ONCE_COLLISION")
         self.assertFalse((REPO / "resident-runtime/materialized").exists())
 
-    def test_the_unreferenced_transport_is_gone(self):
-        self.assertFalse((REPO / "org-boundary/runtime/intr_transport.py").exists())
+    def test_the_transport_is_only_the_adopted_crossings(self):
+        # intr_transport.py returned as the StegVerse-org reference file, adopted
+        # byte-identical with the SDK manifest crossing that uses it. Nothing
+        # else in SV-LLM's own trees references it.
+        adopted = json.loads((REPO / "data/organization-role-reference-adoption.json").read_text())["files"]
+        self.assertEqual(adopted["org-boundary/runtime/intr_transport.py"]["rule"], "byte_identical")
         here = Path(__file__).resolve()
         # SV-LLM's own trees only: CI checks out the StegVerse-org reference
         # beside them, and that organization's files are not SV-LLM's references.
@@ -523,7 +534,9 @@ class IngressMaterializesInNodeState(unittest.TestCase):
         referencing = [str(p.relative_to(REPO)) for top in own for pattern in ("*.py", "*.json", "*.yml")
                        for p in (REPO / top).rglob(pattern)
                        if p.resolve() != here and "intr_transport" in p.read_text(errors="ignore")]
-        self.assertEqual(referencing, [])
+        self.assertEqual(sorted(referencing), ["data/organization-role-reference-adoption.json",
+                                               "org-runtime/tests/test_reference_adoption_and_authentic_steps.py",
+                                               "resident-runtime/sdk_manifest_crossing.py"])
 
 
 if __name__ == "__main__":
