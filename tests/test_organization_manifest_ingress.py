@@ -605,6 +605,21 @@ class EndToEndDryRun(unittest.TestCase):
 
 
 class ExemptionStaysUntilAReceiptIsReadBack(unittest.TestCase):
+    W04_RECEIPT = "sha256:fb84dadd9fa85ac2bce4f503a3b05bd9b5bb293684579001d3f52700587a1760"
+
+    def test_only_the_read_back_path_portion_is_retired(self):
+        # The W04 request disclosed the path to the boundary diagnostic with no
+        # Sandbox activation, so its receipt retires the missing-path claim and
+        # nothing else.
+        register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
+        exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-004"]
+        self.assertNotEqual(exemption["failure_code"], "NO_MANIFEST_DIRECTED_APPEND_PATH_FOR_RUNTIME_OBSERVATION")
+        self.assertIn(self.W04_RECEIPT, exemption["surface"])
+        self.assertIn(self.W04_RECEIPT, exemption["required_evidence_or_repair"])
+        self.assertIn("no provider execution or Sandbox activation", json.loads((ROOT / REQUEST).read_text())["purpose"])
+        for workstream in ("W4's Sandbox", "W5", "W7", "W13"):
+            self.assertIn(workstream, exemption["surface"])
+
     def test_exemption_004_names_the_new_path_and_retry(self):
         register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
         exemption, = [e for e in register["exemptions"] if e["exemption_id"] == "SV-LLM-EXEMPTION-004"]

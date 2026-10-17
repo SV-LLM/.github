@@ -292,9 +292,9 @@ class NoBrowserEngineOrTestFramework(unittest.TestCase):
 
 class RuntimeObservationHoldsARegisteredExemption(unittest.TestCase):
     """Runtime reality is an organization receipt appended by manifest-directed
-    append. This repository has no committed transition-request path to its
-    organization ledger, so W4/W5/W7/W13 runtime observation holds
-    SV-LLM-EXEMPTION-004 and is never claimed from source or CI."""
+    append. The append path has one read-back receipt (W04); W4's Sandbox
+    observation and W5/W7/W13 have none, so they hold SV-LLM-EXEMPTION-004 and
+    are never claimed from source or CI."""
 
     def test_without_a_transition_request_path_the_exemption_is_registered(self):
         register = json.loads((ROOT / "data/organization-role-exemption-register.json").read_text())
