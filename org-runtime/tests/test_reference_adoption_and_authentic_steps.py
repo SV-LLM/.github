@@ -53,7 +53,18 @@ class ReferenceAdoption(unittest.TestCase):
         record = json.loads(adoption.RECORD.read_text())
         self.assertEqual(set(record["files"]), {"resident-runtime/ledger_store.py", ".stegverse/transition-ledger/emit.py",
                                                 "resident-runtime/aggregate_repo_transition.py",
-                                                "resident-runtime/organization_ledger_readback.py"})
+                                                "resident-runtime/organization_ledger_readback.py",
+                                                # SV-LLM/.github#30 W4: the manifest-directed append path.
+                                                "resident-runtime/organization_manifest_ingress.py",
+                                                "resident-runtime/sdk_manifest_crossing.py",
+                                                "resident-runtime/manifest_directed_run_inputs.py",
+                                                "org-boundary/runtime/process_boundary.py",
+                                                "org-boundary/runtime/intr_transport.py",
+                                                "org-boundary/runtime/capability_ingress.py",
+                                                "org-boundary/runtime/node_standing.py"})
+        self.assertEqual(set(record["adapted"]), {".github/workflows/organization-ledger-transition.yml"})
+        rules = {entry["rule"] for entry in record["files"].values()}
+        self.assertEqual(rules, {"byte_identical", "declared_insertion", "declared_substitutions"})
         self.assertEqual(set(record["contracts"]), {".stegverse/transition-ledger/org-contract.json",
                                                     ".stegverse/transition-ledger/contract.json"})
 
@@ -80,6 +91,31 @@ class ReferenceAdoption(unittest.TestCase):
         path.write_text(path.read_text().replace('STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"',
                                                  'STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIX"'))
         self.assertMismatch(root, "declared insertion missing or changed")
+
+    def test_a_changed_byte_outside_a_declared_substitution_is_a_mismatch(self):
+        root = self.copy()
+        path = root / "resident-runtime/organization_manifest_ingress.py"
+        path.write_text(path.read_text().replace('ORGANIZATION_REPLAY = "PASS"', 'ORGANIZATION_REPLAY = "FAIL"'))
+        self.assertMismatch(root, "organization_manifest_ingress.py: local bytes are not the recorded adaptation")
+        self.assertMismatch(root, "organization_manifest_ingress.py: differs from the reference")
+
+    def test_an_undeclared_identity_substitution_is_a_mismatch(self):
+        # One more occurrence of the declared local text is not the recorded count.
+        root = self.copy()
+        path = root / "resident-runtime/organization_manifest_ingress.py"
+        path.write_text(path.read_text().replace('"origin_organization": ORGANIZATION,',
+                                                 '"origin_organization": ORGANIZATION, "x": ORGANIZATION,'))
+        self.assertMismatch(root, "declared substitution missing or changed")
+
+    def test_the_substitutions_reverse_to_the_reference_bytes(self):
+        record = json.loads(adoption.RECORD.read_text())
+        entry = record["files"]["resident-runtime/organization_manifest_ingress.py"]
+        data = (ROOT / "resident-runtime/organization_manifest_ingress.py").read_bytes()
+        reference, problems = adoption.adopted_reference_bytes("ingress", data, entry)
+        self.assertEqual(problems, [])
+        self.assertEqual(adoption.digest(reference), entry["reference_sha256"])
+        self.assertIn(b'OWNER_REPOSITORY = "StegVerse-org/.github"', reference)
+        self.assertNotIn(b"StegVerse-org", data)
 
     def test_contracts_may_differ_only_in_their_own_name(self):
         root = self.copy()

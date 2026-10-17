@@ -33,6 +33,20 @@ INGRESS  frame addressed to SV-LLM
 
 Every disposition, refusals included, is appended to the repository ledger and then the organization ledger. No frame means nothing crossed, so nothing is recorded. SV-LLM repositories are destinations because they exist; none declares an endpoint profile.
 
+## Manifest-directed append — `resident-runtime/organization_manifest_ingress.py` (SV-LLM/.github#30 W4)
+
+```text
+.stegverse/transition-requests/<id>.json   committed request (push to main, or dispatch mode=request)
+  -> StegVerse-SDK@74d9b473 build_manifest   (checked out, on PYTHONPATH; nothing installed)
+  -> organization_manifest_ingress.receive   sdk-manifest-ingress / SUBMIT_MANIFEST (org-runtime/interlock-intr.json)
+       -> sdk_manifest_crossing.cross -> org-boundary/runtime/process_boundary.py
+       -> emit.py::append (repository receipt) -> aggregate_repo_transition.py::append (organization receipt)
+  -> fast-forward push of refs/stegverse/organization-ledger
+  -> organization_ledger_readback.py on a fresh fetch
+```
+
+Adopted from StegVerse-org/.github@10d14104; `data/organization-role-reference-adoption.json` records each file's digest and the declared substitutions (organization identity read from `org-runtime/interlock-intr.json`; an absent outbound destination binding read as none). The writer is `.github/workflows/organization-ledger-transition.yml`; it has no mesh lane, so a request declaring `mesh_root` is refused before it is received. The first committed request is W4's own: `.stegverse/transition-requests/SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001.json`. Tested by `tests/test_organization_manifest_ingress.py` (temporary ledgers only). SV-LLM-EXEMPTION-004 stays until that request's receipt is read back from this organization's ledger ref.
+
 ## Federation directory — updatable projection
 
 `org-boundary/registry/federation.json` is a projection of the single canonical directory at `StegVerse-Labs/.github/org-boundary/registry/federation.json`. It carries the canonical entries unchanged plus `projection` provenance (source commit, source and entries digests). It is read locally, so no crossing waits on a remote directory. Local additions are prohibited; an organization is added in the canonical directory and every organization re-projects:

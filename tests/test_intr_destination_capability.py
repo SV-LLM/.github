@@ -127,9 +127,11 @@ class DeclarationTests(unittest.TestCase):
         proven = BOUNDARY["egress"]["peer_capability_resolution"]["proven_on_this_organization"]
         served = {entry["receiving_operation"]["addressed_service"]
                   for entry in BOUNDARY["ingress"]["capability_endpoint_bindings"]}
-        self.assertEqual(served, {ADDRESS})
-        self.assertEqual(proven, ADDRESS)
-        self.assertNotIn("stegverse-org.intr-destination", (proven,))
+        # This capability and sdk-manifest-ingress, adopted for the
+        # manifest-directed append path (SV-LLM/.github#30 W4).
+        self.assertEqual(served, {ADDRESS, "sv-llm.sdk-manifest-ingress"})
+        self.assertEqual(set(proven), served)
+        self.assertNotIn("stegverse-org.intr-destination", proven)
         report = runtime_boundary.validate()
         self.assertIs(report["valid"], True, report["checks"])
         self.assertIs(report["checks"]["capability_addresses_resolve"], True)
@@ -152,8 +154,10 @@ class DeclarationTests(unittest.TestCase):
         self.assertIs(runtime_boundary.peer_capability_addresses_derive(document), False)
 
     def test_a_single_served_address_may_still_be_named_as_a_string(self):
-        self.assertIsInstance(
-            BOUNDARY["egress"]["peer_capability_resolution"]["proven_on_this_organization"], str)
+        document = json.loads(json.dumps(BOUNDARY))
+        document["ingress"]["capability_endpoint_bindings"] = [binding(PROFILE_ID)]
+        document["egress"]["peer_capability_resolution"]["proven_on_this_organization"] = ADDRESS
+        self.assertIs(runtime_boundary.peer_capability_addresses_derive(document), True)
         self.assertIs(runtime_boundary.peer_capability_addresses_derive(BOUNDARY), True)
 
     def test_peer_services_are_not_written_into_the_federation_directory(self):

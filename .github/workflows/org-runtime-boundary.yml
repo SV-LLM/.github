@@ -12,6 +12,8 @@ on:
       - 'data/organization-*.json'
       - 'ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md'
       - '.github/workflows/org-runtime-boundary.yml'
+      - '.github/workflows/organization-ledger-transition.yml'
+      - '.stegverse/transition-requests/**'
   push:
     branches: [main]
     paths:
@@ -24,6 +26,8 @@ on:
       - 'data/organization-*.json'
       - 'ORG_RESIDENT_RUNTIME_INTR_BOUNDARY_MIRROR_HANDOFF.md'
       - '.github/workflows/org-runtime-boundary.yml'
+      - '.github/workflows/organization-ledger-transition.yml'
+      - '.stegverse/transition-requests/**'
   workflow_dispatch:
 
 permissions:
@@ -73,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: StegVerse-org/.github
-          ref: 2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c
+          ref: 10d141041fd0fa3b8bd696f6c6236bef199845b8
           path: stegverse-org-reference
           persist-credentials: false
       - name: Recorded digests are the reference commit's

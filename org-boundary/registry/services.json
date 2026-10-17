@@ -22,6 +22,22 @@
       "runtime_required_for_consumption": false
     },
     {
+      "service_id": "sv-llm.sdk-manifest-ingress",
+      "repository": "SV-LLM/.github",
+      "boundary_role": "BOUNDARY_LOCAL_CAPABILITY_INGRESS",
+      "profile_status": "ACTIVE",
+      "capability_profile_id": "sdk-manifest-ingress",
+      "capability_binding_document": "org-runtime/interlock-intr.json",
+      "accepts": [
+        "stegverse.sdk-manifest-crossing-payload/v1"
+      ],
+      "runtime_required_for_consumption": true,
+      "admission_authority_constraint": "CONSTRAINT_VARIABLE",
+      "time_constraint": "CONSTRAINT_VARIABLE",
+      "disposition_role": "TRANSITION_EVIDENCE_ONLY",
+      "selects_processing_at_this_address": false
+    },
+    {
       "service_id": "sv-llm.intr-destination",
       "repository": "SV-LLM/.github",
       "boundary_role": "BOUNDARY_LOCAL_CAPABILITY_INGRESS",
