@@ -661,7 +661,7 @@ class StageEvaluationEvidence(unittest.TestCase):
     head-side at #3264 7898cedb (ALLOW) and base-side at main 978b8880 (the manifest under evaluation from the contract pins)."""
     ROOTDIR = ROOT / "evidence" / "stage-evaluations"
     BASE_REF = {"registry_generation": 319, "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1"}
-    CASES = {"7898cedb": ("7898cedba1400c8545cebcb463fd26deb25f7d5a", "EVALUATED_COMMIT", "ALLOW", None),
+    CASES = {"7898cedb": ("7898cedba1400c8545cebcb463fd26deb25f7d5a", "CONTRACT_PINS", "ALLOW", None),
              "978b8880": ("978b8880d238dc3e3a8b690c0675d8bb0e9d6985", "CONTRACT_PINS", "FAIL_CLOSED", "STAGE_REGRESSION")}
 
     def load(self, short):
@@ -677,6 +677,9 @@ class StageEvaluationEvidence(unittest.TestCase):
                 self.assertEqual(evaluation["input_sha256"], "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest())
                 self.assertEqual((document["trigger"], evaluation["trigger"]), ("STAGE_GATE_EVALUATION", "STAGE_GATE_EVALUATION"))
                 self.assertEqual(evaluation["manifest_source"], source)
+                self.assertEqual(document["manifest_source"], "CONTRACT_PINS")
+                self.assertEqual(evaluation["manifest"], {"file": m.STAGE_GATE_MANIFEST_FILE, "blob": m.STAGE_GATE_MANIFEST_BLOB,
+                                                          "from": "contract-pins " + m.CONTRACT_PINS["sha256"]})
                 self.assertIs(evaluation["in_required_checks_row"], False)
                 self.assertIs(evaluation["ledger_appended"], False)
                 subject = evaluation["evaluation_subject"]

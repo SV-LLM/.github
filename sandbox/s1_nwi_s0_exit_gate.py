@@ -12,11 +12,15 @@ evaluation subject. Never on a push, a pull-request head or a schedule, and not 
 evaluate(input, checkout, p1):
   0. P1's sv_work_items.py and stage_gate.py are imported from the contract-pinned tree (every used file's bytes
      checked against its contract-pins.json entry; org-kernel/kernel.py, which the manifest omits, by blob).
-  1. Subject stegverse.nwi-stage-evaluation-subject/v1 = {repository, stage_id, manifest_blob (git blob of the
-     manifest at evaluated_commit), evaluated_commit, base_ref {registry_generation read at evaluated_commit from the
+  1. Subject stegverse.nwi-stage-evaluation-subject/v1 = {repository, stage_id, manifest_blob (the contract-pinned
+     gate declaration's blob from contract-pins.json, never the subject's own tree: a subject never supplies its own
+     acceptance criteria; orchestrator 17:09Z), evaluated_commit (identifies the subject only), base_ref {registry_generation read at evaluated_commit from the
      repository's own registry, ledger_head}} via sv_work_items.stage_evaluation_subject; anything unobserved or
      contradicted is FAIL_CLOSED STAGE_EVALUATION_SUBJECT_UNOBSERVED and nothing is emitted.
-  2. sv_work_items.validate_gate_declaration(manifest at evaluated_commit) must be ALLOW; else FAIL_CLOSED
+     The input must say manifest_source CONTRACT_PINS; anything else (EVALUATED_COMMIT, absent, any other value)
+     is FAIL_CLOSED STAGE_GATE_MANIFEST_SELF_SOURCED and nothing is emitted. Whatever NWI-S*.json the evaluated
+     commit carries is never read.
+  2. sv_work_items.validate_gate_declaration(the contract-pinned manifest) must be ALLOW; else FAIL_CLOSED
      STAGE_GATE_DECLARATION_INCOMPLETE and nothing is emitted.
   3. hb_epoch = $.hb_reference.epoch from the Labs#3266 readback at subject.base_ref.ledger_head, checked with
      sv_work_items.verify_admission_hb_epoch(..., target_repository=subject.repository) (and this verifier's
@@ -57,10 +61,12 @@ RETRY_ENTRYPOINT = ("sandbox/s1_nwi_s0_exit_gate.py evaluate --input <stage-eval
 READBACKS_PATHS_FROM = Path(__file__).resolve().parent / "s1_pins" / "sv_change_base_state_readback.py"
 INPUT_KEYS = {"schema", "stage_id", "target_stage", "repository", "evaluated_commit", "base_ref", "hb_epoch_readback",
               "trigger", "note", "manifest_source"}
-# Where the manifest under evaluation comes from. EVALUATED_COMMIT: the manifest (and every NWI-S* stage) at
-# evaluated_commit. CONTRACT_PINS (orchestrator 16:57Z, base-side evaluation): the contract-pinned manifest (blob from
-# contract-pins.json) and the pinned tree's stages, evaluated against a commit that need not carry them.
-MANIFEST_SOURCES = ("EVALUATED_COMMIT", "CONTRACT_PINS")
+# The only manifest source (orchestrator 17:09Z, by invariant): the gate declaration pinned in P1's contract-pins.json
+# (blob STAGE_GATE_MANIFEST_BLOB) and the pinned tree's NWI-S* stages. The former EVALUATED_COMMIT path (the manifest
+# read from the subject's own tree) is removed; asking for it is FAIL_CLOSED STAGE_GATE_MANIFEST_SELF_SOURCED.
+MANIFEST_SOURCE = "CONTRACT_PINS"
+SELF_SOURCED_CODE = "STAGE_GATE_MANIFEST_SELF_SOURCED"
+SELF_SOURCED_PREDICATE = "STAGE_GATE_MANIFEST_IS_CONTRACT_PINNED"
 
 
 def gate_verifier_ref() -> str:
@@ -135,16 +141,12 @@ def registry_paths() -> dict[str, str]:
 
 def observe_subject(wi: Any, document: Mapping[str, Any], checkout: Path, tree: Path) -> tuple[dict[str, Any], bytes | None]:
     commit, repo = document.get("evaluated_commit"), document.get("repository")
-    if document.get("manifest_source", "EVALUATED_COMMIT") == "CONTRACT_PINS":
-        data = (tree / m.STAGE_GATE_MANIFEST_FILE).read_bytes()
-        manifest_bytes, manifest_blob = data, m.rc_blob(data)
-        if manifest_blob != m.STAGE_GATE_MANIFEST_BLOB:
-            raise RuntimeError("the pinned tree's manifest is not the contract-pins blob")
-        if isinstance(commit, str) and m.rc.git(checkout, "cat-file", "-e", commit + "^{commit}").returncode:
-            manifest_blob = None  # the evaluated commit itself is unobserved
-    else:
-        got = m.read_at(checkout, commit, m.STAGE_GATE_MANIFEST_FILE) if isinstance(commit, str) else None
-        manifest_bytes, manifest_blob = got if got else (None, None)
+    data = (tree / m.STAGE_GATE_MANIFEST_FILE).read_bytes()  # the contract-pinned declaration, never the subject's
+    manifest_bytes, manifest_blob = data, m.rc_blob(data)
+    if manifest_blob != m.STAGE_GATE_MANIFEST_BLOB:
+        raise RuntimeError("the pinned tree's manifest is not the contract-pins blob")
+    if isinstance(commit, str) and m.rc.git(checkout, "cat-file", "-e", commit + "^{commit}").returncode:
+        manifest_blob = None  # the evaluated commit itself is unobserved
     try:
         subject = wi.stage_evaluation_subject(repo, document.get("stage_id"), manifest_blob, commit, document.get("base_ref"))
     except wi.Refusal as r:
@@ -186,14 +188,22 @@ def evaluate(input_path: Path, checkout: Path, p1: Path) -> tuple[dict[str, Any]
         document = json.loads(raw)
         if not isinstance(document, dict) or document.get("schema") != INPUT_SCHEMA or set(document) - INPUT_KEYS \
                 or document.get("trigger") != TRIGGER or document.get("stage_id") != STAGE_ID \
-                or document.get("target_stage") != TARGET_STAGE \
-                or document.get("manifest_source", "EVALUATED_COMMIT") not in MANIFEST_SOURCES:
+                or document.get("target_stage") != TARGET_STAGE:
             raise Refused("FAIL_CLOSED", six("STAGE_EVALUATION_SUBJECT_UNOBSERVED", "STAGE_GATE_DECLARATION_IS_COMPLETE",
                                              "a " + INPUT_SCHEMA + " input for one STAGE_GATE_EVALUATION NWI-S0 -> NWI-S1",
                                              "re-run with a well-formed input; nothing was evaluated"))
+        if document.get("manifest_source") != MANIFEST_SOURCE:
+            raise Refused("FAIL_CLOSED", six(
+                SELF_SOURCED_CODE, SELF_SOURCED_PREDICATE,
+                "manifest_source " + MANIFEST_SOURCE + ": the gate declaration pinned in P1's contract-pins.json ("
+                + m.CONTRACT_PINS["file"] + " sha256 " + m.CONTRACT_PINS["sha256"] + "); a subject never supplies its own "
+                "acceptance criteria and evaluated_commit only identifies the subject",
+                "re-run with manifest_source " + MANIFEST_SOURCE + "; nothing was evaluated, no receipt was emitted"),
+                {"manifest_source": document.get("manifest_source")})
         wi, sg, tree = load_p1(p1, work)
-        source = document.get("manifest_source", "EVALUATED_COMMIT")
-        out["manifest_source"] = source
+        out["manifest_source"] = MANIFEST_SOURCE
+        out["manifest"] = {"file": m.STAGE_GATE_MANIFEST_FILE, "blob": m.STAGE_GATE_MANIFEST_BLOB,
+                           "from": "contract-pins " + m.CONTRACT_PINS["sha256"]}
         subject, manifest_bytes = observe_subject(wi, document, checkout, tree)
         digest = wi.stage_evaluation_digest(subject)
         out.update(evaluation_subject=subject, evaluation_subject_digest=digest)
@@ -206,13 +216,7 @@ def evaluate(input_path: Path, checkout: Path, p1: Path) -> tuple[dict[str, Any]
         if out["declaration"] is None:
             raise Refused("FAIL_CLOSED", six("STAGE_GATE_DECLARATION_INCOMPLETE", wi.GATE_DECLARATION_PREDICATE,
                                              "the manifest declares exit_gate_check", "re-evaluate once it is declared"))
-        # Every NWI-S* manifest at the evaluated commit (the gate reads the stages there, not the pin's copies).
-        stages = []
-        for path in [] if source == "CONTRACT_PINS" else sorted(git(checkout, "ls-tree", "--name-only", subject["evaluated_commit"], "data/sv-work-items/stages/")
-                           .stdout.decode().split()):
-            if Path(path).name.startswith("NWI-S") and path.endswith(".json"):
-                stages.append(json.loads(m.read_at(checkout, subject["evaluated_commit"], path)[0]))
-        stages = sg.load_stages() if source == "CONTRACT_PINS" else sorted(stages, key=lambda s: s.get("ordinal", -1))
+        stages = sg.load_stages()  # the contract-pinned tree's NWI-S* stages (each a contract-pins entry), not the subject's
         readback = load_readback(document.get("hb_epoch_readback"))
         ledger_head = subject["base_ref"]["ledger_head"]
         mine = eb.binder_check(eb.HB_EPOCH_NOT_CROSS_CHECKED, readback, ledger_head, subject["repository"])

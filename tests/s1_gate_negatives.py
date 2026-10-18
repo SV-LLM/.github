@@ -57,10 +57,21 @@ c, rc_ = run(BASE_SIDE)
 assert c["disposition"] == "FAIL_CLOSED" and c["failure_code"] == "STAGE_REGRESSION", c.get("failure_code")
 assert {r["failure_code"] for k, r in rc_.items() if k != "nwi-s0-exit-gate"} == {"CHECK_COMMAND_ABSENT_AT_HEAD"}
 assert c["evaluation_subject_digest"] != a["evaluation_subject_digest"]
-refused(*run({**BASE_SIDE, "manifest_source": "HEAD_TREE"}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
 refused(*run({**BASE_SIDE, "evaluated_commit": "1" * 40}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")  # commit unobserved
-# without the contract-pins source the base tree carries no manifest: the subject is unobserved, nothing is emitted
-refused(*run({k: v for k, v in BASE_SIDE.items() if k != "manifest_source"}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
+# both sides name the same contract-pinned manifest
+for out in (a, c):
+    assert out["manifest_source"] == "CONTRACT_PINS" and out["evaluation_subject"]["manifest_blob"] == m.STAGE_GATE_MANIFEST_BLOB
+    assert out["contract_pins"]["sha256"] == m.CONTRACT_PINS["sha256"]
+
+# 0. a self-sourced manifest is refused before anything is evaluated (orchestrator 17:09Z): six fields, nothing emitted
+for doc in (BASE, BASE_SIDE):
+    for source in ("EVALUATED_COMMIT", "HEAD_TREE", None):
+        bad = {k: v for k, v in doc.items() if k != "manifest_source"}
+        if source is not None:
+            bad["manifest_source"] = source
+        out, rs = run(bad)
+        refused(out, rs, "STAGE_GATE_MANIFEST_SELF_SOURCED")
+        assert out["failed_predicate"] == "STAGE_GATE_MANIFEST_IS_CONTRACT_PINNED" and out["evaluation_subject"] is None
 
 # 1. subject unobserved
 refused(*run({**BASE, "base_ref": {**BASE["base_ref"], "registry_generation": 318}}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
@@ -84,16 +95,68 @@ for name, body in (("other-repo", m.eb.seal({**rb_body, "repository": "StegVerse
     refused(*run({**BASE, "hb_epoch_readback": {"file": str(f), "sha256": "sha256:" + __import__("hashlib").sha256(raw).hexdigest()}}),
             "STAGE_EVIDENCE_UNOBSERVED")
 
-# 3. declaration incomplete at the evaluated commit: no producers / a producer argv that is not the row's
-for name, edit in (("no-producers", lambda c: c.pop("evidence_producers")),
-                   ("argv", lambda c: c["evidence_producers"][0].__setitem__("offline_command", ["python3", "-c", "0"])),
-                   ("cadence", lambda c: c["cadence"].__setitem__("not_per_head", False))):
-    def change(raw, edit=edit):
-        doc = json.loads(raw); edit(doc["exit_gate_check"]); return (json.dumps(doc, indent=2, sort_keys=True) + "\n").encode()
-    repo, head = commit_on(BASE["evaluated_commit"], {m.STAGE_GATE_MANIFEST_FILE: change})
+# 3. the subject never supplies its own acceptance criteria: a subject whose tree carries a different NWI-S0.json is
+#    evaluated against the contract-pinned declaration all the same: same manifest_blob, same declaration, the pinned
+#    producer argv (not the subject's), and never STAGE_GATE_DECLARATION_INCOMPLETE from the subject's copy.
+#    a. outcome invariance: a different NWI-S0.json in an otherwise consistent subject tree (its own contract-pins.json
+#       entry re-stated so its own fixtures are not stale) leaves the outcome exactly as at the parent (ALLOW).
+#    b. a different NWI-S0.json that the subject's OWN code rejects (stale pins, its tests reading its manifest) fails
+#       those producers as a subject regression; the gate's criteria are still the pinned ones.
+import hashlib
+
+
+def restated_pins(new):
+    def pins(raw):
+        doc = json.loads(raw)
+        doc["files"][m.STAGE_GATE_MANIFEST_FILE] = {"blob": m.rc_blob(new), "sha256": "sha256:" + hashlib.sha256(new).hexdigest()}
+        return (json.dumps(doc, indent=2, sort_keys=True) + "\n").encode()
+    return pins
+
+
+ORIGINAL = m.read_at(LABS, BASE["evaluated_commit"], m.STAGE_GATE_MANIFEST_FILE)[0]
+PINNED_COMMANDS = [(p["id"], p["command"]) for p in a["producers"]]
+for name, edit, consistent in (("annotated", lambda c: c.__setitem__("subject_note", "not the pinned declaration"), True),
+                               ("no-producers", lambda c: c.pop("evidence_producers"), False),
+                               ("argv", lambda c: c["evidence_producers"][0].__setitem__("offline_command", ["python3", "-c", "0"]), False),
+                               ("cadence", lambda c: c["cadence"].__setitem__("not_per_head", False), False),
+                               ("emptied", None, False)):
+    if edit is None:
+        new = b"{}\n"
+    else:
+        doc = json.loads(ORIGINAL); edit(doc["exit_gate_check"]); new = (json.dumps(doc, indent=2, sort_keys=True) + "\n").encode()
+    edits = {m.STAGE_GATE_MANIFEST_FILE: new}
+    if consistent:
+        edits["data/sv-work-items/contract-pins.json"] = restated_pins(new)
+    repo, head = commit_on(BASE["evaluated_commit"], edits)
+    assert m.rc_blob(new) != m.STAGE_GATE_MANIFEST_BLOB, name
     out, rs = run({**BASE, "evaluated_commit": head}, repo)
-    refused(out, rs, "STAGE_GATE_DECLARATION_INCOMPLETE")
-    assert out["detail"], name
+    assert out["manifest_source"] == "CONTRACT_PINS" and out["manifest"] == a["manifest"], name
+    assert out["evaluation_subject"]["manifest_blob"] == m.STAGE_GATE_MANIFEST_BLOB, name
+    assert out["declaration"] == a["declaration"], name
+    assert [(p["id"], p["command"]) for p in out["producers"]] == PINNED_COMMANDS, name
+    assert out.get("failure_code") != "STAGE_GATE_DECLARATION_INCOMPLETE" and sorted(rs) == sorted(ra), name
+    if consistent:
+        assert (out["disposition"], out.get("failure_code")) == (a["disposition"], a.get("failure_code")), (name, out.get("failure_code"))
+        assert {k: r["disposition"] for k, r in rs.items()} == {k: r["disposition"] for k, r in ra.items()}, name
+    else:
+        assert (out["disposition"], out["failure_code"]) == ("FAIL_CLOSED", "STAGE_REGRESSION"), name
+        assert all(p["outcome"] in ("AS_EXPECTED", "NOT_AS_EXPECTED") for p in out["producers"]), name
+
+# 3b. DECLARATION_INCOMPLETE is now reachable only through the pinned declaration itself (a subject cannot reach it):
+#     P1's validate_gate_declaration refusing the pinned manifest emits nothing.
+_load = g.load_p1
+def load_incomplete(p1, work):
+    wi, sg, tree = _load(p1, work)
+    real = wi.validate_gate_declaration
+    def stripped(manifest):
+        doc = copy.deepcopy(manifest); doc["exit_gate_check"].pop("evidence_producers"); return real(doc)
+    wi.validate_gate_declaration = stripped
+    return wi, sg, tree
+g.load_p1 = load_incomplete
+out, rs = run(BASE)
+g.load_p1 = _load
+refused(out, rs, "STAGE_GATE_DECLARATION_INCOMPLETE")
+assert out["detail"]
 
 # 4. a failing producer: a stale migration fixture fails schema-validate; the gate is FAIL_CLOSED STAGE_REGRESSION and
 #    all three receipts are emitted (a failing gate receipt, once appended, is what derives the NATIVE SV_ISSUE)
@@ -105,4 +168,6 @@ assert rs["nwi-s0-exit-gate"]["disposition"] == "FAIL_CLOSED" and rs["nwi-s0-exi
 assert out["evaluation_subject_digest"] != a["evaluation_subject_digest"]  # a new commit is a new evaluation
 assert set(out["receipts_validated"]["results"].values()) == {"ALLOW"}  # failing receipts are still valid gate receipts
 print(n, "stage evaluations: nwi-s0-exit-gate ALLOW on the committed subject (twice, byte-identical); "
-      "SUBJECT_UNOBSERVED, EVIDENCE_UNOBSERVED and DECLARATION_INCOMPLETE emit nothing; a failing producer gives STAGE_REGRESSION")
+      "MANIFEST_SELF_SOURCED, SUBJECT_UNOBSERVED, EVIDENCE_UNOBSERVED and DECLARATION_INCOMPLETE emit nothing; "
+      "a subject's own NWI-S0.json never changes manifest_blob, declaration or producer argv (outcome unchanged in a "
+      "consistent subject tree); a failing producer gives STAGE_REGRESSION")
