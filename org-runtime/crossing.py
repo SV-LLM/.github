@@ -240,7 +240,9 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
                                    packet_id=SLUG+"-"+sha(manifest)[7:31])
         if mesh_root is None:
             raise FailClosed(MESH_LOCATION_REQUIRED,"the declared carrier publishes only to a mesh supplied as mesh_root")
-        published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,now_ns=now_ns)
+        # The frame is stamped with the supplied epoch (a caller-supplied sample still wins); never a clock.
+        published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,now_ns=now_ns,
+                                      epoch=None if now_ns is not None else int(str(hb_epoch)))
     except Refused as refused:
         outcome=refusal_outcome(refused,EGRESS_RETRY,manifest_sha256=sha(manifest))
         return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}

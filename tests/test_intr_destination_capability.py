@@ -345,32 +345,25 @@ class AddressedAndClosedTests(RedirectedLedgers):
                 frames.append(frame)
         return frames
 
-    def test_a_peer_frame_at_the_address_is_received_and_receipted(self):
+    def test_a_peer_frame_at_the_address_without_a_supplied_epoch_is_refused_six_field(self):
+        # NWI-S1: the kernel's consume path supplies no hb_epoch, and the kernel
+        # no longer reads a clock for one. The frame is resolved to this
+        # capability, then the receipt is refused HB_EPOCH_NOT_SUPPLIED with the
+        # six fields before either ledger is written. A receipted receive at a
+        # supplied epoch is covered by tests/test_intr_hop.py.
+        before = self.receipts("STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1")
         self.publish(diagnostic("addressed-diagnostic"), ADDRESS, "addressed-diagnostic")
-        results = self.consume()
-        self.assertEqual(len(results), 1)
-        execution = results[0]["result"]["execution_result"]
-        self.assertEqual(results[0]["result"]["status"], "CONSUMED")
-        self.assertEqual(results[0]["result"]["packet"]["origin"]["org"], PEER)
-        self.assertEqual(execution["service_id"], ADDRESS)
-        self.assertEqual(execution["processing_selection"], "BOUNDARY_LOCAL_NO_PROCESSOR_SELECTED")
-        application = execution["application_result"]
-        self.assertIs(application["capability_received"], True)
-        self.assertEqual(application["capability_profile_id"], PROFILE_ID)
-        self.assertEqual(application["receiving_operation_id"], OPERATION_ID)
-        self.assertIs(application["declared_capability_processed_at_this_address"], False)
-        operation = application["receiving_operation_result"]
-        self.assertEqual(operation["disposition"], "ALLOW", operation.get("detail"))
-        self.assertIs(operation["communication_acknowledged"], True)
-        self.assertEqual(operation["authority_effect"], "NONE_DIAGNOSTIC_ACK_ONLY")
-        assert_constraints(self, operation)
-        self.assertIs(operation["organization_receipt_preserves_repository_receipt"], True)
-        repository, = self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
-                                    "stegverse.repo-transition-receipt/v1", OPERATION_ID)
-        matched = [record for record in self.receipts(
-            "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1")
-            if record.get("repo_receipt_sha256") == repository["receipt_sha256"]]
-        self.assertEqual(len(matched), 1)
+        with self.assertRaises(ValueError) as refused:
+            self.consume()
+        refusal = refused.exception.refusal
+        self.assertEqual((refusal["disposition"], refusal["failure_code"], refusal["failed_predicate"]),
+                         ("FAIL_CLOSED", "HB_EPOCH_NOT_SUPPLIED", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
+        for field in ("required_evidence_or_repair", "retry_entrypoint", "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
+        self.assertEqual(self.receipts(
+            "STEGVERSE_REPO_LEDGER_ROOT", "stegverse.repo-transition-receipt/v1", OPERATION_ID), [])
+        self.assertEqual(self.receipts(
+            "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1"), before)
 
     def test_a_manifest_addressed_to_this_capability_is_not_a_diagnostic(self):
         self.publish({"manifest": {"probe": True}}, ADDRESS, "not-a-diagnostic")

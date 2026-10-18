@@ -6,7 +6,6 @@ No GitHub, hosted scheduler, provider, or carrier sets authority. Authority and 
 """
 from __future__ import annotations
 import base64, hashlib, importlib.util, json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +52,68 @@ def validate_hb_reference(ref:dict[str,Any])->dict[str,Any]:
         raise ValueError("heartbeat_progression_not_oscillator")
     return ref
 
+#: NWI-S1: the kernel reads no clock. A heartbeat reference is built from a
+#: supplied epoch, or from a caller-supplied sample `now_ns`; with neither it is
+#: refused six-field FAIL_CLOSED by the shared supplied-epoch rule, vendored
+#: byte-identical (function segment sha256 SHARED_RULE_SHA256).
+HB_EPOCH_PREDICATE="SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"
+SHARED_RULE_SHA256="726248a585904b52cfe2eec1754e7ce582f67d6b501bd664bb7bee80bce9b7ef"
+HB_REFERENCE_OWNING_GOAL="SVORG-LLM-ORG-FOUNDATION-001 W04"
+
+
+def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, str] | None:
+    """The shared supplied-epoch rule (SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH).
+
+    Byte-identical in StegVerse-org/.github#185 and StegVerse-Labs/.github#3212
+    and #3213. `hb_epoch` absent (None) is HB_EPOCH_NOT_SUPPLIED. Otherwise it
+    must be ASCII [0-9]+ only -- an int is read as its decimal text; a bool, a
+    float or anything coerced ('+33', ' 33', '3_3', '33.0') is refused -- with
+    integer value >= 32 (the HB32 anchor). `reference`, the carrier frame's
+    heartbeat reference when there is one, must be an object, and a
+    `derived_from_clock` it carries must be exactly false. Any failure is
+    HB_EPOCH_INVALID. Returns (failure_code, detail), or None when the epoch is
+    supplied. No clock is read.
+    """
+    if reference is not None and not isinstance(reference, dict):
+        return "HB_EPOCH_INVALID", "the carrier's heartbeat reference is not an object"
+    if hb_epoch is None:
+        return "HB_EPOCH_NOT_SUPPLIED", "no hb_epoch was supplied and no clock is read"
+    if isinstance(hb_epoch, bool):
+        text = None
+    elif isinstance(hb_epoch, int):
+        text = str(hb_epoch)
+    elif isinstance(hb_epoch, str):
+        text = hb_epoch
+    else:
+        text = None
+    if text is None or not text.isascii() or not text.isdigit():
+        return "HB_EPOCH_INVALID", "hb_epoch " + repr(hb_epoch) + " is not ASCII [0-9]+"
+    if int(text) < 32:
+        return "HB_EPOCH_INVALID", "hb_epoch " + text + " is below the HB32 anchor (32)"
+    if reference is not None and "derived_from_clock" in reference \
+            and reference["derived_from_clock"] is not False:
+        return "HB_EPOCH_INVALID", ("the carrier's derived_from_clock is not exactly false; "
+                                    "a clock-derived epoch is not a supplied one")
+    return None
+
+
+class HbEpochRefused(ValueError):
+    """No epoch (and no supplied sample) for a heartbeat reference; `refusal` is the six-field FAIL_CLOSED."""
+    def __init__(self, refusal:dict[str,Any]):
+        super().__init__(refusal["failure_code"]+":"+refusal["detail"])
+        self.refusal=dict(refusal)
+
+def hb_epoch_refusal(epoch:Any)->dict[str,Any]|None:
+    failure=supplied_epoch_failure(epoch)
+    if failure is None: return None
+    code,detail=failure
+    return {"disposition":"FAIL_CLOSED","failure_code":code,"failed_predicate":HB_EPOCH_PREDICATE,"detail":detail,
+            "required_evidence_or_repair":"supply epoch= (ASCII [0-9]+, >= %d) or an explicit now_ns sample; "
+                                          "the kernel never reads a clock"%HB_ANCHOR_EPOCH,
+            "retry_entrypoint":"org-kernel/kernel.py::hb_reference(epoch=<supplied>)",
+            "owning_existing_goal":HB_REFERENCE_OWNING_GOAL,
+            "next_attempt":"call again with the supplied epoch","authority_effect":"NONE"}
+
 def hb_reference(now_ns:int|None=None, *, epoch:int|None=None)->dict[str,Any]:
     """Build the heartbeat reference for a crossing.
 
@@ -74,7 +135,8 @@ def hb_reference(now_ns:int|None=None, *, epoch:int|None=None)->dict[str,Any]:
                 "phase_offset_ns":0,"frequency_hz":HB_HZ,"progression_dependency":"OSCILLATOR_ONLY",
                 "derived_from_clock":False,"authority_effect":"NONE"})
     if now_ns is None:
-        now_ns=int(datetime.now(timezone.utc).timestamp()*1_000_000_000)
+        # No clock fallback: with neither an epoch nor a supplied sample there is nothing to stamp.
+        raise HbEpochRefused(hb_epoch_refusal(None))
     if now_ns<HB_ANCHOR_UNIX_NS:
         raise ValueError("sample_precedes_hb32_anchor")
     q,phase=divmod(now_ns-HB_ANCHOR_UNIX_NS,HB_PERIOD_NS)
@@ -576,7 +638,8 @@ def resident_status(root:Path, registry:dict[str,Any]|None=None, *, epoch:int|No
       "registered_service_count":len(reg.get("services") or []),
       "registered_services":[s.get("service_id") for s in reg.get("services") or []],
       "org_control_service":organization_slug(reg["organization"])+".org-control",
-      "heartbeat_reference":hb_reference(epoch=epoch) if epoch is not None else hb_reference(),
+      # No epoch, no reference: the six-field refusal is reported in its place, never a clock sample.
+      "heartbeat_reference":hb_reference(epoch=epoch) if epoch is not None else hb_epoch_refusal(None),
       "runtime_observation_claimed":False
     }
 

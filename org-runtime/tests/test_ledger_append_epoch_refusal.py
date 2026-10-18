@@ -141,5 +141,68 @@ class CrossingCarriesTheEpoch(unittest.TestCase):
                         self.assertFalse(org.exists() and documents(org))
 
 
+class KernelReadsNoClock(unittest.TestCase):
+    """org-kernel/kernel.py hb_reference: the clock fallback (was L77) is removed, so it is unreachable."""
+
+    def setUp(self):
+        kspec = importlib.util.spec_from_file_location("g4_kernel", ROOT / "org-kernel/kernel.py")
+        self.k = importlib.util.module_from_spec(kspec)
+        kspec.loader.exec_module(self.k)
+        self.text = (ROOT / "org-kernel/kernel.py").read_text()
+
+    def test_the_kernel_imports_and_names_no_clock(self):
+        tree = ast.parse(self.text)
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported |= {alias.name.split(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module.split(".")[0])
+        self.assertFalse(imported & {"datetime", "time"}, imported)
+        names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        self.assertFalse(names & {"datetime", "time"})
+
+    def test_the_vendored_rule_is_the_shared_segment(self):
+        [node] = [n for n in ast.parse(self.text).body if getattr(n, "name", None) == "supplied_epoch_failure"]
+        segment = "\n".join(self.text.splitlines()[node.lineno - 1:node.end_lineno]).rstrip()
+        self.assertEqual(hashlib.sha256(segment.encode()).hexdigest(), self.k.SHARED_RULE_SHA256)
+
+    def assertRefusedSixField(self):
+        with self.assertRaises(self.k.HbEpochRefused) as caught:
+            self.k.hb_reference()
+        refusal = caught.exception.refusal
+        self.assertEqual((refusal["disposition"], refusal["failure_code"], refusal["failed_predicate"]),
+                         ("FAIL_CLOSED", "HB_EPOCH_NOT_SUPPLIED", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
+        self.assertTrue(all(refusal.get(field) for field in SIX), refusal)
+
+    def test_a_missing_epoch_is_refused_six_field(self):
+        self.assertRefusedSixField()
+
+    def test_patching_the_clock_has_no_effect(self):
+        import datetime as real_datetime
+        seen = []
+        for clock in (1_000.0, 9_999_999_999.0):
+            fake = mock.Mock(wraps=real_datetime)
+            fake.datetime.now.side_effect = AssertionError("clock read")
+            with mock.patch("time.time", return_value=clock), mock.patch("time.time_ns", return_value=int(clock * 1e9)), \
+                    mock.patch.object(self.k, "datetime", fake, create=True), \
+                    mock.patch.dict(sys.modules, {"datetime": fake}):
+                self.assertRefusedSixField()
+                seen.append(self.k.hb_reference(epoch=4000))
+        self.assertEqual(seen[0], seen[1])
+        self.assertIs(seen[0]["derived_from_clock"], False)
+
+    def test_the_adopted_emitter_without_an_epoch_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {**os.environ, "STEGVERSE_REPO_LEDGER_ROOT": tmp + "/repo"}
+            run = subprocess.run([sys.executable, "-B", str(ROOT / ".stegverse/transition-ledger/emit.py"),
+                                  "--transition-id", "t:1", "--transition-class", "T",
+                                  "--predecessor-state-sha256", STATE_AFTER, "--successor-state-sha256", STATE_AFTER],
+                                 capture_output=True, text=True, env=env)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn("HB_EPOCH_NOT_SUPPLIED", run.stderr)
+            self.assertEqual(documents(tmp), [])
+
+
 if __name__ == "__main__":
     unittest.main()
