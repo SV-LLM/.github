@@ -8,10 +8,10 @@ organization writer, StegVerse-Labs/.github#3255, appends them. Non-SV_CHANGE
 heads keep sandbox/s1_required_checks_verifier.py and its interim
 per-repository list.
 
-Pins (StegVerse-Labs/.github#3264 head ae8b105d; tests fail on drift):
+Pins (StegVerse-Labs/.github#3264 head 76407068; tests fail on drift):
 data/sv-work-items/required-checks.json blob 9c75778f (row
 SV-CHANGE-REQUIRED-CHECKS-001) and schemas/sv-check-receipt.v1.schema.json blob
-070f13f4. Both are read from a supplied `--dependency labs-row=<git checkout>`
+a4934cc1. Both are read from a supplied `--dependency labs-row=<git checkout>`
 at that commit and blob; nothing is fetched.
 
 Which ids. Exactly the row's `checks` ids, one receipt each, for every SV_CHANGE
@@ -88,9 +88,31 @@ ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
 OUT_OF_TREE = "OUT_OF_TREE"  # a record outside any repository (e.g. P1's posted record), bound only by its sha256
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "ae8b105d7504565665bf6918367517ffdcb481fd"
+PIN_COMMIT = "764070689f0dd793c987d27d7cbf3252f37a6b47"
 ROW_BLOB = "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d"
-RECEIPT_SCHEMA_BLOB = "070f13f468558ca08aa5162a8f34431608fc1404"
+RECEIPT_SCHEMA_BLOB = "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3"
+# nwi-s0-exit-gate (schema a4934cc1 enumerates it; STAGE_GATE_RECEIPT_DERIVES_NATIVE_ISSUE) is declared at #3264 76407068
+# in the stage manifest data/sv-work-items/stages/NWI-S0.json (blob d5467533, vendored at sandbox/s1_pins/NWI-S0.json),
+# not in the row (required-checks.json blob 9c75778f is unchanged and carries no such id). That declaration names the
+# built-in and its predicate but not its inputs, so this verifier emits no receipt for it (no invented semantics) and
+# records what is missing in the bundle.
+STAGE_GATE_MANIFEST_FILE = "data/sv-work-items/stages/NWI-S0.json"
+STAGE_GATE_MANIFEST_BLOB = "d5467533df4d604e7948805a07792829472992f1"
+STAGE_GATE_CHECKS = {"nwi-s0-exit-gate": {
+    "emitted": False, "status": "NOT_EMITTED_DECLARATION_INCOMPLETE",
+    "declared_in": STAGE_GATE_MANIFEST_FILE + "#exit_gate_check @ " + "764070689f0dd793c987d27d7cbf3252f37a6b47",
+    "declared": ["check_id", "offline_command.verifier_builtin", "offline_command.verifier_ref",
+                 "offline_command.predicate (stage_gate.evaluate_gate NWI-S0 -> NWI-S1)", "expected {disposition: ALLOW}",
+                 "command_paths []", "surface", "invariant", "minter", "appender"],
+    "missing": [
+        "evidence inputs: exit_gate predicates SV_WORK_ITEM_SCHEMAS_VALIDATE and EVERY_MIGRATION_FIXTURE_LOADS declare "
+        "evidence 'receipt' but no producer, check id, path or ledger ref for those receipts; evaluate_gate needs "
+        "evidence[predicate] = {receipt_ref, disposition} and nothing declares where the verifier reads them",
+        "receipt subject: sv-check-receipt.v1 requires change_digest and head_sha, but the gate is 'required of no change' "
+        "and no head/change the gate receipt binds to is declared",
+        "hb_epoch: evaluate_gate takes hb_epoch; no Labs#3266 readback/base_ref is declared for the gate",
+        "trigger: not in the row, so required_for() selects it for no SV_CHANGE; when the verifier emits it (per head "
+        "minted here, or per stage evaluation) is not declared"]}}
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
 DISPOSITIONS = ("ALLOW", "DENY", "FAIL_CLOSED")
@@ -103,7 +125,13 @@ SHARED_RULE_SHA256 = "726248a585904b52cfe2eec1754e7ce582f67d6b501bd664bb7bee80bc
 P1_SOURCE = {"repository": ROW_REPOSITORY, "commit": PIN_COMMIT, "path": "resident-runtime/sv_work_items.py"}
 P1_SEGMENT_SHA256 = {"LEDGER_WRITER_PATHS": "2a854d7b2ff1f0eeef7259befd2e0998a092d4610eab685412b3ee7556fe49db",
                      "surface_kind": "ad28dd85120a90740b2f85556658d61a774dafe1e4f28a39349bcd3a88b038d6",
-                     "required_for": "710f20a2078b2079ebdf7734913d8acb8f99726d8b6f3d7f57badbe1c9f2d180"}
+                     "required_for": "710f20a2078b2079ebdf7734913d8acb8f99726d8b6f3d7f57badbe1c9f2d180",
+                     "UNKNOWN": "e66ddd56722a720a1b9b264d41f803c04adc60d7aea70febdaeb1d585ffc8f98",
+                     "sentinel_pointers": "42ef15466b7738d0532279e26ddb6f564836fd192d8af979a57674e5e00c724b"}
+# P1 decision UNKNOWN_IN_NATIVE_RECORD (#3264 76407068): a NATIVE record field holding UNKNOWN is FAIL_CLOSED, never DENY;
+# at admission /hb_epoch is excluded (its own FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED, decided earlier).
+NATIVE_FIELDS_PREDICATE = "NATIVE_RECORD_FIELDS_ARE_OBSERVED"
+ADMISSION_UNKNOWN_EXCLUDED = ("/hb_epoch",)
 REQUIRED_CHECKS: Any = None  # P1's module-level default; the row is always passed explicitly here
 
 
@@ -136,6 +164,27 @@ def required_for(paths: Iterable[str], row: Mapping[str, Any] = REQUIRED_CHECKS)
         checks |= set(row["surface_kinds"][k]["checks"])
         signoffs |= set(row["surface_kinds"][k]["signoffs"])
     return sorted(checks), sorted(signoffs)
+
+
+UNKNOWN = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+
+
+def sentinel_pointers(rec: Any, path: str = "") -> list[str]:
+    """JSON pointers holding UNKNOWN (exact or embedded). /projection is a non-authority view and is not scanned;
+    writer_session.evidence_class is an enum whose value happens to be the sentinel."""
+    out: list[str] = []
+    if isinstance(rec, Mapping):
+        for k, v in rec.items():
+            p = path + "/" + str(k)
+            if p == "/projection" or (k == "evidence_class" and "/writer_session" in path):
+                continue
+            out += sentinel_pointers(v, p)
+    elif isinstance(rec, list):
+        for i, v in enumerate(rec):
+            out += sentinel_pointers(v, path + "/" + str(i))
+    elif isinstance(rec, str) and UNKNOWN in rec:
+        out.append(path or "/")
+    return out
 # ---- end of P1 segments ----
 
 
@@ -637,6 +686,7 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         "verifier_network_read": False, "credentials_passed": False, "verifier_ref": verifier_ref(),
         "verifier": {"paths_sha256": verifier_files()}, "input_sha256": None, "row": None,
         "required_check_ids": [], "touched_surface_kinds": [], "checks": [], "receipts": {},
+        "stage_gate_checks": json.loads(json.dumps(STAGE_GATE_CHECKS)),
     }
     receipts: dict[str, dict] = {}
     work = Path(tempfile.mkdtemp(prefix="sv-llm-s1svc-"))
@@ -704,6 +754,15 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                 raise Global("SV_CHANGE_CONTENT_NOT_AT_HEAD", "SV_CHANGE_CONTENT_IS_THE_HEAD_TREE",
                              "every content blob_digest equal to the head's bytes", "re-derive the SV_CHANGE at the head",
                              str(c.get("path")))
+        if change.get("record_mode") == "NATIVE":  # UNKNOWN_IN_NATIVE_RECORD (P1 sv_work_items.native_unknown_refusal)
+            unknown = sorted(q for q in sentinel_pointers(change) if q not in ADMISSION_UNKNOWN_EXCLUDED)
+            bundle["sv_change"]["native_unknown_pointers"] = unknown
+            if unknown:
+                raise Global("UNKNOWN_IN_NATIVE_RECORD", NATIVE_FIELDS_PREDICATE,
+                             "authentically observe every field the NATIVE record holds as " + UNKNOWN + ", or record the "
+                             "history as MIGRATED_HISTORICAL (UNKNOWN is FAIL_CLOSED, never DENY)",
+                             "after the field is observed, propose a successor record carrying the observed value",
+                             "UNKNOWN at " + ", ".join(unknown))
         derived = derived_change_id(checkout, change, head)
         bundle["sv_change"]["derived_change_id"] = derived
         if derived != change.get("change_id"):

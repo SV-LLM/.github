@@ -60,18 +60,22 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_sv_check_receipts.py
           python3 -B tests/test_s1_sv_check_receipts.py -v
-      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at ae8b105d; vendored P1 segments are its bytes
+      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at 76407068; vendored P1 segments are its bytes
         run: |
           set -euo pipefail
-          pin=ae8b105d7504565665bf6918367517ffdcb481fd
+          pin=764070689f0dd793c987d27d7cbf3252f37a6b47
           git init -q "$RUNNER_TEMP/labs"
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
           test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = 070f13f468558ca08aa5162a8f34431608fc1404
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3
           test "$(git hash-object sandbox/s1_pins/required-checks.json)" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:resident-runtime/sv_work_items.py")" = 446889c5114c416f34ee4ceadd5c3492c821df50
-          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_supplied_epoch_binder as eb, s1_sv_check_receipts as m; assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"].startswith("446889c5")' 
-          test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = 070f13f468558ca08aa5162a8f34431608fc1404
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:resident-runtime/sv_work_items.py")" = 625b12f7c637b030eccc2fea03d745d12e4d36d8
+          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_supplied_epoch_binder as eb, s1_sv_check_receipts as m; assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"].startswith("625b12f7")' 
+          test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3
+          # nwi-s0-exit-gate is declared in the stage manifest, not the row: vendored manifest equals the pinned blob
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/stages/NWI-S0.json")" = d5467533df4d604e7948805a07792829472992f1
+          test "$(git hash-object sandbox/s1_pins/NWI-S0.json)" = d5467533df4d604e7948805a07792829472992f1
+          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; assert m.STAGE_GATE_MANIFEST_BLOB == "d5467533df4d604e7948805a07792829472992f1"'
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
           python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
           import ast, hashlib, sys
@@ -111,7 +115,7 @@ jobs:
       - name: Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin
         run: |
           set -euo pipefail
-          pin=ae8b105d7504565665bf6918367517ffdcb481fd
+          pin=764070689f0dd793c987d27d7cbf3252f37a6b47
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > /dev/null
           rm -rf "$RUNNER_TEMP/p1" && mkdir -p "$RUNNER_TEMP/p1"
           git -C "$RUNNER_TEMP/labs" archive "$pin" | tar -x -C "$RUNNER_TEMP/p1"
@@ -276,7 +280,7 @@ jobs:
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
           # P1's #3264 head itself; its SV_CHANGE record is P1's out-of-tree record, pinned by sha256 (not copied here)
-          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-7d940851}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-76407068}
           # dd8bfd02 is not fetchable (no public ref) and has no #3266 readback: HB_EPOCH_SOURCE_UNOBSERVED
           - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
     steps:

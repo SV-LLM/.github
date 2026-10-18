@@ -2,7 +2,7 @@
 """S1 supplied-epoch-binder-check: the verifier built-in for the P1 row's supplied-epoch-binder-check.
 
 StegVerse-org/.github#162 (NWI-S1), S1 home #163. The row (StegVerse-Labs/.github#3264
-ae8b105d, blob 9c75778f) declares offline_command {verifier_builtin:
+76407068, blob 9c75778f) declares offline_command {verifier_builtin:
 supplied-epoch-binder-check, verifier_ref: SV-LLM/.github#46, predicate: the supplied
 hb_epoch equals the epoch on the readback receipt sealed by Labs#3266 at
 base_ref.ledger_head, and passes 726248a5 validation}, expected {disposition: ALLOW},
@@ -50,7 +50,7 @@ READBACK_PR = "StegVerse-Labs/.github#3266"
 READBACK_PIN_COMMIT = "641f4b03e612d07047e15f2384d24780e2af86c0"
 READBACK_COMPONENT_FILE = "resident-runtime/sv_change_base_state_readback.py"
 READBACK_COMPONENT_BLOB = "fbd453e531fc8d8f62261d2a72bc7a596798a445"
-# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 ae8b105d): the
+# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 76407068; rule unchanged from ae8b105d): the
 # readback's hb_epoch slot counts only with hb_epoch_source {ledger_head: base_ref.ledger_head, field:
 # HB_EPOCH_SOURCE_FIELD}. #3266 at 641f4b03 seals hb_epoch with hb_epoch_source {ledger_head, receipt, field} (both
 # null on every FAIL_CLOSED); its 78a0c78e head sealed none (unobserved).
@@ -58,9 +58,9 @@ HB_EPOCH_SOURCE_FIELD = "$.hb_reference.epoch"
 CHECK_ID = "supplied-epoch-binder-check"
 # The canonical rule: P1's sv_work_items.verify_admission_hb_epoch, in this blob at this commit (CI fetches and compares;
 # tests/s1_binder_parity.py runs every case against it).
-P1_REFERENCE = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "ae8b105d7504565665bf6918367517ffdcb481fd",
+P1_REFERENCE = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "764070689f0dd793c987d27d7cbf3252f37a6b47",
                 "file": "resident-runtime/sv_work_items.py", "function": "verify_admission_hb_epoch",
-                "blob_sha": "446889c5114c416f34ee4ceadd5c3492c821df50"}
+                "blob_sha": "625b12f7c637b030eccc2fea03d745d12e4d36d8"}
 UNOBSERVED_SENTINEL = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
 # P1 sv_work_items.SUPPLIED_EPOCH_UNOBSERVED_VALUES (Labs#3264 ae8b105d): checked before 726248a5.
 SUPPLIED_EPOCH_UNOBSERVED_VALUES = (None, "", "null", UNOBSERVED_SENTINEL)

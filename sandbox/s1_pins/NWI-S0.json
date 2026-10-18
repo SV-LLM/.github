@@ -1,0 +1,36 @@
+{
+  "entry_transition": "STAGE_NWI_S0_ADMITTED",
+  "exit_gate": [
+    {
+      "evidence": "receipt",
+      "predicate": "SV_WORK_ITEM_SCHEMAS_VALIDATE"
+    },
+    {
+      "evidence": "receipt",
+      "predicate": "EVERY_MIGRATION_FIXTURE_LOADS"
+    }
+  ],
+  "exit_gate_check": {
+    "appender": "org-ledger-writer (Labs#3255/#3270)",
+    "check_id": "nwi-s0-exit-gate",
+    "command_paths": [],
+    "expected": {
+      "disposition": "ALLOW"
+    },
+    "home": "this stage manifest: the required-checks row SV-CHANGE-REQUIRED-CHECKS-001 declares the checks an SV_CHANGE needs per touched surface; a stage gate is required of no change, so its check is declared where the gate is (stage_gate.py reads gates only from these manifests)",
+    "invariant": "STAGE_GATE_RECEIPT_DERIVES_NATIVE_ISSUE",
+    "minter": "NWI-S1-verifier (SV-LLM/.github#46)",
+    "offline_command": {
+      "predicate": "STAGE_GATE_PASSES over this manifest's exit_gate (stage_gate.evaluate_gate from NWI-S0 to NWI-S1): every exit predicate has a receipted ALLOW",
+      "verifier_builtin": "nwi-s0-exit-gate",
+      "verifier_ref": "SV-LLM/.github#46"
+    },
+    "surface": "data/sv-work-items/stages/NWI-S0.json"
+  },
+  "name": "DEFINE",
+  "ordinal": 0,
+  "schema": "stegverse.nwi-stage-manifest/v1",
+  "source": "KV INDEX.md 'STEPWISE GROWTH' (Rigel 12:44Z) and 'STAGE VERIFICATION' (12:53Z)",
+  "stage_id": "NWI-S0",
+  "thresholds_source": "this manifest only; a null value is undeclared and the gate FAIL_CLOSES STAGE_THRESHOLD_UNDECLARED"
+}

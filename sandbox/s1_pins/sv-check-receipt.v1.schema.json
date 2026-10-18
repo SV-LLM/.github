@@ -37,9 +37,10 @@
       "type": "string"
     },
     "check_id": {
-      "description": "one of data/sv-work-items/required-checks.json#checks (row SV-CHANGE-REQUIRED-CHECKS-001); any other id is CHECK_ID_UNDECLARED",
+      "description": "one of data/sv-work-items/required-checks.json#checks (row SV-CHANGE-REQUIRED-CHECKS-001) or a stage manifest's exit_gate_check.check_id (data/sv-work-items/stages/NWI-S*.json; STAGE_GATE_RECEIPT_DERIVES_NATIVE_ISSUE); any other id is CHECK_ID_UNDECLARED",
       "enum": [
         "mutation-negative-suite",
+        "nwi-s0-exit-gate",
         "registry-generation-fence",
         "schema-validate",
         "supplied-epoch-binder-check",

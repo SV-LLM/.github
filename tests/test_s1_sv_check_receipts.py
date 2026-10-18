@@ -25,7 +25,7 @@ eb = m.eb
 READBACKS = SANDBOX / "s1-base-state-readbacks"
 LEDGER_HEAD = "a" * 40
 # P1's out-of-tree #3264 record (not copied here; pinned by sha256)
-P1_RECORD_SHA256 = "sha256:cda39b6dc187c72afa52eac35eed47a8023b17822d76bbf75ac39709ec51c85e"
+P1_RECORD_SHA256 = "sha256:26b381cfee4c5169a6b8fa494e3c287f994af2a243bd261880800f5bd9886db2"
 PINS = SANDBOX / "s1_pins"
 INPUTS = SANDBOX / "s1-sv-check-inputs"
 EVIDENCE = ROOT / "evidence" / "sv-check-receipts"
@@ -92,7 +92,8 @@ class Fixture:
 
     def __init__(self, tmp: Path, head_files: dict[str, bytes], *, supplied="4000", readback: object = "sealed",
                  row: bytes | None = None, tamper_content: bool = False, base: bool = False,
-                 extra_input: dict | None = None, forge_change_id: bool = False) -> None:
+                 extra_input: dict | None = None, forge_change_id: bool = False,
+                 record_extra: dict | None = None) -> None:
         self.head_repo = tmp / "head"
         env = rc.base_env(tmp)
         subprocess.run(["git", "init", "-q", str(self.head_repo)], check=True, env=env)
@@ -122,6 +123,7 @@ class Fixture:
                   "base_ref": {"ledger_head": LEDGER_HEAD, "registry_generation": 1}, "content": content,
                   "touched_paths": sorted(c["path"] for c in content),
                   "projection": {"repo": "Fixture/repo", "head_sha": self.head, "base_sha": self.root}}
+        record.update(json.loads(json.dumps(record_extra or {})))
         if supplied is not ...:
             record["hb_epoch"] = supplied  # the SV_CHANGE's supplied epoch, which the binder check tests
         digest = m.change_digest(record)
@@ -155,13 +157,13 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "ae8b105d7504565665bf6918367517ffdcb481fd")
+        self.assertEqual(m.PIN_COMMIT, "764070689f0dd793c987d27d7cbf3252f37a6b47")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
         self.assertTrue(m.ROW_BLOB.startswith("9c75778f"))
         self.assertEqual(eb.P1_REFERENCE["commit"], m.PIN_COMMIT)  # the agreement test's canonical rule
-        self.assertTrue(eb.P1_REFERENCE["blob_sha"].startswith("446889c5"))
+        self.assertTrue(eb.P1_REFERENCE["blob_sha"].startswith("625b12f7"))
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
-        self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("070f13f4"))
+        self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("a4934cc1"))
         for path in sorted(INPUTS.glob("*.json")):
             row = json.loads(path.read_text())["required_checks_row"]
             self.assertEqual((row["commit"], row["blob_sha"], row["receipt_schema_blob_sha"]),
@@ -186,8 +188,8 @@ class Pins(unittest.TestCase):
             body = json.loads(path.read_text())
             self.assertEqual(body["schema"], eb.READBACK_SCHEMA, path.name)
             self.assertEqual(eb.seal(body)["result_sha256"], body["result_sha256"], path.name)
-        p1 = json.loads((INPUTS / "StegVerse-Labs-3264-7d940851.json").read_text())["sv_change"]
-        self.assertEqual(p1, {"repository": "OUT_OF_TREE", "file": "/workspace/p1/posted/SV_CHANGE_3264_7d940851.json",
+        p1 = json.loads((INPUTS / "StegVerse-Labs-3264-76407068.json").read_text())["sv_change"]
+        self.assertEqual(p1, {"repository": "OUT_OF_TREE", "file": "/workspace/p1/posted/SV_CHANGE_3264_76407068.json",
                               "sha256": P1_RECORD_SHA256, "derived_by": "/workspace/p1/redo6/derive_3264.py (P1)"})
         for path in sorted(INPUTS.glob("*.json")):  # no supplied epoch in any input; a readback bound by sha256
             document = json.loads(path.read_text())
@@ -199,7 +201,9 @@ class Pins(unittest.TestCase):
 
     def test_the_row_declares_exactly_the_six_ids_and_the_schema_enumerates_them(self):
         self.assertEqual(m.row_ids(ROW), SIX_IDS)
-        self.assertEqual(sorted(SCHEMA["properties"]["check_id"]["enum"]), SIX_IDS)
+        # a4934cc1: the enum is the row's six ids plus the stage manifest's gate check (not a row id)
+        self.assertEqual(sorted(SCHEMA["properties"]["check_id"]["enum"]), sorted(SIX_IDS + ["nwi-s0-exit-gate"]))
+        self.assertNotIn("nwi-s0-exit-gate", ROW["checks"])
         self.assertEqual(SCHEMA["properties"]["schema"]["const"], m.RECEIPT_SCHEMA)
 
     def test_the_vendored_p1_segments_and_epoch_rule_are_byte_identical(self):
@@ -255,7 +259,7 @@ class Minting(unittest.TestCase):
 
     def test_the_pinned_row_is_read_verbatim(self):
         cmds = {i: m.command_declaration(ROW["checks"][i]) for i in SIX_IDS}
-        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at ae8b105d as a verifier built-in
+        binder = ROW["checks"]["supplied-epoch-binder-check"]  # declared at 76407068 (row blob unchanged since ae8b105d) as a verifier built-in
         self.assertEqual(m.verifier_builtin("supplied-epoch-binder-check", binder), "supplied-epoch-binder-check")
         self.assertEqual(binder["offline_command"]["verifier_ref"], "SV-LLM/.github#46")
         self.assertEqual(binder["expected"], {"disposition": "ALLOW"})
@@ -422,6 +426,57 @@ class Minting(unittest.TestCase):
         self.assertNotEqual(bundle["sv_change"]["derived_change_id"], bundle["sv_change"]["change_id"])
         good, _, _ = self.minted({"README": b"x\n"})
         self.assertEqual(good["sv_change"]["derived_change_id"], good["sv_change"]["change_id"])
+
+    def test_unknown_in_a_native_record_is_fail_closed(self):
+        u = m.UNKNOWN
+        for extra, pointers in (({"admission_order_slot": u}, ["/admission_order_slot"]),
+                                ({"base_ref": {"ledger_head": LEDGER_HEAD, "registry_generation": 1, "note": "x " + u}},
+                                 ["/base_ref/note"]),
+                                ({"resolves": ["a", u]}, ["/resolves/1"])):
+            with self.subTest(extra=extra):
+                bundle, receipts, _ = self.minted({"README": b"x\n"}, record_extra=extra)
+                self.assertEqual(sorted(receipts), SIX_IDS)
+                self.assertEqual(self.codes(receipts), {k: ("FAIL_CLOSED", "UNKNOWN_IN_NATIVE_RECORD") for k in SIX_IDS})
+                self.assertEqual({r["failed_predicate"] for r in receipts.values()}, {m.NATIVE_FIELDS_PREDICATE})
+                self.assertEqual(bundle["sv_change"]["native_unknown_pointers"], pointers)
+
+    def test_unknown_outside_the_scanned_native_fields_is_not_unknown_in_native_record(self):
+        u = m.UNKNOWN
+        bundle, receipts, _ = self.minted({"README": b"x\n"}, record_extra={"projection_note": "ok"})
+        self.assertEqual(bundle["sv_change"]["native_unknown_pointers"], [])
+        # /hb_epoch is excluded at admission: the binder's own FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED decides it
+        bundle, receipts, _ = self.minted({"README": b"x\n"}, supplied=u)
+        self.assertEqual(bundle["sv_change"]["native_unknown_pointers"], [])
+        self.assertEqual(self.codes(receipts)["supplied-epoch-binder-check"], ("FAIL_CLOSED", "HB_EPOCH_SOURCE_UNOBSERVED"))
+        self.assertNotIn("UNKNOWN_IN_NATIVE_RECORD", {r.get("failure_code") for r in receipts.values()})
+        # /projection is a non-authority view and writer_session.evidence_class is an enum: neither is scanned
+        self.assertEqual(m.sentinel_pointers({"projection": {"x": u}, "content": [{"writer_session": {"evidence_class": u}}]}), [])
+        self.assertEqual(m.sentinel_pointers({"content": [{"writer_session": {"session": u}}]}), ["/content/0/writer_session/session"])
+
+    def test_unknown_in_a_migrated_record_is_not_unknown_in_native_record(self):
+        bundle, receipts, _ = self.minted({"README": b"x\n"}, record_extra={"record_mode": "MIGRATED_HISTORICAL",
+                                                                           "target_repository": m.UNKNOWN})
+        self.assertNotIn("native_unknown_pointers", bundle["sv_change"])
+        self.assertNotIn("UNKNOWN_IN_NATIVE_RECORD", {r.get("failure_code") for r in receipts.values()})
+
+    def test_the_stage_gate_check_is_not_emitted(self):
+        bundle, receipts, _ = self.minted({"README": b"x\n"})
+        self.assertNotIn("nwi-s0-exit-gate", receipts)
+        gate = bundle["stage_gate_checks"]["nwi-s0-exit-gate"]
+        self.assertIs(gate["emitted"], False)
+        self.assertEqual(gate["status"], "NOT_EMITTED_DECLARATION_INCOMPLETE")
+        self.assertEqual(len(gate["missing"]), 4)
+        manifest = json.loads((PINS / "NWI-S0.json").read_bytes())
+        declared = manifest["exit_gate_check"]
+        self.assertEqual(git_blob((PINS / "NWI-S0.json").read_bytes()), m.STAGE_GATE_MANIFEST_BLOB)
+        self.assertEqual(declared["offline_command"]["verifier_builtin"], "nwi-s0-exit-gate")
+        self.assertEqual(declared["offline_command"]["verifier_ref"], "SV-LLM/.github#46")
+        # what makes it incomplete: no input declaration for the gate's evidence, subject or epoch
+        for key in ("inputs", "evidence", "evidence_source", "change_digest", "head_sha", "hb_epoch", "hb_epoch_readback"):
+            self.assertNotIn(key, declared)
+            self.assertNotIn(key, declared["offline_command"])
+        self.assertEqual({g["evidence"] for g in manifest["exit_gate"]}, {"receipt"})
+        self.assertTrue(all(set(g) == {"evidence", "predicate"} for g in manifest["exit_gate"]))
 
     def test_a_supplied_epoch_in_the_input_is_refused(self):
         bundle, receipts, _ = self.minted({"README": b"x\n"}, extra_input={"hb_epoch": "4000"})
