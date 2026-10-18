@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib
 import importlib.util
 import json
 import subprocess
@@ -656,44 +657,88 @@ class CommittedEvidence(unittest.TestCase):
 
 
 class StageEvaluationEvidence(unittest.TestCase):
-    """The committed nwi-s0-exit-gate stage evaluation (re-derived byte for byte by CI's rederive-stage-evaluation)."""
-    DIR = ROOT / "evidence" / "stage-evaluations" / "NWI-S0-StegVerse-Labs-7898cedb"
-    INPUT = SANDBOX / "s1-stage-evaluations" / "NWI-S0-StegVerse-Labs-7898cedb.json"
+    """The committed nwi-s0-exit-gate stage evaluations (re-derived byte for byte by CI's rederive-stage-evaluation):
+    head-side at #3264 7898cedb (ALLOW) and base-side at main 978b8880 (the manifest under evaluation from the contract pins)."""
+    ROOTDIR = ROOT / "evidence" / "stage-evaluations"
+    BASE_REF = {"registry_generation": 319, "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1"}
+    CASES = {"7898cedb": ("7898cedba1400c8545cebcb463fd26deb25f7d5a", "EVALUATED_COMMIT", "ALLOW", None),
+             "978b8880": ("978b8880d238dc3e3a8b690c0675d8bb0e9d6985", "CONTRACT_PINS", "FAIL_CLOSED", "STAGE_REGRESSION")}
 
-    def test_three_receipts_bound_to_the_subject_digest(self):
-        evaluation = json.loads((self.DIR / "evaluation.json").read_bytes())
-        document = json.loads(self.INPUT.read_bytes())
-        self.assertEqual(evaluation["input_sha256"], "sha256:" + hashlib.sha256(self.INPUT.read_bytes()).hexdigest())
-        self.assertEqual((document["trigger"], evaluation["trigger"]), ("STAGE_GATE_EVALUATION", "STAGE_GATE_EVALUATION"))
-        self.assertIs(evaluation["in_required_checks_row"], False)
-        self.assertIs(evaluation["ledger_appended"], False)
-        subject = evaluation["evaluation_subject"]
-        self.assertEqual(subject, {"repository": "StegVerse-Labs/.github", "stage_id": "NWI-S0",
-                                   "manifest_blob": m.STAGE_GATE_MANIFEST_BLOB,
-                                   "evaluated_commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
-                                   "base_ref": {"registry_generation": 319,
-                                                "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1"}})
-        digest = "sha256:" + hashlib.sha256(m.canon(subject)).hexdigest()  # stage_evaluation_digest
-        self.assertEqual(evaluation["evaluation_subject_digest"], digest)
-        self.assertEqual(evaluation["contract_pins"], m.CONTRACT_PINS)
-        self.assertEqual(evaluation["declaration"]["disposition"], "ALLOW")
-        self.assertEqual(evaluation["hb_epoch"]["hb_epoch"], "469411750")
-        self.assertEqual(evaluation["disposition"], "ALLOW")
-        self.assertEqual(evaluation["gate_outcome"]["entry_transition"], "STAGE_NWI_S1_ADMITTED")
-        names = sorted(p.name for p in self.DIR.glob("*.json") if p.name != "evaluation.json")
-        self.assertEqual(names, ["nwi-s0-exit-gate.json", "schema-validate.json", "unit-tests.json"])
-        for name in names:
-            data = (self.DIR / name).read_bytes()
-            body = json.loads(data)
-            self.assertEqual(m.schema_errors(body, SCHEMA), [], name)
-            self.assertEqual((body["change_digest"], body["head_sha"], body["hb_epoch"]),
-                             (digest, subject["evaluated_commit"], "469411750"), name)
-            self.assertEqual(body["verifier_ref"], m.verifier_ref(), name)
-            self.assertEqual(evaluation["receipts"][body["check_id"]], "sha256:" + hashlib.sha256(data).hexdigest())
-            self.assertEqual(evaluation["receipts_validated"]["results"][body["check_id"]], "ALLOW")
-        evidence = evaluation["gate_outcome"]["record"]["evidence"]
-        for predicate, check_id in (("SV_WORK_ITEM_SCHEMAS_VALIDATE", "schema-validate"), ("EVERY_MIGRATION_FIXTURE_LOADS", "unit-tests")):
-            self.assertEqual(evidence[predicate]["receipt_ref"], evaluation["receipts"][check_id])
+    def load(self, short):
+        d = self.ROOTDIR / ("NWI-S0-StegVerse-Labs-" + short)
+        return d, json.loads((d / "evaluation.json").read_bytes()), SANDBOX / "s1-stage-evaluations" / (d.name + ".json")
+
+    def test_both_evaluations_bind_three_receipts_to_their_subject(self):
+        gate = importlib.import_module("s1_nwi_s0_exit_gate")
+        for short, (commit, source, disposition, code) in self.CASES.items():
+            with self.subTest(short):
+                d, evaluation, path = self.load(short)
+                document = json.loads(path.read_bytes())
+                self.assertEqual(evaluation["input_sha256"], "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest())
+                self.assertEqual((document["trigger"], evaluation["trigger"]), ("STAGE_GATE_EVALUATION", "STAGE_GATE_EVALUATION"))
+                self.assertEqual(evaluation["manifest_source"], source)
+                self.assertIs(evaluation["in_required_checks_row"], False)
+                self.assertIs(evaluation["ledger_appended"], False)
+                subject = evaluation["evaluation_subject"]
+                self.assertEqual(subject, {"repository": "StegVerse-Labs/.github", "stage_id": "NWI-S0",
+                                           "manifest_blob": m.STAGE_GATE_MANIFEST_BLOB, "evaluated_commit": commit,
+                                           "base_ref": self.BASE_REF})
+                digest = "sha256:" + hashlib.sha256(m.canon(subject)).hexdigest()  # stage_evaluation_digest
+                self.assertEqual(evaluation["evaluation_subject_digest"], digest)
+                self.assertEqual(evaluation["contract_pins"], m.CONTRACT_PINS)
+                self.assertEqual(evaluation["declaration"]["disposition"], "ALLOW")
+                self.assertEqual(evaluation["hb_epoch"]["hb_epoch"], "469411750")
+                self.assertEqual((evaluation["disposition"], evaluation.get("failure_code")), (disposition, code))
+                names = sorted(p.name for p in d.glob("*.json") if p.name != "evaluation.json")
+                self.assertEqual(names, ["nwi-s0-exit-gate.json", "schema-validate.json", "unit-tests.json"])
+                for name in names:
+                    data = (d / name).read_bytes()
+                    body = json.loads(data)
+                    self.assertEqual(m.schema_errors(body, SCHEMA), [], name)
+                    self.assertEqual((body["change_digest"], body["head_sha"], body["hb_epoch"]), (digest, commit, "469411750"))
+                    self.assertEqual(body["verifier_ref"], gate.gate_verifier_ref(), name)
+                    self.assertTrue(body["verifier_ref"].startswith("SV-LLM/.github#46:"))  # is_s1_verifier form
+                    self.assertEqual(evaluation["receipts"][body["check_id"]], "sha256:" + hashlib.sha256(data).hexdigest())
+                    self.assertEqual(evaluation["receipts_validated"]["results"][body["check_id"]], "ALLOW")
+                evidence = evaluation["gate_outcome"]["record"].get("evidence") or {}
+                if disposition == "ALLOW":
+                    for predicate, check_id in (("SV_WORK_ITEM_SCHEMAS_VALIDATE", "schema-validate"),
+                                                ("EVERY_MIGRATION_FIXTURE_LOADS", "unit-tests")):
+                        self.assertEqual(evidence[predicate]["receipt_ref"], evaluation["receipts"][check_id])
+
+    def test_the_base_side_failure_is_the_absent_capability(self):
+        d, evaluation, _ = self.load("978b8880")
+        for p in evaluation["producers"]:
+            self.assertEqual((p["outcome"], p["disposition"]), ("CHECK_COMMAND_ABSENT_AT_HEAD", "FAIL_CLOSED"), p["id"])
+            self.assertTrue(p["absent_command_paths"])
+        self.assertEqual(sorted(evaluation["gate_outcome"]["failed"]), ["EVERY_MIGRATION_FIXTURE_LOADS", "SV_WORK_ITEM_SCHEMAS_VALIDATE"])
+        body = json.loads((d / "nwi-s0-exit-gate.json").read_bytes())
+        self.assertEqual((body["disposition"], body["failure_code"], body["failed_predicate"]),
+                         ("FAIL_CLOSED", "STAGE_REGRESSION", "STAGE_GATE_PASSES"))
+
+    def test_the_failing_gate_receipt_derives_one_native_issue_and_nothing_is_appended(self):
+        record = json.loads((self.ROOTDIR / "NWI-S0-issue-derivation.json").read_bytes())
+        self.assertIs(record["simulated_append"], True)
+        self.assertIs(record["ledger_appended"], False)
+        base = record["evaluations"]["NWI-S0-StegVerse-Labs-978b8880"]["receipts"]
+        head = record["evaluations"]["NWI-S0-StegVerse-Labs-7898cedb"]["receipts"]
+        ids = set()
+        for check_id, entry in base.items():
+            issue = entry["sv_issue"]
+            self.assertEqual((issue["record_mode"], issue["lifecycle_state"]), ("NATIVE", "OPENED"), check_id)
+            self.assertEqual(issue["observed_base"], self.BASE_REF)
+            ids.add(issue["issue_id"])
+        self.assertEqual(len(ids), 3)  # one issue per failing receipt
+        gate_issue = base["nwi-s0-exit-gate"]["sv_issue"]
+        self.assertEqual(gate_issue["surface"]["path"], m.STAGE_GATE_MANIFEST_FILE)
+        self.assertEqual(gate_issue["violated_invariant"]["rule_id"], "NWI-S0#exit_gate_check.nwi-s0-exit-gate")
+        for entry in head.values():  # an ALLOW receipt derives nothing
+            self.assertEqual(entry["refused"]["failure_code"], "CHECK_RECEIPT_NOT_FAILING")
+        resolution = record["resolution"]
+        self.assertEqual(resolution["at_change_base"]["result"], [])  # not on the ledger at #3264's base: unobserved
+        facts = resolution["after_simulated_append_and_rebase"]["result"]
+        self.assertEqual([f["issue_id"] for f in facts], [gate_issue["issue_id"]])
+        self.assertTrue(facts[0]["verifier_ref"].startswith("SV-LLM/.github#46:"))
 
     def test_the_sv_change_minter_never_emits_the_gate(self):
         for bundle in EVIDENCE.glob("*/bundle.json"):

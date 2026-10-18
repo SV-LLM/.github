@@ -50,6 +50,18 @@ assert m.render(a) == m.render(b) and {k: m.render(v) for k, v in ra.items()} ==
 assert {r["change_digest"] for r in ra.values()} == {a["evaluation_subject_digest"]}
 assert {r["head_sha"] for r in ra.values()} == {BASE["evaluated_commit"]} and {r["hb_epoch"] for r in ra.values()} == {"469411750"}
 
+# base-side (manifest under evaluation from the contract pins): the committed 978b8880 subject fails closed on the
+# absent capability, and its receipts are valid gate receipts
+BASE_SIDE = json.loads(Path("sandbox/s1-stage-evaluations/NWI-S0-StegVerse-Labs-978b8880.json").read_text())
+c, rc_ = run(BASE_SIDE)
+assert c["disposition"] == "FAIL_CLOSED" and c["failure_code"] == "STAGE_REGRESSION", c.get("failure_code")
+assert {r["failure_code"] for k, r in rc_.items() if k != "nwi-s0-exit-gate"} == {"CHECK_COMMAND_ABSENT_AT_HEAD"}
+assert c["evaluation_subject_digest"] != a["evaluation_subject_digest"]
+refused(*run({**BASE_SIDE, "manifest_source": "HEAD_TREE"}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
+refused(*run({**BASE_SIDE, "evaluated_commit": "1" * 40}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")  # commit unobserved
+# without the contract-pins source the base tree carries no manifest: the subject is unobserved, nothing is emitted
+refused(*run({k: v for k, v in BASE_SIDE.items() if k != "manifest_source"}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
+
 # 1. subject unobserved
 refused(*run({**BASE, "base_ref": {**BASE["base_ref"], "registry_generation": 318}}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
 refused(*run({**BASE, "evaluated_commit": "7898cedb"}), "STAGE_EVALUATION_SUBJECT_UNOBSERVED")
