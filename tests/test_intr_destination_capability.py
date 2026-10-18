@@ -312,7 +312,7 @@ class AddressedAndClosedTests(RedirectedLedgers):
         super().setUp()
         # This kernel's custody requires a declared organization-ledger genesis.
         # The mesh and both ledgers stay in the temporary roots.
-        crossing.open_organization_ledger()
+        crossing.open_organization_ledger(hb_epoch=4000)
 
     def publish(self, payload, service, packet_id, origin=PEER):
         packet = kernel.build_packet(

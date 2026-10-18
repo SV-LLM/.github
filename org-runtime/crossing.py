@@ -127,7 +127,17 @@ def require_manifest(manifest:Any)->dict[str,Any]:
         raise Refused("MANIFEST_DESTINATION_MISSING")
     return manifest
 
-def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT, genesis:bool=False)->dict[str,Any]:
+def require_supplied_epoch(hb_epoch:Any)->None:
+    """Refuse an absent or invalid epoch six-field FAIL_CLOSED before anything is written.
+
+    SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH: the organization ledger's shared
+    rule decides, and no clock is ever read in place of the supplied epoch.
+    """
+    refusal=organization_ledger.epoch_refusal(hb_epoch)
+    if refusal is not None: raise organization_ledger.OrgLedgerEpochRefused(refusal)
+
+def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT, genesis:bool=False,
+           hb_epoch:Any=None)->dict[str,Any]:
     """Append one transition to the repository ledger, then the organization ledger.
 
     The organization chain is opened only by an explicit genesis transition
@@ -135,12 +145,14 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
     is refused FAIL_CLOSED ORG_LEDGER_GENESIS_NOT_DECLARED.
     """
     require_ledger_locations()
+    require_supplied_epoch(hb_epoch)  # before either ledger is written
     predecessor=sha(subject); successor=sha(outcome)
     transition_id=transition_class+":"+successor[7:31]
     run=subprocess.run([sys.executable,str(root/".stegverse/transition-ledger/emit.py"),
                         "--transition-id",transition_id,"--transition-class",transition_class,
                         "--predecessor-state-sha256",predecessor,"--successor-state-sha256",successor,
-                        "--evidence-json",json.dumps(outcome,sort_keys=True),"--authority-effect","NONE"],
+                        "--evidence-json",json.dumps(outcome,sort_keys=True),"--authority-effect","NONE",
+                        "--hb-epoch",str(hb_epoch)],
                        capture_output=True,text=True,env=dict(os.environ))
     if run.returncode!=0: raise SystemExit("REPO_LEDGER_APPEND_FAILED:"+run.stderr.strip()[-300:])
     repo_receipt=json.loads(run.stdout)
@@ -148,10 +160,10 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         repo_receipt,org_transition_class=transition_class,
         boundary_evidence={"disposition":outcome["disposition"],"credential_authority":CREDENTIAL_AUTHORITY,
                            "transition_authority":"Interlock/InTr"},
-        authority_effect="NONE",genesis=genesis)
+        authority_effect="NONE",genesis=genesis,hb_epoch=hb_epoch)
     return {"repo_receipt_sha256":repo_receipt["receipt_sha256"],"org_receipt_sha256":org_receipt["receipt_sha256"]}
 
-def open_organization_ledger(root:Path=ROOT)->dict[str,Any]:
+def open_organization_ledger(root:Path=ROOT, *, hb_epoch:Any=None)->dict[str,Any]:
     """Open this organization's ledger chain with a declared genesis transition.
 
     Genesis is declared state, never inferred from an empty ledger. Against a
@@ -161,7 +173,7 @@ def open_organization_ledger(root:Path=ROOT)->dict[str,Any]:
     subject={"intended_action":"OPEN_ORGANIZATION_LEDGER","organization":ORG}
     outcome={"disposition":"ALLOW","organization":ORG,"authority_effect":"NONE"}
     return {"transition_class":LEDGER_OPENED,**outcome,
-            **record(LEDGER_OPENED,subject=subject,outcome=outcome,root=root,genesis=True)}
+            **record(LEDGER_OPENED,subject=subject,outcome=outcome,root=root,genesis=True,hb_epoch=hb_epoch)}
 
 def carrier_custody(root:Path)->dict[str,Any]:
     """This organization's custody over its supplied ledgers, which the kernel requires.
@@ -214,9 +226,10 @@ def destination_address(manifest:dict[str,Any], peer:dict[str,Any])->tuple[str,d
              "manifest":carried,"manifest_sha256":sha(carried)})
 
 def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, root:Path=ROOT,
-           now_ns:int|None=None)->dict[str,Any]:
+           now_ns:int|None=None, hb_epoch:Any=None)->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_OUTBOUND","manifest":manifest}
     require_ledger_locations()  # before any frame is published: an unrecordable emission must not happen
+    require_supplied_epoch(hb_epoch)
     try:
         manifest=require_manifest(manifest)
         peer=resolve_peer(manifest["destination"]["organization"],root)
@@ -230,14 +243,14 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
         published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,now_ns=now_ns)
     except Refused as refused:
         outcome=refusal_outcome(refused,EGRESS_RETRY,manifest_sha256=sha(manifest))
-        return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
+        return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
     outcome={"disposition":ALLOW,"manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),
              "destination_organization":packet["destination"]["org"],"destination_service":destination_service,
              "packet_id":packet["packet_id"],"frame_sha256":published["frame"]["frame_sha256"],
              "receiver_unavailable_disposition":"DURABLE_QUEUE_OR_EVENT_EPHEMERAL_MATERIALIZATION",
              "awaits_receiver":False}
     return {"transition_class":EGRESS_EMITTED,**outcome,"spool_path":published["path"],
-            **record(EGRESS_EMITTED,subject=subject,outcome=outcome,root=root)}
+            **record(EGRESS_EMITTED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
 
 def _materialize(node_state:Any, repository:str, packet:dict[str,Any])->tuple[str,dict[str,Any]]:
     """Materialize a manifest for an existing repository, once, in this node's own state.
@@ -255,7 +268,7 @@ def _materialize(node_state:Any, repository:str, packet:dict[str,Any])->tuple[st
     except kernel.node_store_module.WriteOnceCollision: raise Refused("MATERIALIZATION_WRITE_ONCE_COLLISION")
     return node_state.locator(key),record
 
-def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any])->dict[str,Any]:
+def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any], hb_epoch:Any=None)->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND","frame_sha256":frame.get("frame_sha256")}
     try:
         try: packet=kernel.recover_packet(frame)
@@ -270,7 +283,7 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
             outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
                      "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"],
                      **{key:result[key] for key in SELECTION_FIELDS}}
-            return {"transition_class":INGRESS_CONSUMED,**outcome,**record(INGRESS_CONSUMED,subject=subject,outcome=outcome,root=root)}
+            return {"transition_class":INGRESS_CONSUMED,**outcome,**record(INGRESS_CONSUMED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
         manifest=require_manifest(manifest)
         if manifest["destination"]["organization"]!=ORG: raise Refused("MANIFEST_DESTINATION_ORGANIZATION_MISMATCH")
         standing=kernel.node_standing(root)
@@ -286,14 +299,15 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
     except Refused as refused:
         outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=frame.get("packet_id"),
                                 origin_organization=frame.get("origin_org"))
-        return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}
+        return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
     outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
              "manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),"destination_repository":ORG+"/"+name,
              "materialization_sha256":sha(materialized),**{key:selected[key] for key in SELECTION_FIELDS}}
     return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":path,
-            **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root)}
+            **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
 
-def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Path=ROOT)->list[dict[str,Any]]:
+def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Path=ROOT,
+            hb_epoch:Any=None)->list[dict[str,Any]]:
     """Consume every frame addressed to SV-LLM not already consumed. Never waits for one.
 
     Without a supplied mesh there is nothing this boundary may scan, and
@@ -302,6 +316,7 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
     resolved against the host or the checkout. Nothing is consumed then.
     """
     require_ledger_locations()  # before any frame is consumed or marked seen
+    require_supplied_epoch(hb_epoch)
     for location,predicate,reason,field in (
             (mesh_root,MESH_LOCATION_REQUIRED,"frames are scanned only from a mesh supplied as mesh_root","mesh_location"),
             (node_state_root,NODE_STATE_LOCATION_REQUIRED,
@@ -312,14 +327,14 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
             subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_INBOUND",field:None}
             outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=None,origin_organization=None)
             return [{"transition_class":INGRESS_REFUSED,**outcome,
-                     **record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root)}]
+                     **record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}]
     node_state=kernel.addressed_node_state_store(node_state_root)
     # Dispatch processes nothing for a caller that cannot record it; this pass
     # records every disposition below, so it holds the organization's custody.
     custody=carrier_custody(root)
     results=[]
     for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state)):
-        result=_ingest(root,item["frame"],node_state,custody)
+        result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
         kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)
     return results
@@ -330,15 +345,21 @@ def main()->int:
     e.add_argument("--mesh-root",type=Path,required=True)
     i=sub.add_parser("ingress"); i.add_argument("--mesh-root",type=Path,required=True)
     i.add_argument("--node-state-root",type=Path,required=True)
-    sub.add_parser("open-ledger")
+    o=sub.add_parser("open-ledger")
+    for parser in (e,i,o):
+        parser.add_argument("--hb-epoch",type=str,default=None,
+                            help="heartbeat epoch, supplied (ASCII [0-9]+, >= 32); never derived from a clock")
     ns=p.parse_args()
-    if ns.cmd=="open-ledger":
-        out=open_organization_ledger()
-    elif ns.cmd=="egress":
-        out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
-                   mesh_root=ns.mesh_root)
-    else:
-        out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root)
+    try:
+        if ns.cmd=="open-ledger":
+            out=open_organization_ledger(hb_epoch=ns.hb_epoch)
+        elif ns.cmd=="egress":
+            out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
+                       mesh_root=ns.mesh_root,hb_epoch=ns.hb_epoch)
+        else:
+            out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root,hb_epoch=ns.hb_epoch)
+    except organization_ledger.OrgLedgerEpochRefused as refused:
+        print(json.dumps(refused.refusal,sort_keys=True)); return 1
     print(json.dumps(out,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())
