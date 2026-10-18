@@ -49,6 +49,8 @@ jobs:
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3263-690d3ef1}
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-fbf1fa46}
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-4dcf3cd4}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
     steps:
       - uses: actions/checkout@v4
         with:
