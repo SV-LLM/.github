@@ -1,0 +1,77 @@
+name: S1 hop head verifier
+
+# S1 SV-LLM sandbox verifier (sandbox/s1_hop_head_verifier.py). `test` runs
+# its unit tests. `rederive` re-derives, on this runner, every committed
+# receipt whose head is in a public repository: it fetches that pull request's
+# head read-only (no credential), runs the verifier offline against it, and
+# requires the receipt bytes to equal the committed ones. The verifier itself
+# reads no clock, dispatches nothing and appends no ledger. Receipts are
+# admission-input evidence, not authentic organization-ledger receipts.
+on:
+  pull_request:
+    paths:
+      - 'sandbox/**'
+      - 'evidence/s1-hop-head/**'
+      - 'tests/test_s1_hop_head_verifier.py'
+      - '.github/workflows/s1-hop-head-verifier.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sandbox/**'
+      - 'evidence/s1-hop-head/**'
+      - 'tests/test_s1_hop_head_verifier.py'
+      - '.github/workflows/s1-hop-head-verifier.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Unit tests (negatives, determinism, shared epoch rule, committed receipts)
+        run: |
+          python3 -m py_compile sandbox/s1_hop_head_verifier.py
+          python3 -B tests/test_s1_hop_head_verifier.py -v
+
+  rederive:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: SV-LLM/.github, number: 41, input: SV-LLM-41}
+          - {repository: StegVerse-org/.github, number: 181, input: StegVerse-org-181}
+          - {repository: StegVerse-Labs/.github, number: 3206, input: StegVerse-Labs-3206}
+          - {repository: Admissible-Existence/.github, number: 95, input: Admissible-Existence-95}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch the declared head read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          NUMBER: ${{ matrix.number }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "sandbox/s1-inputs/$INPUT.json")
+          git init -q "$RUNNER_TEMP/head"
+          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "refs/pull/$NUMBER/head"
+          test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+          echo "fetched $REPOSITORY#$NUMBER at $head"
+      - name: Re-derive the receipt and compare bytes
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -uo pipefail
+          committed=$(ls evidence/s1-hop-head/"$INPUT"-*.json)
+          python3 -P sandbox/s1_hop_head_verifier.py --input "sandbox/s1-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" --out "$RUNNER_TEMP/receipt.json"
+          echo "verifier exit $? (0 only for ALLOW)"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
+          cmp "$committed" "$RUNNER_TEMP/receipt.json"
+          echo "re-derived receipt is byte-identical to $committed"
