@@ -80,6 +80,7 @@ def commands_row(entries: dict) -> bytes:
 def sealed_readback(epoch="4000", ledger_head=LEDGER_HEAD, **override):
     """A sealed readback of the shape P1's verify_admission_hb_epoch accepts (what #3266 does not yet seal)."""
     body = {"schema": eb.READBACK_SCHEMA, "component_id": "RTC-SV-CHANGE-BASE-STATE-READBACK-014",
+            "repository": "Fixture/repo",
             "disposition": "ALLOW", "base_ref": {"ledger_head": ledger_head, "registry_generation": 1},
             "hb_epoch": epoch, "hb_epoch_source": {"ledger_head": ledger_head, "field": eb.HB_EPOCH_SOURCE_FIELD,
                                                    "receipt": "receipts/" + "c" * 64 + ".json"}}
@@ -170,10 +171,10 @@ class Pins(unittest.TestCase):
                              (m.PIN_COMMIT, m.ROW_BLOB, m.RECEIPT_SCHEMA_BLOB), path.name)
 
     def test_the_3266_readback_pins_have_not_drifted(self):
-        self.assertEqual(eb.READBACK_PIN_COMMIT, "641f4b03e612d07047e15f2384d24780e2af86c0")
+        self.assertEqual(eb.READBACK_PIN_COMMIT, "2ba0e329c224c94863dac15de3f8011f777cb34f")
         vendored = (PINS / "sv_change_base_state_readback.py").read_bytes()
         self.assertEqual(git_blob(vendored), eb.READBACK_COMPONENT_BLOB)
-        self.assertTrue(eb.READBACK_COMPONENT_BLOB.startswith("fbd453e5"))
+        self.assertTrue(eb.READBACK_COMPONENT_BLOB.startswith("2c730142"))
         self.assertIn(('RESULT_SCHEMA = "' + eb.READBACK_SCHEMA + '"').encode(), vendored)
         def segments(source):
             return {n.name: hashlib.sha256(ast.get_source_segment(source, n).encode()).hexdigest()
@@ -409,6 +410,40 @@ class Minting(unittest.TestCase):
                 "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1", "field": "$.hb_reference.epoch",
                 "receipt": "receipts/35810b6598e99cef32d9a0f1f97d07394d9f21c540ed7d3a395d9d78b753db3d.json"}, path.name)
             self.assertEqual(eb.readback_epoch(body, "a5bb54d81893b392a3ce28182986fc39857807e1"), ("469411750", None))
+            # #3266 @2ba0e329, --hb-epoch omitted: ALLOW carries the not-cross-checked pair, and the seal moved with it
+            self.assertEqual(body["disposition"], "ALLOW", path.name)
+            self.assertEqual(eb.readback_cross_check(body), {"cross_checked": False,
+                                                             "hb_epoch_cross_check": "HB_EPOCH_NOT_CROSS_CHECKED"}, path.name)
+            self.assertEqual(body["main_ref"], "refs/remotes/origin/main", path.name)
+        seals = {p.name: json.loads(p.read_text())["result_sha256"] for p in READBACKS.glob("*.json")}
+        self.assertEqual(seals, {
+            "StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json":
+                "sha256:084f638e3663a3f25f789aa3c7a4118d33911dcf27c93379bf384113afb35d6a",  # was ec20c103 at 641f4b03
+            "StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json":
+                "sha256:d8fee09a0d33d3e9025a6a918865eb53fff2a5f6b24baf50c24173766651403f"})  # was 44ec01c0 at 641f4b03
+
+    def test_the_readback_cross_check_fields_are_carried_not_judged(self):
+        omitted = sealed_readback(cross_checked=False, hb_epoch_cross_check="HB_EPOCH_NOT_CROSS_CHECKED")
+        ran = sealed_readback()
+        for rb, want in ((omitted, {"cross_checked": False, "hb_epoch_cross_check": "HB_EPOCH_NOT_CROSS_CHECKED"}),
+                         (ran, {"cross_checked": None, "hb_epoch_cross_check": None})):
+            result = eb.binder_check("4000", rb, LEDGER_HEAD)
+            self.assertEqual(result["disposition"], "ALLOW")
+            self.assertEqual(result["readback_cross_check"], want)
+            bundle, receipts, _ = self.minted({"README": b"x\n"}, readback=rb)
+            self.assertEqual(bundle["hb_epoch_source"]["readback_cross_check"], want)
+            check = [c for c in bundle["checks"] if c["id"] == "supplied-epoch-binder-check"][0]
+            self.assertEqual(check["readback_cross_check"], want)
+            self.assertIs(check["cross_checked"], True)  # the binder's own cross-check of the record's epoch ran
+            self.assertEqual(receipts["supplied-epoch-binder-check"]["disposition"], "ALLOW")
+            self.assertNotIn("cross_checked", receipts["supplied-epoch-binder-check"])  # bundle only (schema has no slot)
+
+    def test_a_readback_of_another_repository_is_unobserved(self):
+        self.assert_source_unobserved(readback=sealed_readback(repository="Other/repo"))
+        self.assertEqual(eb.binder_check("4000", sealed_readback(repository="Other/repo"), LEDGER_HEAD,
+                                         "Fixture/repo")["failure_code"], "HB_EPOCH_SOURCE_UNOBSERVED")
+        self.assertEqual(eb.binder_check("4000", sealed_readback(repository="Other/repo"), LEDGER_HEAD)["disposition"],
+                         "ALLOW")  # no target_repository given: not checked (as P1)
 
     def test_the_comparison_is_numeric_after_726248a5(self):
         rb = sealed_readback("1024")

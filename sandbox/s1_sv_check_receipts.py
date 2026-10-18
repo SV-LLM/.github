@@ -47,7 +47,7 @@ expected stands), as is a run that does not complete; clean and as expected is A
 Receipt stegverse.sv_check_receipt.v1: check_id, disposition, change_digest
 (== head.change_digest == 'sha256:' + change_id hex), head_sha, hb_epoch
 (ADMISSION_HB_EPOCH_IS_THE_BOUND_LEDGER_HEAD_EPOCH: the epoch Lane C's readback,
-StegVerse-Labs/.github#3266 641f4b03, sealed at the record's base_ref.ledger_head,
+StegVerse-Labs/.github#3266 2ba0e329, sealed at the record's base_ref.ledger_head,
 read from the input's hb_epoch_readback {file, sha256}; the input carries no
 hb_epoch, and an unobserved source is a bundle-level FAIL_CLOSED
 HB_EPOCH_SOURCE_UNOBSERVED with no receipts -- never a supplied constant or a
@@ -501,7 +501,7 @@ def sealed_epoch(document: Mapping[str, Any], change: Mapping[str, Any]) -> tupl
     """(epoch, readback, ledger_head): the receipt epoch, read from the sealed readback at base_ref.ledger_head."""
     readback = load_readback(document.get("hb_epoch_readback"))
     ledger_head = (change.get("base_ref") or {}).get("ledger_head") if isinstance(change.get("base_ref"), Mapping) else None
-    epoch, refusal = eb.readback_epoch(readback, ledger_head)
+    epoch, refusal = eb.readback_epoch(readback, ledger_head, change.get("target_repository"))
     if refusal is not None:
         raise Global.of(refusal)
     return epoch, readback, ledger_head
@@ -545,7 +545,7 @@ SAFE_PATH = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\0]+$")
 
 
 BUILTINS = {eb.CHECK_ID: lambda change, readback, ledger_head: eb.binder_check(change.get("hb_epoch"), readback,
-                                                                             ledger_head)}
+                                                                             ledger_head, change.get("target_repository"))}
 BUILTIN_REF = "SV-LLM/.github#46"
 
 
@@ -724,6 +724,7 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
         epoch, readback, ledger_head = sealed_epoch(document, change)
         bundle.update(hb_epoch=epoch, hb_epoch_source={
             "ledger_head": ledger_head, "readback_result_sha256": readback.get("result_sha256"),
+            "readback_cross_check": eb.readback_cross_check(readback),
             "field": eb.HB_EPOCH_SOURCE_FIELD, "readback_component": {
                 "repository": eb.READBACK_REPOSITORY, "pr": eb.READBACK_PR, "commit": eb.READBACK_PIN_COMMIT,
                 "file": eb.READBACK_COMPONENT_FILE, "blob_sha": eb.READBACK_COMPONENT_BLOB}})
@@ -794,7 +795,8 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
                                          "failure_code": result.get("failure_code"),
                                          "supplied_hb_epoch": result.get("supplied_hb_epoch"),
                                          "readback_hb_epoch": result.get("readback_hb_epoch"),
-                                         "cross_checked": result.get("cross_checked")})
+                                         "cross_checked": result.get("cross_checked"),
+                                         "readback_cross_check": result.get("readback_cross_check")})
                 continue
             declared = command_declaration(entry)
             if isinstance(declared, str):

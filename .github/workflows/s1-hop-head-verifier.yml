@@ -90,13 +90,13 @@ jobs:
           assert found == m.P1_SEGMENT_SHA256, found
           print("P1 segments byte-identical at", m.PIN_COMMIT)
           PY
-      - name: Pinned readback equals StegVerse-Labs/.github#3266 at 641f4b03; vendored canon/seal are its bytes
+      - name: Pinned readback equals StegVerse-Labs/.github#3266 at 2ba0e329; vendored canon/seal are its bytes
         run: |
           set -euo pipefail
-          rb=641f4b03e612d07047e15f2384d24780e2af86c0
+          rb=2ba0e329c224c94863dac15de3f8011f777cb34f
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$rb"
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$rb:resident-runtime/sv_change_base_state_readback.py")" = fbd453e531fc8d8f62261d2a72bc7a596798a445
-          test "$(git hash-object sandbox/s1_pins/sv_change_base_state_readback.py)" = fbd453e531fc8d8f62261d2a72bc7a596798a445
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$rb:resident-runtime/sv_change_base_state_readback.py")" = 2c730142254b78a5b9e1c05566fe6f5111b7d571
+          test "$(git hash-object sandbox/s1_pins/sv_change_base_state_readback.py)" = 2c730142254b78a5b9e1c05566fe6f5111b7d571
           git -C "$RUNNER_TEMP/labs" show "$rb:resident-runtime/sv_change_base_state_readback.py" | cmp - sandbox/s1_pins/sv_change_base_state_readback.py
           python3 - <<'PY'
           import ast, hashlib, sys

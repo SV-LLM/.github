@@ -12,25 +12,28 @@ rbs = {"ok": t.sealed_readback(), "null": t.sealed_readback(None, hb_epoch_sourc
        "real": json.load(open("sandbox/s1-base-state-readbacks/StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json")),
        "none": None, "observed_deny": t.sealed_readback(disposition="DENY", failure_code="HB_EPOCH_MISMATCH"),
        "bad_receipt_path": t.sealed_readback(hb_epoch_source={"ledger_head": H, "field": eb.HB_EPOCH_SOURCE_FIELD, "receipt": "x"}), "1024": t.sealed_readback("1024"),
-       "real3266": json.load(open("sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json"))}
+       "real3266": json.load(open("sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json")),
+       "not_cross_checked": t.sealed_readback(cross_checked=False, hb_epoch_cross_check="HB_EPOCH_NOT_CROSS_CHECKED"),
+       "other_repo": t.sealed_readback(repository="Other/repo"), "no_repo": t.sealed_readback(repository=...)}
 n, ruling = 0, []
 for rn, rb in rbs.items():
     head = "a5bb54d81893b392a3ce28182986fc39857807e1" if rn.startswith("real") else H
     for s in ("4000", "4001", "04000", "+4000", None, "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED", "01024", "1024", "469411750",
               "", "null", "NULL", " 4000", 4000, True, "NOT_CROSS_CHECKED"):
         mine_s, theirs_s = (eb.HB_EPOCH_NOT_CROSS_CHECKED, w.HB_EPOCH_NOT_CROSS_CHECKED) if s == "NOT_CROSS_CHECKED" else (s, s)
-        mine = eb.binder_check(mine_s, rb, head)
-        try:
-            ok = w.verify_admission_hb_epoch(theirs_s, rb, head); theirs = ("ALLOW", None)
-            assert ok.get("cross_checked", True) == mine["cross_checked"] and ok["hb_epoch"] == mine["readback_hb_epoch"], (rn, s, ok, mine)
-        except Exception as e:
-            rec = getattr(e, "record", {}); theirs = (rec.get("disposition"), rec.get("failure_code"))
-        got = (mine["disposition"], mine.get("failure_code"))
-        n += 1
-        if got == theirs:
-            continue
-        raise AssertionError((rn, s, got, theirs))
+        for target in (None, "Fixture/repo", "StegVerse-Labs/.github"):
+            mine = eb.binder_check(mine_s, rb, head, target)
+            try:
+                ok = w.verify_admission_hb_epoch(theirs_s, rb, head, target_repository=target); theirs = ("ALLOW", None)
+                assert ok.get("cross_checked", True) == mine["cross_checked"] and ok["hb_epoch"] == mine["readback_hb_epoch"], (rn, s, ok, mine)
+            except Exception as e:
+                rec = getattr(e, "record", {}); theirs = (rec.get("disposition"), rec.get("failure_code"))
+            got = (mine["disposition"], mine.get("failure_code"))
+            n += 1
+            if got == theirs:
+                continue
+            raise AssertionError((rn, s, target, got, theirs))
 assert eb.binder_check("01024", rbs["1024"], H)["disposition"] == "ALLOW"
 assert eb.binder_check("469411750", rbs["real3266"], "a5bb54d81893b392a3ce28182986fc39857807e1")["disposition"] == "ALLOW"
-print(n, "cases: binder_check agrees with P1 sv_work_items.verify_admission_hb_epoch (disposition, failure_code, "
+print(n, "cases: binder_check agrees with P1 sv_work_items.verify_admission_hb_epoch (disposition, failure_code, with and without target_repository, "
       "and on ALLOW the sealed epoch and cross_checked)")

@@ -23,6 +23,6 @@
   },
   "hb_epoch_readback": {
     "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json",
-    "sha256": "sha256:036863cca947f86c2513dde81428dd074295279102361e06455b27c4c49f7993"
+    "sha256": "sha256:6c7d9abbce96f7373611ed5448941508697a063b5935cd1e2fc529d7461ad1b0"
   }
 }
