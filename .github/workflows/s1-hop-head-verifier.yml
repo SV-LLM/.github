@@ -12,6 +12,11 @@ name: S1 hop head verifier
 # dependency commit the head's own .sv/required-checks.json declares (interim
 # basis until SV-CHANGE-REQUIRED-CHECKS-001 is published), runs the declared
 # checks offline twice, and requires byte equality with the committed receipt.
+# `rederive-stage-evaluation` re-derives the committed nwi-s0-exit-gate stage
+# evaluation (sandbox/s1_nwi_s0_exit_gate.py) byte for byte. It is a verifier
+# rederive on this PR, NOT a stage-gate trigger: the gate is evaluated once per
+# STAGE_GATE evaluation subject, never on push, PR head or schedule, and this
+# job evaluates only the committed subject, appending nothing.
 on:
   pull_request:
     paths:
@@ -19,6 +24,8 @@ on:
       - 'evidence/s1-hop-head/**'
       - 'evidence/s1-required-checks/**'
       - 'evidence/sv-check-receipts/**'
+      - 'evidence/stage-evaluations/**'
+      - 'tests/s1_gate_negatives.py'
       - 'tests/test_s1_hop_head_verifier.py'
       - 'tests/test_s1_required_checks_verifier.py'
       - 'tests/test_s1_sv_check_receipts.py'
@@ -30,6 +37,8 @@ on:
       - 'evidence/s1-hop-head/**'
       - 'evidence/s1-required-checks/**'
       - 'evidence/sv-check-receipts/**'
+      - 'evidence/stage-evaluations/**'
+      - 'tests/s1_gate_negatives.py'
       - 'tests/test_s1_hop_head_verifier.py'
       - 'tests/test_s1_required_checks_verifier.py'
       - 'tests/test_s1_sv_check_receipts.py'
@@ -60,22 +69,37 @@ jobs:
         run: |
           python3 -m py_compile sandbox/s1_sv_check_receipts.py
           python3 -B tests/test_s1_sv_check_receipts.py -v
-      - name: Pinned blobs equal StegVerse-Labs/.github#3264 at 76407068; vendored P1 segments are its bytes
+      - name: P1 files resolve through the pinned contract-pins.json (sha256 317aef68) at StegVerse-Labs/.github#3264 7898cedb; vendored P1 segments are its bytes
         run: |
           set -euo pipefail
-          pin=764070689f0dd793c987d27d7cbf3252f37a6b47
+          pin=$(python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; print(m.CONTRACT_PINS["commit"])')
           git init -q "$RUNNER_TEMP/labs"
           git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/required-checks.json")" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:schemas/sv-check-receipt.v1.schema.json")" = a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3
-          test "$(git hash-object sandbox/s1_pins/required-checks.json)" = 9c75778f0a88e0bb4c50a44a9d54a72bc40a496d
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:resident-runtime/sv_work_items.py")" = 625b12f7c637b030eccc2fea03d745d12e4d36d8
-          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_supplied_epoch_binder as eb, s1_sv_check_receipts as m; assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"].startswith("625b12f7")' 
-          test "$(git hash-object sandbox/s1_pins/sv-check-receipt.v1.schema.json)" = a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3
-          # nwi-s0-exit-gate is declared in the stage manifest, not the row: vendored manifest equals the pinned blob
-          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$pin:data/sv-work-items/stages/NWI-S0.json")" = d5467533df4d604e7948805a07792829472992f1
-          test "$(git hash-object sandbox/s1_pins/NWI-S0.json)" = d5467533df4d604e7948805a07792829472992f1
-          python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; assert m.STAGE_GATE_MANIFEST_BLOB == "d5467533df4d604e7948805a07792829472992f1"'
+          git -C "$RUNNER_TEMP/labs" show "$pin:data/sv-work-items/contract-pins.json" | cmp - sandbox/s1_pins/contract-pins.json
+          python3 - "$RUNNER_TEMP/labs" "$pin" <<'PY'
+          import hashlib, json, subprocess, sys
+          sys.path.insert(0, "sandbox")
+          import s1_sv_check_receipts as m, s1_supplied_epoch_binder as eb
+          labs, pin = sys.argv[1], sys.argv[2]
+          def show(path):
+              return subprocess.run(["git", "-C", labs, "show", pin + ":" + path], check=True, capture_output=True).stdout
+          def blob(data):
+              return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+          manifest = show(m.CONTRACT_PINS["file"])
+          assert "sha256:" + hashlib.sha256(manifest).hexdigest() == m.CONTRACT_PINS["sha256"], "contract-pins.json drifted"
+          entries = json.loads(manifest)["files"]
+          for path in m.USED_P1_FILES:  # each used file: its bytes at the pin match its manifest entry
+              data = show(path)
+              assert entries[path] == {"blob": blob(data), "sha256": "sha256:" + hashlib.sha256(data).hexdigest()}, path
+              assert m.p1_blob(path) == entries[path]["blob"], path
+          for path, want in m.UNLISTED_P1_FILES.items():
+              assert path not in entries and blob(show(path)) == want, path
+          for vendored, path in (("required-checks.json", m.ROW_FILE), ("sv-check-receipt.v1.schema.json", m.RECEIPT_SCHEMA_FILE),
+                                 ("NWI-S0.json", m.STAGE_GATE_MANIFEST_FILE), ("sv-change.v1.schema.json", "schemas/sv-change.v1.schema.json")):
+              assert blob(open("sandbox/s1_pins/" + vendored, "rb").read()) == m.p1_blob(path), vendored
+          assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"] == m.p1_blob("resident-runtime/sv_work_items.py")
+          print("contract-pins", m.CONTRACT_PINS["sha256"], "resolves", len(m.USED_P1_FILES), "used P1 files at", pin)
+          PY
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
           python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
           import ast, hashlib, sys
@@ -115,7 +139,7 @@ jobs:
       - name: Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin
         run: |
           set -euo pipefail
-          pin=764070689f0dd793c987d27d7cbf3252f37a6b47
+          pin=7898cedba1400c8545cebcb463fd26deb25f7d5a
           git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > /dev/null
           rm -rf "$RUNNER_TEMP/p1" && mkdir -p "$RUNNER_TEMP/p1"
           git -C "$RUNNER_TEMP/labs" archive "$pin" | tar -x -C "$RUNNER_TEMP/p1"
@@ -280,7 +304,7 @@ jobs:
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
           - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
           # P1's #3264 head itself; its SV_CHANGE record is P1's out-of-tree record, pinned by sha256 (not copied here)
-          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-76407068}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-7898cedb}
           # dd8bfd02 is not fetchable (no public ref) and has no #3266 readback: HB_EPOCH_SOURCE_UNOBSERVED
           - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
     steps:
@@ -342,3 +366,46 @@ jobs:
             python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(sys.argv[1].rsplit("/",1)[1], r.get("disposition"), r.get("failure_code"))' "$f"
           done
           echo "re-minted receipts are byte-identical to evidence/sv-check-receipts/$INPUT"
+  rederive-stage-evaluation:
+    # Verifier rederive of committed evidence on this PR; not a stage-gate trigger (see the header).
+    name: "verifier rederive: nwi-s0-exit-gate stage evaluation (not a stage-gate trigger)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        evaluation: [NWI-S0-StegVerse-Labs-7898cedb]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the contract pin and the evaluated commit read-only
+        env:
+          EVALUATION: ${{ matrix.evaluation }}
+        run: |
+          set -euo pipefail
+          in="sandbox/s1-stage-evaluations/$EVALUATION.json"
+          pin=$(python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; print(m.CONTRACT_PINS["commit"])')
+          commit=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["evaluated_commit"])' "$in")
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags https://github.com/StegVerse-Labs/.github.git "$pin" "$commit"
+          git -C "$RUNNER_TEMP/labs" cat-file -e "$pin^{commit}"
+          git -C "$RUNNER_TEMP/labs" cat-file -e "$commit^{commit}"
+      - name: Evaluate the committed subject again and compare every byte
+        env:
+          EVALUATION: ${{ matrix.evaluation }}
+        run: |
+          set -euo pipefail
+          code=0
+          python3 -P sandbox/s1_nwi_s0_exit_gate.py evaluate --input "sandbox/s1-stage-evaluations/$EVALUATION.json" \
+            --checkout "$RUNNER_TEMP/labs" --p1 "$RUNNER_TEMP/labs" --out-dir "$RUNNER_TEMP/out" || code=$?
+          echo "evaluator exit $code"
+          python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(e["disposition"], e.get("failure_code"), e["evaluation_subject_digest"], e["receipts"])' "$RUNNER_TEMP/out/evaluation.json"
+          diff -r "evidence/stage-evaluations/$EVALUATION" "$RUNNER_TEMP/out"
+      - name: Gate negatives (subject, epoch, declaration, failing producer) against the fetched P1 tree
+        run: |
+          set -euo pipefail
+          git config --global user.name ci && git config --global user.email ci@invalid
+          python3 -B tests/s1_gate_negatives.py "$RUNNER_TEMP/labs"

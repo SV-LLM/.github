@@ -57,7 +57,7 @@ READBACK_COMPONENT_BLOB = "2c730142254b78a5b9e1c05566fe6f5111b7d571"
 # verbatim (binder result and bundle). P1's verify_admission_hb_epoch does not judge them, so neither does this check
 # (the agreement test stays strict).
 READBACK_CROSS_CHECK_FIELDS = ("cross_checked", "hb_epoch_cross_check")
-# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 76407068; rule unchanged from ae8b105d): the
+# P1's in-repo reference (resident-runtime/sv_work_items.py::verify_admission_hb_epoch, Labs#3264 7898cedb via contract-pins 317aef68; rule unchanged from ae8b105d): the
 # readback's hb_epoch slot counts only with hb_epoch_source {ledger_head: base_ref.ledger_head, field:
 # HB_EPOCH_SOURCE_FIELD}. #3266 at 641f4b03 seals hb_epoch with hb_epoch_source {ledger_head, receipt, field} (both
 # null on every FAIL_CLOSED); its 78a0c78e head sealed none (unobserved).
@@ -65,9 +65,9 @@ HB_EPOCH_SOURCE_FIELD = "$.hb_reference.epoch"
 CHECK_ID = "supplied-epoch-binder-check"
 # The canonical rule: P1's sv_work_items.verify_admission_hb_epoch, in this blob at this commit (CI fetches and compares;
 # tests/s1_binder_parity.py runs every case against it).
-P1_REFERENCE = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "764070689f0dd793c987d27d7cbf3252f37a6b47",
+P1_REFERENCE = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
                 "file": "resident-runtime/sv_work_items.py", "function": "verify_admission_hb_epoch",
-                "blob_sha": "625b12f7c637b030eccc2fea03d745d12e4d36d8"}
+                "blob_sha": "4c2aa6ef97b5e4e6f055a2a904e42e0487ed5a9a"}
 UNOBSERVED_SENTINEL = "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
 # P1 sv_work_items.SUPPLIED_EPOCH_UNOBSERVED_VALUES (Labs#3264 ae8b105d): checked before 726248a5.
 SUPPLIED_EPOCH_UNOBSERVED_VALUES = (None, "", "null", UNOBSERVED_SENTINEL)

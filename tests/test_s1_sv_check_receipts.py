@@ -25,7 +25,7 @@ eb = m.eb
 READBACKS = SANDBOX / "s1-base-state-readbacks"
 LEDGER_HEAD = "a" * 40
 # P1's out-of-tree #3264 record (not copied here; pinned by sha256)
-P1_RECORD_SHA256 = "sha256:26b381cfee4c5169a6b8fa494e3c287f994af2a243bd261880800f5bd9886db2"
+P1_RECORD_SHA256 = "sha256:a5d021317e1de82399dacfedac829586a11f5ed23a5a10b08abd4ab1a2d516c4"
 PINS = SANDBOX / "s1_pins"
 INPUTS = SANDBOX / "s1-sv-check-inputs"
 EVIDENCE = ROOT / "evidence" / "sv-check-receipts"
@@ -158,11 +158,45 @@ class Fixture:
 
 class Pins(unittest.TestCase):
     def test_the_pinned_blobs_have_not_drifted(self):
-        self.assertEqual(m.PIN_COMMIT, "764070689f0dd793c987d27d7cbf3252f37a6b47")
+        self.assertEqual(m.PIN_COMMIT, "7898cedba1400c8545cebcb463fd26deb25f7d5a")
         self.assertEqual(git_blob((PINS / "required-checks.json").read_bytes()), m.ROW_BLOB)
         self.assertTrue(m.ROW_BLOB.startswith("9c75778f"))
         self.assertEqual(eb.P1_REFERENCE["commit"], m.PIN_COMMIT)  # the agreement test's canonical rule
-        self.assertTrue(eb.P1_REFERENCE["blob_sha"].startswith("625b12f7"))
+        self.assertEqual(eb.P1_REFERENCE["blob_sha"], m.p1_blob("resident-runtime/sv_work_items.py"))
+        self.assertTrue(eb.P1_REFERENCE["blob_sha"].startswith("4c2aa6ef"))
+
+    def test_p1_files_resolve_through_the_pinned_contract_pins_manifest(self):
+        raw = (PINS / "contract-pins.json").read_bytes()
+        self.assertEqual("sha256:" + hashlib.sha256(raw).hexdigest(), m.CONTRACT_PINS["sha256"])
+        self.assertTrue(m.CONTRACT_PINS["sha256"].startswith("sha256:317aef68"))
+        manifest = json.loads(raw)
+        self.assertEqual(manifest["schema"], "stegverse.sv-contract-pins/v1")
+        entries = manifest["files"]
+        for path in m.USED_P1_FILES:
+            self.assertIn(path, entries, path)
+            self.assertEqual(m.p1_blob(path), entries[path]["blob"], path)
+        self.assertNotIn("org-kernel/kernel.py", entries)  # imported by sv_work_items.py, pinned separately
+        for vendored, path in (("required-checks.json", m.ROW_FILE), ("sv-check-receipt.v1.schema.json", m.RECEIPT_SCHEMA_FILE),
+                               ("NWI-S0.json", m.STAGE_GATE_MANIFEST_FILE), ("sv-change.v1.schema.json", "schemas/sv-change.v1.schema.json")):
+            data = (PINS / vendored).read_bytes()
+            self.assertEqual({"blob": git_blob(data), "sha256": "sha256:" + hashlib.sha256(data).hexdigest()}, entries[path], vendored)
+        self.assertEqual(entries[m.STAGE_GATE_MANIFEST_FILE]["blob"], "20b37917e1454ec788e8f1b8c75d1562ba76d1b3")
+        self.assertEqual(entries["schemas/sv-change.v1.schema.json"]["blob"], "6b43b6ecfa22c2f178de00f5c14121cb27bf1c5a")
+        with self.assertRaises(KeyError):
+            m.p1_blob("resident-runtime/not_used.py")
+        with mock.patch.object(m, "CONTRACT_PINS", {**m.CONTRACT_PINS, "sha256": "sha256:" + "0" * 64}):
+            with self.assertRaises(RuntimeError):
+                m.p1_blob(m.ROW_FILE)
+
+    def test_the_sv_change_hb_epoch_pattern_is_the_726248a5_rule(self):
+        schema = json.loads((PINS / "sv-change.v1.schema.json").read_bytes())
+        pattern = schema["properties"]["hb_epoch"]["anyOf"][0]["pattern"]
+        self.assertEqual(pattern, "^0*(?:3[2-9]|[4-9][0-9]|[1-9][0-9]{2,})$")
+        import re
+        for value in ("31", "32", "032", "0", "00", "99", "100", "0100", "469411750", "1024", "01024", "+33", " 33", "3a", "",
+                      "4000.0", "1_000", "٣٣"):
+            self.assertEqual(re.fullmatch(pattern, value) is not None and value.isascii(),
+                             m.supplied_epoch_failure(value) is None, value)
         self.assertEqual(git_blob((PINS / "sv-check-receipt.v1.schema.json").read_bytes()), m.RECEIPT_SCHEMA_BLOB)
         self.assertTrue(m.RECEIPT_SCHEMA_BLOB.startswith("a4934cc1"))
         for path in sorted(INPUTS.glob("*.json")):
@@ -189,8 +223,8 @@ class Pins(unittest.TestCase):
             body = json.loads(path.read_text())
             self.assertEqual(body["schema"], eb.READBACK_SCHEMA, path.name)
             self.assertEqual(eb.seal(body)["result_sha256"], body["result_sha256"], path.name)
-        p1 = json.loads((INPUTS / "StegVerse-Labs-3264-76407068.json").read_text())["sv_change"]
-        self.assertEqual(p1, {"repository": "OUT_OF_TREE", "file": "/workspace/p1/posted/SV_CHANGE_3264_76407068.json",
+        p1 = json.loads((INPUTS / "StegVerse-Labs-3264-7898cedb.json").read_text())["sv_change"]
+        self.assertEqual(p1, {"repository": "OUT_OF_TREE", "file": "/workspace/p1/posted/SV_CHANGE_3264_7898cedb.json",
                               "sha256": P1_RECORD_SHA256, "derived_by": "/workspace/p1/redo6/derive_3264.py (P1)"})
         for path in sorted(INPUTS.glob("*.json")):  # no supplied epoch in any input; a readback bound by sha256
             document = json.loads(path.read_text())
@@ -494,24 +528,14 @@ class Minting(unittest.TestCase):
         self.assertNotIn("native_unknown_pointers", bundle["sv_change"])
         self.assertNotIn("UNKNOWN_IN_NATIVE_RECORD", {r.get("failure_code") for r in receipts.values()})
 
-    def test_the_stage_gate_check_is_not_emitted(self):
+    def test_the_stage_gate_check_is_not_emitted_per_head(self):
         bundle, receipts, _ = self.minted({"README": b"x\n"})
         self.assertNotIn("nwi-s0-exit-gate", receipts)
         gate = bundle["stage_gate_checks"]["nwi-s0-exit-gate"]
         self.assertIs(gate["emitted"], False)
-        self.assertEqual(gate["status"], "NOT_EMITTED_DECLARATION_INCOMPLETE")
-        self.assertEqual(len(gate["missing"]), 4)
-        manifest = json.loads((PINS / "NWI-S0.json").read_bytes())
-        declared = manifest["exit_gate_check"]
+        self.assertEqual(gate["status"], "NOT_PER_HEAD_EMITTED_PER_STAGE_EVALUATION")
+        self.assertNotIn("nwi-s0-exit-gate", ROW["checks"])
         self.assertEqual(git_blob((PINS / "NWI-S0.json").read_bytes()), m.STAGE_GATE_MANIFEST_BLOB)
-        self.assertEqual(declared["offline_command"]["verifier_builtin"], "nwi-s0-exit-gate")
-        self.assertEqual(declared["offline_command"]["verifier_ref"], "SV-LLM/.github#46")
-        # what makes it incomplete: no input declaration for the gate's evidence, subject or epoch
-        for key in ("inputs", "evidence", "evidence_source", "change_digest", "head_sha", "hb_epoch", "hb_epoch_readback"):
-            self.assertNotIn(key, declared)
-            self.assertNotIn(key, declared["offline_command"])
-        self.assertEqual({g["evidence"] for g in manifest["exit_gate"]}, {"receipt"})
-        self.assertTrue(all(set(g) == {"evidence", "predicate"} for g in manifest["exit_gate"]))
 
     def test_a_supplied_epoch_in_the_input_is_refused(self):
         bundle, receipts, _ = self.minted({"README": b"x\n"}, extra_input={"hb_epoch": "4000"})
@@ -629,6 +653,51 @@ class CommittedEvidence(unittest.TestCase):
                 data = (EVIDENCE / name / (check_id + ".json")).read_bytes()
                 self.assertEqual(bundle["receipts"][check_id], "sha256:" + hashlib.sha256(data).hexdigest())
                 self.assertEqual(m.schema_errors(json.loads(data), SCHEMA), [], name + "/" + check_id)
+
+
+class StageEvaluationEvidence(unittest.TestCase):
+    """The committed nwi-s0-exit-gate stage evaluation (re-derived byte for byte by CI's rederive-stage-evaluation)."""
+    DIR = ROOT / "evidence" / "stage-evaluations" / "NWI-S0-StegVerse-Labs-7898cedb"
+    INPUT = SANDBOX / "s1-stage-evaluations" / "NWI-S0-StegVerse-Labs-7898cedb.json"
+
+    def test_three_receipts_bound_to_the_subject_digest(self):
+        evaluation = json.loads((self.DIR / "evaluation.json").read_bytes())
+        document = json.loads(self.INPUT.read_bytes())
+        self.assertEqual(evaluation["input_sha256"], "sha256:" + hashlib.sha256(self.INPUT.read_bytes()).hexdigest())
+        self.assertEqual((document["trigger"], evaluation["trigger"]), ("STAGE_GATE_EVALUATION", "STAGE_GATE_EVALUATION"))
+        self.assertIs(evaluation["in_required_checks_row"], False)
+        self.assertIs(evaluation["ledger_appended"], False)
+        subject = evaluation["evaluation_subject"]
+        self.assertEqual(subject, {"repository": "StegVerse-Labs/.github", "stage_id": "NWI-S0",
+                                   "manifest_blob": m.STAGE_GATE_MANIFEST_BLOB,
+                                   "evaluated_commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+                                   "base_ref": {"registry_generation": 319,
+                                                "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1"}})
+        digest = "sha256:" + hashlib.sha256(m.canon(subject)).hexdigest()  # stage_evaluation_digest
+        self.assertEqual(evaluation["evaluation_subject_digest"], digest)
+        self.assertEqual(evaluation["contract_pins"], m.CONTRACT_PINS)
+        self.assertEqual(evaluation["declaration"]["disposition"], "ALLOW")
+        self.assertEqual(evaluation["hb_epoch"]["hb_epoch"], "469411750")
+        self.assertEqual(evaluation["disposition"], "ALLOW")
+        self.assertEqual(evaluation["gate_outcome"]["entry_transition"], "STAGE_NWI_S1_ADMITTED")
+        names = sorted(p.name for p in self.DIR.glob("*.json") if p.name != "evaluation.json")
+        self.assertEqual(names, ["nwi-s0-exit-gate.json", "schema-validate.json", "unit-tests.json"])
+        for name in names:
+            data = (self.DIR / name).read_bytes()
+            body = json.loads(data)
+            self.assertEqual(m.schema_errors(body, SCHEMA), [], name)
+            self.assertEqual((body["change_digest"], body["head_sha"], body["hb_epoch"]),
+                             (digest, subject["evaluated_commit"], "469411750"), name)
+            self.assertEqual(body["verifier_ref"], m.verifier_ref(), name)
+            self.assertEqual(evaluation["receipts"][body["check_id"]], "sha256:" + hashlib.sha256(data).hexdigest())
+            self.assertEqual(evaluation["receipts_validated"]["results"][body["check_id"]], "ALLOW")
+        evidence = evaluation["gate_outcome"]["record"]["evidence"]
+        for predicate, check_id in (("SV_WORK_ITEM_SCHEMAS_VALIDATE", "schema-validate"), ("EVERY_MIGRATION_FIXTURE_LOADS", "unit-tests")):
+            self.assertEqual(evidence[predicate]["receipt_ref"], evaluation["receipts"][check_id])
+
+    def test_the_sv_change_minter_never_emits_the_gate(self):
+        for bundle in EVIDENCE.glob("*/bundle.json"):
+            self.assertNotIn("nwi-s0-exit-gate", json.loads(bundle.read_bytes())["receipts"], bundle.parent.name)
 
 
 if __name__ == "__main__":

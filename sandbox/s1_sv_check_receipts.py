@@ -88,31 +88,59 @@ ROW_REPOSITORY = "StegVerse-Labs/.github"
 ROW_DEPENDENCY = "labs-row"
 OUT_OF_TREE = "OUT_OF_TREE"  # a record outside any repository (e.g. P1's posted record), bound only by its sha256
 SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
-PIN_COMMIT = "764070689f0dd793c987d27d7cbf3252f37a6b47"
-ROW_BLOB = "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d"
-RECEIPT_SCHEMA_BLOB = "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3"
-# nwi-s0-exit-gate (schema a4934cc1 enumerates it; STAGE_GATE_RECEIPT_DERIVES_NATIVE_ISSUE) is declared at #3264 76407068
-# in the stage manifest data/sv-work-items/stages/NWI-S0.json (blob d5467533, vendored at sandbox/s1_pins/NWI-S0.json),
-# not in the row (required-checks.json blob 9c75778f is unchanged and carries no such id). That declaration names the
-# built-in and its predicate but not its inputs, so this verifier emits no receipt for it (no invented semantics) and
-# records what is missing in the bundle.
+# P1 contract pin (CONTRACT_PINS_MANIFEST_IS_THE_CONSUMER_PIN, P1 16:41Z): this verifier pins P1's
+# data/sv-work-items/contract-pins.json by sha256 (vendored at sandbox/s1_pins/contract-pins.json, fetched at
+# CONTRACT_PINS["commit"]) and resolves every P1 file it uses through that manifest's entries. A new P1 head is a re-pin
+# only when the manifest entry of a file in USED_P1_FILES changes (the drift test and CI compare exactly these).
+CONTRACT_PINS = {"repository": "StegVerse-Labs/.github", "pr": "#3264", "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+                 "file": "data/sv-work-items/contract-pins.json",
+                 "sha256": "sha256:317aef68d7a875b84633361a25b000810457fbc89b96f735dde3259008b897d7"}
+CONTRACT_PINS_COPY = Path(__file__).resolve().parent / "s1_pins" / "contract-pins.json"
 STAGE_GATE_MANIFEST_FILE = "data/sv-work-items/stages/NWI-S0.json"
-STAGE_GATE_MANIFEST_BLOB = "d5467533df4d604e7948805a07792829472992f1"
+# The P1 files this verifier reads (vendored copies or segments) or imports at the pinned tree (the nwi-s0-exit-gate
+# built-in imports resident-runtime/sv_work_items.py and stage_gate.py, which load the row and the stage manifests).
+USED_P1_FILES = ("data/sv-work-items/required-checks.json", "schemas/sv-check-receipt.v1.schema.json",
+                 "resident-runtime/sv_work_items.py", "resident-runtime/stage_gate.py",
+                 "data/sv-work-items/stages/NWI-S0.json", "data/sv-work-items/stages/NWI-S1.json",
+                 "data/sv-work-items/stages/NWI-S2.json", "data/sv-work-items/stages/NWI-S3.json",
+                 "data/sv-work-items/stages/NWI-S4.json", "schemas/sv-change.v1.schema.json")
+# Imported by sv_work_items.py but not listed in contract-pins.json (its manifest omits it): pinned by blob here, and P1's
+# own KERNEL_RULE_SHA256 check (726248a5) guards its supplied_epoch_failure segment.
+UNLISTED_P1_FILES = {"org-kernel/kernel.py": "ffec5d648d7fa4aead1f44f76df936a2da21bb96"}
+
+
+def rc_blob(data: bytes) -> str:
+    """git blob sha1 of bytes (git hash-object), the contract-pins blob digest."""
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def contract_pins() -> dict[str, Any]:
+    raw = CONTRACT_PINS_COPY.read_bytes()
+    if "sha256:" + hashlib.sha256(raw).hexdigest() != CONTRACT_PINS["sha256"]:
+        raise RuntimeError("sandbox/s1_pins/contract-pins.json is not the pinned " + CONTRACT_PINS["sha256"])
+    return json.loads(raw)
+
+
+def p1_blob(path: str) -> str:
+    """A used P1 file's git blob, resolved through the pinned contract-pins manifest."""
+    if path in UNLISTED_P1_FILES:
+        return UNLISTED_P1_FILES[path]
+    if path not in USED_P1_FILES:
+        raise KeyError(path + " is not a used P1 file")
+    return contract_pins()["files"][path]["blob"]
+
+
+PIN_COMMIT = CONTRACT_PINS["commit"]
+ROW_BLOB = p1_blob("data/sv-work-items/required-checks.json")
+RECEIPT_SCHEMA_BLOB = p1_blob("schemas/sv-check-receipt.v1.schema.json")
+STAGE_GATE_MANIFEST_BLOB = p1_blob(STAGE_GATE_MANIFEST_FILE)
+# nwi-s0-exit-gate (schema a4934cc1; STAGE_GATE_RECEIPT_DERIVES_NATIVE_ISSUE) is declared complete in the NWI-S0 stage
+# manifest at the contract pin. It is not a row check and is never minted per head: it is emitted once per STAGE_GATE
+# evaluation by sandbox/s1_nwi_s0_exit_gate.py (evaluate), never here.
 STAGE_GATE_CHECKS = {"nwi-s0-exit-gate": {
-    "emitted": False, "status": "NOT_EMITTED_DECLARATION_INCOMPLETE",
-    "declared_in": STAGE_GATE_MANIFEST_FILE + "#exit_gate_check @ " + "764070689f0dd793c987d27d7cbf3252f37a6b47",
-    "declared": ["check_id", "offline_command.verifier_builtin", "offline_command.verifier_ref",
-                 "offline_command.predicate (stage_gate.evaluate_gate NWI-S0 -> NWI-S1)", "expected {disposition: ALLOW}",
-                 "command_paths []", "surface", "invariant", "minter", "appender"],
-    "missing": [
-        "evidence inputs: exit_gate predicates SV_WORK_ITEM_SCHEMAS_VALIDATE and EVERY_MIGRATION_FIXTURE_LOADS declare "
-        "evidence 'receipt' but no producer, check id, path or ledger ref for those receipts; evaluate_gate needs "
-        "evidence[predicate] = {receipt_ref, disposition} and nothing declares where the verifier reads them",
-        "receipt subject: sv-check-receipt.v1 requires change_digest and head_sha, but the gate is 'required of no change' "
-        "and no head/change the gate receipt binds to is declared",
-        "hb_epoch: evaluate_gate takes hb_epoch; no Labs#3266 readback/base_ref is declared for the gate",
-        "trigger: not in the row, so required_for() selects it for no SV_CHANGE; when the verifier emits it (per head "
-        "minted here, or per stage evaluation) is not declared"]}}
+    "emitted": False, "status": "NOT_PER_HEAD_EMITTED_PER_STAGE_EVALUATION",
+    "declared_in": STAGE_GATE_MANIFEST_FILE + "#exit_gate_check (blob " + STAGE_GATE_MANIFEST_BLOB + ")",
+    "emitted_by": "sandbox/s1_nwi_s0_exit_gate.py evaluate (one STAGE_GATE evaluation subject; never push, PR head or schedule)"}}
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
               "owning_existing_goal", "next_attempt")
 DISPOSITIONS = ("ALLOW", "DENY", "FAIL_CLOSED")
@@ -252,7 +280,7 @@ def change_digest(rec: Mapping[str, Any]) -> str:
 
 def verifier_files() -> dict[str, str]:
     files = {name: "sha256:" + sha256_hex((HERE / name).read_bytes())
-             for name in ("s1_sv_check_receipts.py", "s1_supplied_epoch_binder.py")}
+             for name in ("s1_sv_check_receipts.py", "s1_supplied_epoch_binder.py", "s1_nwi_s0_exit_gate.py")}
     files.update(rc.verifier_files())
     return files
 
@@ -675,6 +703,21 @@ def run_row_commands(head_checkout: Path, head: str, planned: list[tuple[str, li
     return results
 
 
+def judge_runs(a: Mapping[str, Any], b: Mapping[str, Any]) -> tuple[str, tuple[str, str] | None]:
+    """Disposition of a declared command from its two offline runs (shared with the nwi-s0-exit-gate producers)."""
+    if "DID_NOT_COMPLETE" in (a["outcome"], b["outcome"]):
+        return "FAIL_CLOSED", ("REQUIRED_CHECK_DID_NOT_COMPLETE", "EVERY_DECLARED_CHECK_COMPLETES_OFFLINE")
+    if a["clock_reads"] or b["clock_reads"]:
+        return "DENY", ("REQUIRED_CHECK_READS_THE_CLOCK", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+    if a["network_reads"] or b["network_reads"]:
+        return "DENY", ("REQUIRED_CHECK_READS_THE_NETWORK", "EVERY_DECLARED_CHECK_RUNS_OFFLINE")
+    if a != b:
+        return "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
+    if a["outcome"] != "AS_EXPECTED":
+        return "FAIL_CLOSED", ("REQUIRED_CHECK_FAILED_AT_HEAD", "THE_COMMAND_GIVES_THE_ROWS_EXPECTED_RESULT")
+    return "ALLOW", None
+
+
 def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path]) -> tuple[dict[str, Any], dict[str, dict]]:
     bundle: dict[str, Any] = {
         "schema": BUNDLE_SCHEMA, "stage": "S1", "receipt_schema": RECEIPT_SCHEMA,
@@ -829,19 +872,7 @@ def mint(input_path: Path, checkout: Path | None, dependencies: dict[str, Path])
             second = run_row_commands(checkout, head, planned, work / "run")
             for (check_id, _argv, expected), a, b, bound in zip(planned, first, second, rc.bind(first, second)):
                 bundle["checks"].append(bound)
-                if "DID_NOT_COMPLETE" in (a["outcome"], b["outcome"]):
-                    disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_DID_NOT_COMPLETE", "EVERY_DECLARED_CHECK_COMPLETES_OFFLINE")
-                elif a["clock_reads"] or b["clock_reads"]:
-                    disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_CLOCK", "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
-                elif a["network_reads"] or b["network_reads"]:
-                    disp, f = "DENY", ("REQUIRED_CHECK_READS_THE_NETWORK", "EVERY_DECLARED_CHECK_RUNS_OFFLINE")
-                elif a != b:
-                    disp, f = "DENY", ("REQUIRED_CHECK_OUTPUT_DIFFERS_ACROSS_TWO_RUNS",
-                                       "EVERY_DECLARED_CHECK_IS_A_FUNCTION_OF_THE_HEAD")
-                elif a["outcome"] != "AS_EXPECTED":
-                    disp, f = "FAIL_CLOSED", ("REQUIRED_CHECK_FAILED_AT_HEAD", "THE_COMMAND_GIVES_THE_ROWS_EXPECTED_RESULT")
-                else:
-                    disp, f = "ALLOW", None
+                disp, f = judge_runs(a, b)
                 receipts[check_id] = receipt(check_id, disp, change_d, head, epoch, None if f is None else six(
                     f[0], f[1], "repair " + check_id + " at a new head (see the bundle's checks entry)",
                     "repair at a new head and re-mint"))

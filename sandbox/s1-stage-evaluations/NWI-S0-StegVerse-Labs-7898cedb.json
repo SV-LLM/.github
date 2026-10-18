@@ -1,0 +1,17 @@
+{
+  "base_ref": {
+    "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1",
+    "registry_generation": 319
+  },
+  "evaluated_commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+  "hb_epoch_readback": {
+    "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json",
+    "sha256": "sha256:7f66b725d563920df316e945b625db70a93287b81018d8a0cf9ae5511dbbf5db"
+  },
+  "note": "evidence evaluation (P1 16:41Z): subject StegVerse-Labs/.github at 7898cedb, base_ref {319, a5bb54d8}; the readback is #3266 2ba0e329's of main 978b8880, whose base_ref is this subject's (ledger_head a5bb54d8, generation 319); 7898cedb is not on main, so #3266 cannot bind it directly",
+  "repository": "StegVerse-Labs/.github",
+  "schema": "stegverse.sv-llm.s1-stage-evaluation-input/v1",
+  "stage_id": "NWI-S0",
+  "target_stage": "NWI-S1",
+  "trigger": "STAGE_GATE_EVALUATION"
+}

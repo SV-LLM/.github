@@ -2,10 +2,10 @@
   "schema": "stegverse.sv-change.s1-sv-check-input/v1",
   "type": "SV_CHANGE",
   "repository": "StegVerse-Labs/.github",
-  "head_sha": "764070689f0dd793c987d27d7cbf3252f37a6b47",
+  "head_sha": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
   "required_checks_row": {
     "repository": "StegVerse-Labs/.github",
-    "commit": "764070689f0dd793c987d27d7cbf3252f37a6b47",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
     "file": "data/sv-work-items/required-checks.json",
     "blob_sha": "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d",
     "receipt_schema_blob_sha": "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3",
@@ -17,8 +17,8 @@
   },
   "sv_change": {
     "repository": "OUT_OF_TREE",
-    "file": "/workspace/p1/posted/SV_CHANGE_3264_76407068.json",
-    "sha256": "sha256:26b381cfee4c5169a6b8fa494e3c287f994af2a243bd261880800f5bd9886db2",
+    "file": "/workspace/p1/posted/SV_CHANGE_3264_7898cedb.json",
+    "sha256": "sha256:a5d021317e1de82399dacfedac829586a11f5ed23a5a10b08abd4ab1a2d516c4",
     "derived_by": "/workspace/p1/redo6/derive_3264.py (P1)"
   },
   "hb_epoch_readback": {
