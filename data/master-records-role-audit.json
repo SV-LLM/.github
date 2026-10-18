@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 21,
+      "PROPER": 25,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 24,
-      "TOTAL": 48
+      "NAMING_ONLY": 26,
+      "TOTAL": 54
     }
   },
   "not_changed_with_reason": {
@@ -605,7 +605,49 @@
       "line": 118,
       "text": "\"master_records_awaited\": False,",
       "classification": "PROPER",
-      "rationale": "Adopted byte-identical from the StegVerse-org reference (2bacf5c9): the ledger readback states that Master Records is not awaited, non-authorizing and non-gating."
+      "rationale": "Adopted byte-identical from the StegVerse-org reference (10d14104; previously 2bacf5c9): the ledger readback states that Master Records is not awaited, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 76,
+      "text": "Records separately and does not claim a Master Records organization record it",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the receiving operation publishes its organization records separately and does not claim a Master Records record it has not seen; Master Records is not awaited and not runtime reality."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 512,
+      "text": "\"master_records_organization_record_observed\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the governance-request result reports that no Master Records organization record was observed; nothing awaits one."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 896,
+      "text": "# Organization records are published to Master Records separately and",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): organization records are published to Master Records separately and are not awaited (propagation_gates_organization_runtime_reality false)."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 900,
+      "text": "\"master_records_organization_record_observed\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the ALLOW result reports that no Master Records organization record was observed; nothing awaits one."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 901,
+      "text": "\"master_records_propagation_entrypoint\":",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 902,
+      "text": "\"resident-runtime/submit_org_transition_to_master_records.py\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     }
   ]
 }

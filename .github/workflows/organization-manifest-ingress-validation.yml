@@ -1,0 +1,62 @@
+name: Validate Organization Manifest Ingress
+
+# SV-LLM/.github#30 W4: the manifest-directed organization ledger append path
+# adopted from StegVerse-org/.github (data/organization-role-reference-adoption.json).
+# Contract binding, request validation, the ledger workflow's dispatch guards,
+# and a local end-to-end dry run of that workflow's own steps against a
+# temporary bare origin with the pinned SDK. Every ledger written here is
+# temporary; nothing reaches the published ledger ref.
+on:
+  pull_request:
+    paths:
+      - 'resident-runtime/**'
+      - 'org-boundary/**'
+      - 'org-runtime/interlock-intr.json'
+      - '.stegverse/**'
+      - 'data/organization-role-*.json'
+      - 'tests/test_organization_manifest_ingress.py'
+      - '.github/workflows/organization-ledger-transition.yml'
+      - '.github/workflows/organization-manifest-ingress-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'resident-runtime/**'
+      - 'org-boundary/**'
+      - 'org-runtime/interlock-intr.json'
+      - '.stegverse/**'
+      - 'data/organization-role-*.json'
+      - 'tests/test_organization_manifest_ingress.py'
+      - '.github/workflows/organization-ledger-transition.yml'
+      - '.github/workflows/organization-manifest-ingress-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-manifest-ingress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout organization boundary
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The same pin as organization-ledger-transition.yml. Checked out and put
+      # on the import path; nothing is installed.
+      - name: Checkout exact merged SDK manifest state-transition runtime
+        uses: actions/checkout@v4
+        with:
+          repository: StegVerse-org/StegVerse-SDK
+          ref: 74d9b473aa415b06a9d550c28b2779a691b4ba32
+          path: sdk
+          persist-credentials: false
+
+      - name: Validate the manifest-directed append path
+        env:
+          STEGVERSE_SDK_ROOT: ${{ github.workspace }}/sdk
+          STEGVERSE_SDK_REQUIRED: '1'
+        run: python -B tests/test_organization_manifest_ingress.py -v
+
+      - name: Reference adoption parity (offline)
+        run: python -B resident-runtime/reference_adoption.py verify
