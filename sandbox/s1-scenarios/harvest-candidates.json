@@ -1,0 +1,22 @@
+{
+  "schema": "stegverse.sv-llm.s1-scenario-harvest-candidates/v1",
+  "corpus": "P1 admission scenario corpus (StegVerse-org/.github#163, ADMISSION_SCENARIOS_LEARN_FROM_OBSERVED_OUTCOMES)",
+  "authority_effect": "NONE",
+  "candidates": [
+    {
+      "scenario_id": "S1-HOP-RECEIPT-WRITER-WALL-CLOCK-OBSERVED-AT",
+      "harvest_state": "CANDIDATE_NOT_HARVESTED",
+      "observed_at_heads": [
+        "StegVerse-Labs/.github#3206@e07326f6",
+        "Admissible-Existence/.github#95@fbf1fa46"
+      ],
+      "mutation": "the receipt writer stamps observed_at from the wall clock instead of the supplied hb_epoch",
+      "expected": {
+        "disposition": "DENY",
+        "failure_code": "HOP_RECEIPTS_DEPEND_ON_AN_UNSUPPLIED_INPUT",
+        "failed_predicate": "THE_HOP_RECEIPTS_ARE_A_FUNCTION_OF_THE_SUPPLIED_INPUTS"
+      },
+      "test": "tests/test_s1_hop_head_verifier.py::ClockMutationTests"
+    }
+  ]
+}

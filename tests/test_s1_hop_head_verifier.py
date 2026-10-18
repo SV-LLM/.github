@@ -41,9 +41,37 @@ if mode == "deny-" + phase:
     emit({"disposition": "FAIL_CLOSED", "failure_code": "STUB_REFUSED", "failed_predicate": "STUB"}, 1)
 if phase == "readback":
     emit({"failed_predicates": ["STUB_READBACK"] if mode == "readback-fails" else []})
+epoch = int(args[args.index("--hb-epoch") + 1])
 digest = "sha256:" + ("%064x" % random.getrandbits(256) if mode == "unsupplied" else "ab" * 32)
 result = {"disposition": "ALLOW", "frame": "ZnJhbWU=", "packet_id": "pkt", "repository_receipt_sha256": digest,
-          "hb_epoch": int(args[args.index("--hb-epoch") + 1])}
+          "hb_epoch": epoch}
+if mode in ("wall-clock-observed-at", "supplied-observed-at"):
+    # A receipt writer: one organization receipt appended to the sandbox
+    # ledger ref. The mutation stamps observed_at from the wall clock.
+    import hashlib, subprocess
+    from datetime import datetime, timezone
+    observed = (datetime.now(timezone.utc).isoformat() if mode == "wall-clock-observed-at"
+                else "SUPPLIED_HB_EPOCH:%d" % epoch)
+    body = {"schema": "stub.organization-receipt", "phase": phase, "hb_reference": {"epoch": epoch},
+            "observed_at": observed}
+    text = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    hexdigest = hashlib.sha256(text.encode()).hexdigest()
+    git_dir = os.environ["STEGVERSE_ORG_LEDGER_GIT_DIR"]
+    ref = "refs/stegverse/organization-ledger"
+    def git(*a, data=None, env=None):
+        return subprocess.run(["git", "--git-dir", git_dir, *a], input=data, capture_output=True, check=True,
+                              env={**os.environ, **(env or {})}).stdout.decode().strip()
+    index = {"GIT_INDEX_FILE": git_dir + "/stub-index"}
+    parent = subprocess.run(["git", "--git-dir", git_dir, "rev-parse", "--verify", "-q", ref],
+                            capture_output=True).stdout.decode().strip()
+    if parent:
+        git("read-tree", parent, env=index)
+    blob = git("hash-object", "-w", "--stdin", data=text.encode())
+    git("update-index", "--add", "--cacheinfo", "100644," + blob + ",receipts/" + hexdigest + ".json", env=index)
+    tree = git("write-tree", env=index)
+    commit = git("commit-tree", tree, *(["-p", parent] if parent else []), "-m", phase, data=b"")
+    git("update-ref", ref, commit)
+    result["organization_receipt_sha256"] = "sha256:" + hexdigest
 if phase == "close":
     result["closed"] = mode != "not-closed"
 emit(result)
@@ -179,6 +207,42 @@ class DenyTests(Base):
         self.assertEqual(v.render(receipt), v.render(v.verify(path, root)))
 
 
+# Harvest candidate for P1's scenario corpus (StegVerse-org/.github#163,
+# ADMISSION_SCENARIOS_LEARN_FROM_OBSERVED_OUTCOMES): the observed outcome at
+# StegVerse-Labs/.github#3206 e07326f6 and Admissible-Existence/.github#95
+# fbf1fa46, reduced to a mutation of one receipt writer. Listed in
+# sandbox/s1-scenarios/harvest-candidates.json.
+HARVEST_CANDIDATE = "S1-HOP-RECEIPT-WRITER-WALL-CLOCK-OBSERVED-AT"
+
+
+class ClockMutationTests(Base):
+    """A head whose receipt writer stamps a wall-clock observed_at is DENY, never ALLOW."""
+
+    def test_wall_clock_observed_at_is_deny_with_the_six_fields_and_names_the_field(self):
+        root, head = make_head(self.base, "wall-clock-observed-at")
+        path = write_input(self.base, head)
+        receipt = v.verify(path, root)
+        self.assert_refused(receipt, "DENY", "HOP_RECEIPTS_DEPEND_ON_AN_UNSUPPLIED_INPUT")
+        self.assertEqual(receipt["failed_predicate"], "THE_HOP_RECEIPTS_ARE_A_FUNCTION_OF_THE_SUPPLIED_INPUTS")
+        self.assertEqual(receipt["nondeterministic_receipt_fields"], ["organization_receipt/observed_at"])
+        self.assertIn("organization_receipt/observed_at", receipt["required_evidence_or_repair"])
+        self.assertEqual(receipt["phases"][0]["organization_receipt_sha256"], v.NONDETERMINISTIC)
+        self.assertEqual(v.render(receipt), v.render(v.verify(path, root)))
+
+    def test_control_the_same_writer_with_the_supplied_epoch_is_allow(self):
+        root, head = make_head(self.base, "supplied-observed-at")
+        path = write_input(self.base, head)
+        receipt = v.verify(path, root)
+        self.assertEqual(receipt["disposition"], "ALLOW", receipt)
+        self.assertEqual(v.render(receipt), v.render(v.verify(path, root)))
+
+    def test_it_is_listed_as_a_harvest_candidate(self):
+        listed = json.loads((ROOT / "sandbox" / "s1-scenarios" / "harvest-candidates.json").read_text(encoding="utf-8"))
+        entry = next(item for item in listed["candidates"] if item["scenario_id"] == HARVEST_CANDIDATE)
+        self.assertEqual(entry["expected"]["failure_code"], "HOP_RECEIPTS_DEPEND_ON_AN_UNSUPPLIED_INPUT")
+        self.assertEqual(entry["harvest_state"], "CANDIDATE_NOT_HARVESTED")
+
+
 class FailClosedTests(Base):
     def test_a_phase_with_no_result_is_fail_closed(self):
         root, head = make_head(self.base, "crash-receive")
@@ -265,7 +329,9 @@ class CommittedReceiptTests(unittest.TestCase):
 
     def test_committed_receipts_are_canonical_and_bound_to_their_inputs(self):
         receipts = sorted((ROOT / "evidence" / "s1-hop-head").glob("*.json"))
-        self.assertEqual(len(receipts), 8)
+        inputs = sorted((ROOT / "sandbox" / "s1-inputs").glob("*.json"))
+        self.assertGreaterEqual(len(receipts), 8)
+        self.assertEqual([path.name for path in receipts], [path.name for path in inputs])
         verifier = hashlib.sha256(VERIFIER.read_bytes()).hexdigest()
         for path in receipts:
             raw = path.read_bytes()
@@ -275,9 +341,8 @@ class CommittedReceiptTests(unittest.TestCase):
             self.assertEqual(receipt["receipt_sha256"], "sha256:" + hashlib.sha256(v.canon(body)).hexdigest())
             self.assertEqual(receipt["verifier"]["sha256"], verifier, path.name)
             self.assertIs(receipt["authentic_ledger_receipt"], False)
-            organization, _, rest = path.stem.rpartition("-")
-            name = organization + ".json"
-            source = ROOT / "sandbox" / "s1-inputs" / name
+            rest = path.stem.rpartition("-")[2]
+            source = ROOT / "sandbox" / "s1-inputs" / path.name
             self.assertEqual(receipt["input_sha256"], hashlib.sha256(source.read_bytes()).hexdigest(), path.name)
             self.assertTrue(receipt["head_sha"].startswith(rest), path.name)
             if receipt["disposition"] != "ALLOW":

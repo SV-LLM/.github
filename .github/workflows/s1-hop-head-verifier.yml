@@ -43,10 +43,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {repository: SV-LLM/.github, number: 41, input: SV-LLM-41}
-          - {repository: StegVerse-org/.github, number: 181, input: StegVerse-org-181}
-          - {repository: StegVerse-Labs/.github, number: 3206, input: StegVerse-Labs-3206}
-          - {repository: Admissible-Existence/.github, number: 95, input: Admissible-Existence-95}
+          - {repository: SV-LLM/.github, input: SV-LLM-41-97c8e43c}
+          - {repository: StegVerse-org/.github, input: StegVerse-org-181-22b1ef4a}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3206-e07326f6}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3263-690d3ef1}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-fbf1fa46}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,21 +56,20 @@ jobs:
       - name: Fetch the declared head read-only
         env:
           REPOSITORY: ${{ matrix.repository }}
-          NUMBER: ${{ matrix.number }}
           INPUT: ${{ matrix.input }}
         run: |
           set -euo pipefail
           head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "sandbox/s1-inputs/$INPUT.json")
           git init -q "$RUNNER_TEMP/head"
-          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "refs/pull/$NUMBER/head"
+          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
           test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
-          echo "fetched $REPOSITORY#$NUMBER at $head"
+          echo "fetched $REPOSITORY at $head"
       - name: Re-derive the receipt and compare bytes
         env:
           INPUT: ${{ matrix.input }}
         run: |
           set -euo pipefail
-          committed=$(ls evidence/s1-hop-head/"$INPUT"-*.json)
+          committed="evidence/s1-hop-head/$INPUT.json"
           code=0
           python3 -P sandbox/s1_hop_head_verifier.py --input "sandbox/s1-inputs/$INPUT.json" \
             --checkout "$RUNNER_TEMP/head" --out "$RUNNER_TEMP/receipt.json" || code=$?
