@@ -128,7 +128,7 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:6da5eefad4109553d7cc1926fb80c7ad54859e96011acae892c59a95e878af7b",
+      "local_sha256": "sha256:80ddce127f1a806352cfe23ca7e36e193dd15fe660fec10a5152957001db1aae",
       "substitutions": [
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
@@ -165,6 +165,18 @@
           "local": "packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)",
           "count": 1,
           "why": "the CLI passes the epoch the kernel rule admitted as its integer value"
+        },
+        {
+          "reference": "        \"NONE\", hb_epoch=repository_receipt[\"hb_reference\"][\"epoch\"], idempotent=True)\n    return {\"repository_receipt\": repository_receipt,\n            \"organization_receipt\": organization_receipt}\n",
+          "local": "        \"NONE\", hb_epoch=organization_ledger.kernel.carried_epoch(\n            repository_receipt[\"hb_reference\"],\n            retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::_record_refusal\"), idempotent=True)\n    return {\"repository_receipt\": repository_receipt,\n            \"organization_receipt\": organization_receipt}\n",
+          "count": 1,
+          "why": "the organization receipt's epoch is CARRIED from the repository receipt through kernel.carried_epoch, which refuses a clock-derived or invalid heartbeat reference with the six fields, so a clock epoch is never re-stamped derived_from_clock false (B-P36f)"
+        },
+        {
+          "reference": "    hb_epoch = repository_receipt[\"hb_reference\"][\"epoch\"]\n    organization_receipt = organization_ledger.append(",
+          "local": "    hb_epoch = organization_ledger.kernel.carried_epoch(\n        repository_receipt[\"hb_reference\"], retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::receive\")\n    organization_receipt = organization_ledger.append(",
+          "count": 1,
+          "why": "the organization receipt's epoch is CARRIED from the repository receipt through kernel.carried_epoch, which refuses a clock-derived or invalid heartbeat reference with the six fields, so a clock epoch is never re-stamped derived_from_clock false (B-P36f)"
         }
       ]
     }

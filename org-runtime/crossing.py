@@ -170,7 +170,9 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         repo_receipt,org_transition_class=transition_class,
         boundary_evidence={"disposition":outcome["disposition"],"credential_authority":CREDENTIAL_AUTHORITY,
                            "transition_authority":"Interlock/InTr"},
-        authority_effect="NONE",genesis=genesis,hb_epoch=repo_receipt["hb_reference"]["epoch"])
+        authority_effect="NONE",genesis=genesis,
+        # CARRIED from the repository receipt, never re-stamped from a clock reading (B-P36f).
+        hb_epoch=kernel.carried_epoch(repo_receipt["hb_reference"],retry_entrypoint="org-runtime/crossing.py::record"))
     return {"repo_receipt_sha256":repo_receipt["receipt_sha256"],"org_receipt_sha256":org_receipt["receipt_sha256"]}
 
 def open_organization_ledger(root:Path=ROOT, *, hb_epoch:int|None=None)->dict[str,Any]:
@@ -292,8 +294,11 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
             # and refuses a selection the addressed service does not admit.
             # The consumed frame's epoch, as the kernel's own ingest passes it, so a
             # receiving operation's receipts carry a supplied epoch.
+            # A clock-stamped frame carries no epoch (B-P36f): carried_epoch refuses it,
+            # and the refusal is recorded at the caller's supplied epoch.
             try: result=kernel.dispatch(root,packet,custody=custody,node_state=node_state,
-                                        epoch=(frame.get("heartbeat_reference") or {}).get("epoch"))
+                                        epoch=kernel.carried_epoch(frame.get("heartbeat_reference"),
+                                                                   retry_entrypoint="org-runtime/crossing.py::ingress"))
             except ValueError as exc: raise Refused("BOUNDARY_DISPATCH_REFUSED",str(exc))
             outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
                      "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"],

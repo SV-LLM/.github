@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory() as td:
     labs=nodes["StegVerse-Labs"]
     def send(pid,payload,service="sv-llm.org-control"):
         labs.publish(labs.kernel.build_packet(origin_org="StegVerse-Labs",origin_service="stegverse-labs.org-control",destination_org="SV-LLM",
-                     destination_service=service,payload=payload,standing=STANDING,packet_id=pid),mesh_root=mesh)
+                     destination_service=service,payload=payload,standing=STANDING,packet_id=pid),mesh_root=mesh,epoch=40)
     send("in-sandbox",{"manifest":{"manifest_id":"m-sandbox","destination":{"organization":"SV-LLM","repository":"sandbox"},"payload":{"work":"w"}}})
     send("in-missing-repo",{"manifest":{"manifest_id":"m-missing","destination":{"organization":"SV-LLM","repository":"does-not-exist"}}})
     send("in-wrong-org",{"manifest":{"manifest_id":"m-wrong","destination":{"organization":"AaCT-E","repository":"sandbox"}}})

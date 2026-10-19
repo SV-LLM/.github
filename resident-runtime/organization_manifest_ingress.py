@@ -234,7 +234,9 @@ def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str
          "intended_action": INTENDED_ACTION,
          "disposition": "DENY",
          "failed_predicate": record["failed_predicate"]},
-        "NONE", hb_epoch=repository_receipt["hb_reference"]["epoch"], idempotent=True)
+        "NONE", hb_epoch=organization_ledger.kernel.carried_epoch(
+            repository_receipt["hb_reference"],
+            retry_entrypoint="resident-runtime/organization_manifest_ingress.py::_record_refusal"), idempotent=True)
     return {"repository_receipt": repository_receipt,
             "organization_receipt": organization_receipt}
 
@@ -814,7 +816,8 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
     # Everything after the repository receipt takes its epoch from that receipt,
     # so a replay rebuilds the same organization receipt and the same outbound
     # frame rather than ones stamped with whatever epoch this attempt carried.
-    hb_epoch = repository_receipt["hb_reference"]["epoch"]
+    hb_epoch = organization_ledger.kernel.carried_epoch(
+        repository_receipt["hb_reference"], retry_entrypoint="resident-runtime/organization_manifest_ingress.py::receive")
     organization_receipt = organization_ledger.append(
         repository_receipt, "REPO_STATE_PROPAGATION",
         predecessor_state, successor_state,

@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as td:
  "carrier":{"kind":"HB_DERIVED","reference":"canonical"},"intr_profile":"stegverse.intr.org-boundary.v1",
  "transition":{"reference":"diagnostic","authority_effect":"NONE"},"payload":{"probe":"ping"},"standing":STANDING,
  "evidence":{"ingress_receipt":None,"dispatch_receipt":None,"consumption_receipt":None,"egress_receipt":None,"reconstruction_reference":None}}
- frame=k.carrier_frame(packet,now_ns=k.HB_ANCHOR_UNIX_NS+1_000_000_000)
+ frame=k.carrier_frame(packet,epoch=33)
  recovered=k.recover_packet(frame); assert recovered==packet
  # A direct ingest is a recorded crossing: without custody it refuses before dispatching.
  try:
@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory() as td:
     except ValueError as refused:
         assert "crossing_custody_required_from_recording_operation" in str(refused)
     assert not mesh.exists()
-    pub=a.publish(packet,mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+2_000_000_000)
+    pub=a.publish(packet,mesh_root=mesh,epoch=34)
     assert Path(pub["path"]).exists() and pub["organization_record"]["organization_receipt_sha256"]
     assert [r["transition_class"] for r in a.receipts("repo") if r["transition_class"]!="ORGANIZATION_LEDGER_OPENED"]==["ORGANIZATION_FEDERATION_CROSSING_EMITTED"]
     assert a.consume_addressed(mesh_root=mesh)==[]
@@ -90,7 +90,7 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="REPORT_STATUS",
         communication_id="ecosystem-broadcast-001",
         root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+3_000_000_000,
+        epoch=35,
         custody=origin.custody()
     )
     assert pub["published_count"]==14
@@ -119,12 +119,12 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="REPORT_STATUS",
         communication_id="ecosystem-monitor-response-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+4_000_000_000,
+        epoch=36,
         **origin.ledgers()
     )
     assert pub["published_count"]==14
     for org,n in nodes.items():
-        n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+4_100_000_000)
+        n.consume(mesh_root=mesh)
     roll=k.collect_ecosystem_responses("StegVerse-Labs","ecosystem-monitor-response-001",mesh_root=mesh)
     assert roll["response_count"]==14
     assert {x["organization"] for x in roll["organizations"]}==set(ORGS)
@@ -144,12 +144,12 @@ with tempfile.TemporaryDirectory() as td:
         requested_action="RECONCILE_LOCAL_STATUS",
         communication_id="ecosystem-work-intake-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+5_000_000_000,
+        epoch=37,
         **origin.ledgers()
     )
     assert pub["published_count"]==14
     for org,n in nodes.items():
-        n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+5_100_000_000)
+        n.consume(mesh_root=mesh)
         # Work intake is this node's own state, at the location supplied to it,
         # never under the repository checkout.
         assert not (n.root/"resident-runtime/control").exists()
@@ -177,11 +177,11 @@ with tempfile.TemporaryDirectory() as td:
         body={"value":1},
         communication_id="ecosystem-dedup-001",
         mesh_root=mesh,
-        now_ns=k.HB_ANCHOR_UNIX_NS+6_000_000_000,
+        epoch=38,
         **n.ledgers()
     )
-    first=n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_100_000_000)
-    second=n.consume(mesh_root=mesh,now_ns=k.HB_ANCHOR_UNIX_NS+6_200_000_000)
+    first=n.consume(mesh_root=mesh)
+    second=n.consume(mesh_root=mesh)
     assert len(first)==1
     assert len(second)==1 or len(second)==0
     # second cycle may see only the response addressed to self; it must not reconsume the original request.

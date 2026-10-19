@@ -218,8 +218,10 @@ def _append(transition_class: str, packet_id: str, evidence: Mapping[str, Any],
         "NONE", hb_epoch=hb_epoch,
         idempotent_on=("communication_id", "payload_sha256", "disposition"))
     # The organization receipt takes the repository receipt's epoch, so a replay
-    # rebuilds the same organization receipt rather than one stamped later.
-    epoch = repository_receipt["hb_reference"]["epoch"]
+    # rebuilds the same organization receipt rather than one stamped later. It
+    # is CARRIED, never re-stamped: a clock-derived receipt is refused (B-P36f).
+    epoch = organization_ledger.kernel.carried_epoch(
+        repository_receipt["hb_reference"], retry_entrypoint="resident-runtime/intr_destination_ingress.py::_append")
     organization_receipt = organization_ledger.append(
         repository_receipt, "REPO_STATE_PROPAGATION", predecessor, successor,
         {"operation": OPERATION_ID, "profile_id": PROFILE_ID,

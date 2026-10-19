@@ -84,7 +84,7 @@ class KernelMeshIsSupplied(Scratch):
                                           payload={"probe": 1}, standing=STANDING, packet_id="supplied-probe")
 
     def test_an_unsupplied_mesh_fails_closed_and_the_host_is_untouched(self):
-        for call in (lambda: self.k.publish_packet(self.packet, now_ns=self.k.HB_ANCHOR_UNIX_NS, custody=self.custody),
+        for call in (lambda: self.k.publish_packet(self.packet, epoch=32, custody=self.custody),
                      lambda: self.k.scan_addressed_frames(PEER),
                      lambda: self.k.resolve_federation_root(None)):
             with self.assertRaisesRegex(ValueError, "mesh_location_required_from_materializer"):
@@ -99,7 +99,7 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_a_supplied_mesh_keeps_the_frame_layout(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+        published = self.k.publish_packet(self.packet, root=mesh, epoch=32,
                                           custody=self.custody)
         frame = published["frame"]
         import hashlib
@@ -130,7 +130,7 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_node_markers_stay_in_the_node_state_root(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+        published = self.k.publish_packet(self.packet, root=mesh, epoch=32,
                                           custody=self.custody)
         # There is no default node state: the checkout is not node state.
         with self.assertRaisesRegex(ValueError, "node_state_location_required_from_materializer"):

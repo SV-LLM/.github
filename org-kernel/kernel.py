@@ -193,6 +193,30 @@ def supplied_hb_reference(hb_epoch:Any, *, retry_entrypoint:str)->dict[str,Any]:
         raise SuppliedEpochRefused(refusal)
     return hb_reference(epoch=int(str(hb_epoch)))
 
+def carried_epoch(reference:Any, *, retry_entrypoint:str)->int:
+    """The epoch a heartbeat reference carries, admitted only when it is not a clock reading.
+
+    A writer may forward an epoch it was not handed directly only when that
+    epoch is CARRIED: read from a frame or receipt whose heartbeat reference
+    passes the shared rule and is not clock-derived. A reference is CLOCK when
+    derived_from_clock is anything but false, or is absent beside a
+    sampled_unix_ns. A CLOCK, absent or invalid reference raises
+    SuppliedEpochRefused (six fields) before anything is written; a carried
+    clock epoch is never re-stamped derived_from_clock false. No clock is read.
+    """
+    epoch=reference.get("epoch") if isinstance(reference,dict) else None
+    failure=supplied_epoch_failure(epoch,reference)
+    if failure is None and "derived_from_clock" not in reference and "sampled_unix_ns" in reference:
+        failure=("HB_EPOCH_INVALID","the carried heartbeat reference was sampled from a clock")
+    if failure is None:
+        return int(str(epoch))
+    refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+    refusal.update(failure_code=failure[0],detail=failure[1],
+                   required_evidence_or_repair=("a carried heartbeat reference has an ASCII-digit epoch >= "
+                                                +str(HB_ANCHOR_EPOCH)+" and derived_from_clock false; a "
+                                                "clock-sampled epoch is never forwarded as supplied"))
+    raise SuppliedEpochRefused(refusal)
+
 def receipt(kind:str, packet_id:str, subject:str, previous:str|None, detail:dict[str,Any])->dict[str,Any]:
     body={"kind":kind,"packet_id":packet_id,"subject":subject,"previous_receipt_id":previous,"detail":detail}
     rid=kind.lower()+"-"+hashlib.sha256(canon(body)).hexdigest()[:24]
@@ -354,8 +378,9 @@ def _ingest(root:Path, frame:dict[str,Any], *, custody:dict[str,Any], node_state
     if frame["destination_org"]!=registry["organization"]:
         return {"status":"IGNORED_NOT_ADDRESSED","packet_id":frame["packet_id"]}
     # The epoch of the frame being consumed, which recovery has validated. What
-    # the answer embeds is then a function of the frame, not of this pass.
-    epoch=(frame.get("heartbeat_reference") or {}).get("epoch")
+    # the answer embeds is then a function of the frame, not of this pass. A
+    # clock-stamped frame carries no epoch a receipt may take (B-P36f).
+    epoch=carried_epoch(frame.get("heartbeat_reference"),retry_entrypoint="org-kernel/kernel.py::_ingest")
     result=dispatch(root,packet,custody=custody,node_state=node_state,epoch=epoch,mesh_root=mesh_root)
     return {"status":"CONSUMED","packet":packet,"execution_result":result}
 
@@ -373,7 +398,7 @@ def ingest_frame(root:Path, frame:dict[str,Any], *, repo_ledger_root:Path|None=N
     registry=load_registry(root)
     node_state=addressed_node_state_store(node_state_root) if node_state_root is not None else None
     item={"frame":frame,"path":node_store_module.frame_key(frame)}
-    epoch=(frame.get("heartbeat_reference") or {}).get("epoch")
+    epoch=carried_epoch(frame.get("heartbeat_reference"),retry_entrypoint="org-kernel/kernel.py::ingest_frame")
     result,recorded=ingest_recorded(root,item,custody,registry,node_state=node_state,epoch=epoch)
     return {**result,"organization_record":recorded}
 
@@ -383,7 +408,7 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "addressed_node_state_store","record_federation_cycle","federation_cycles","required_node_state",
          "crossing_custody","require_custody","carry_packet",
          "HB_EPOCH_NOT_SUPPLIED","HB_EPOCH_INVALID","supplied_epoch_failure",
-         "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference"]
+         "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference","carried_epoch"]
 
 
 # --- Federation mesh v1.1 additions ---
@@ -511,7 +536,8 @@ def carry_packet(packet:dict[str,Any], *, custody:dict[str,Any]|None, root:Path|
     return _carry(packet,root=root,now_ns=now_ns,epoch=epoch)
 
 def publish_packet(packet:dict[str,Any], *, root:Path|None=None, now_ns:int|None=None,
-                   epoch:int|None=None, custody:dict[str,Any]|None=None)->dict[str,Any]:
+                   epoch:int|None=None, custody:dict[str,Any]|None=None,
+                   epoch_provenance:dict[str,Any]|None=None)->dict[str,Any]:
     """Publish one packet as a recorded emission of this organization.
 
     It used to write the frame and record nothing. It now refuses without the
@@ -522,10 +548,20 @@ def publish_packet(packet:dict[str,Any], *, root:Path|None=None, now_ns:int|None
     idempotent and the frame write-once.
     """
     require_custody(custody)
-    frame=carrier_frame(packet,now_ns=now_ns,epoch=epoch)
+    # A recorded emission takes a supplied epoch, checked by the shared rule
+    # before the frame is built: an absent or invalid one raises
+    # SuppliedEpochRefused (six fields) and nothing is written. A clock-sampled
+    # frame is never recorded (B-P36f); the unrecorded carrier (carry_packet)
+    # keeps the kernel's sample default.
+    if now_ns is not None:
+        raise SuppliedEpochRefused(dict(writer_epoch_refusal(
+            None,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)"),
+            detail="a recorded emission is not stamped from a clock sample; supply epoch="))
+    epoch=supplied_hb_reference(epoch,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)")["epoch"]
+    frame=carrier_frame(packet,epoch=epoch)
     if root is None:  # the refusal publish_frame would make, before anything is recorded
         raise ValueError("mesh_location_required_from_materializer")
-    recorded=record_emission(custody,frame,packet)
+    recorded=record_emission(custody,frame,packet,epoch_provenance=epoch_provenance)
     path=_publish_frame(frame,root=root)
     return {"packet":packet,"frame":frame,"path":str(path),"organization_record":recorded}
 
@@ -542,7 +578,8 @@ def consume_addressed_frames(repo_root:Path, *, mesh_root:Path|None=None, seen:s
     node_state=addressed_node_state_store(node_state_root) if node_state_root is not None else None
     results=[]
     for item in scan_addressed_frames(organization,root=mesh_root,seen=seen):
-        epoch=(item["frame"].get("heartbeat_reference") or {}).get("epoch")
+        epoch=carried_epoch(item["frame"].get("heartbeat_reference"),
+                            retry_entrypoint="org-kernel/kernel.py::consume_addressed_frames")
         result,recorded=ingest_recorded(repo_root,item,custody,registry,node_state=node_state,
                                         epoch=epoch,mesh_root=mesh_root)
         results.append({"path":item["path"],"result":result,"organization_record":recorded})
@@ -605,9 +642,12 @@ def publish_ecosystem_message(*, origin_org:str, origin_service:str, organizatio
       communication_id=communication_id
     )
     # Each packet is a recorded emission (publish_packet), so the fanout leaves
-    # no frame its organization did not record. Custody is checked before the
-    # first packet, so a refused fanout publishes none of them.
+    # no frame its organization did not record. Custody and the supplied epoch
+    # are checked before the first packet, so a refused fanout publishes none
+    # of them (B-P36f).
     require_custody(custody)
+    if now_ns is None:
+        epoch=supplied_hb_reference(epoch,retry_entrypoint="org-kernel/kernel.py::publish_ecosystem_message (epoch=)")["epoch"]
     publications=[publish_packet(packet,root=root,now_ns=now_ns,epoch=epoch,custody=custody)
                   for packet in built["packets"]]
     return {"communication_id":built["communication_id"],"organization_count":built["organization_count"],
@@ -835,7 +875,8 @@ def _append_both(custody:dict[str,Any], identity:str, transition_class:str, pred
     organization_receipt=organization_ledger.append(
         repository_receipt,"REPO_STATE_PROPAGATION",predecessor,successor,
         {"operation":transition_class,**organization_evidence},
-        "NONE",hb_epoch=repository_receipt["hb_reference"]["epoch"],
+        "NONE",hb_epoch=carried_epoch(repository_receipt["hb_reference"],
+                                      retry_entrypoint="org-kernel/kernel.py::_append_both"),
         store=custody["organization_store"],idempotent=True)
     return {"repository_receipt_sha256":repository_receipt["receipt_sha256"],
             "organization_receipt_sha256":organization_receipt["receipt_sha256"]}
@@ -843,12 +884,16 @@ def _append_both(custody:dict[str,Any], identity:str, transition_class:str, pred
 def _crossing_identity(name:str)->str:
     return "ORGANIZATION-FEDERATION-CROSSING-"+hashlib.sha256(name.encode()).hexdigest()[:16]
 
-def record_emission(custody:dict[str,Any], frame:dict[str,Any], packet:dict[str,Any])->dict[str,Any]:
+def record_emission(custody:dict[str,Any], frame:dict[str,Any], packet:dict[str,Any], *,
+                    epoch_provenance:dict[str,Any]|None=None)->dict[str,Any]:
     """Append the repository and organization receipts for one frame this kernel publishes.
 
     Identified by the content-addressed frame, so publishing the same frame
     again (the same packet at the same epoch) returns the receipts already
-    recorded rather than minting more.
+    recorded rather than minting more. A frame stamped from a clock is never
+    recorded (carried_epoch refuses it). `epoch_provenance`, when the caller's
+    epoch was CARRIED rather than SUPPLIED, is recorded in both receipts as
+    `hb_epoch_provenance`.
     """
     name=node_store_module.frame_name(node_store_module.frame_key(frame))
     predecessor="sha256:"+hashlib.sha256(canon(packet.get("payload"))).hexdigest()
@@ -857,10 +902,14 @@ def record_emission(custody:dict[str,Any], frame:dict[str,Any], packet:dict[str,
     evidence={"frame_name":name,"frame_sha256":frame["frame_sha256"],"packet_id":packet["packet_id"],
               "origin":packet["origin"],"destination":packet["destination"],
               "message_class":(packet.get("payload") or {}).get("message_class"),"disposition":"ALLOW"}
+    organization_evidence={"packet_id":packet["packet_id"],"destination_org":packet["destination"]["org"],
+                           "disposition":"ALLOW"}
+    if epoch_provenance is not None:
+        evidence["hb_epoch_provenance"]=dict(epoch_provenance)
+        organization_evidence["hb_epoch_provenance"]=dict(epoch_provenance)
     return _append_both(custody,"ORGANIZATION-FEDERATION-EMISSION-"+hashlib.sha256(name.encode()).hexdigest()[:16],
-                        CROSSING_EMITTED_CLASS,predecessor,successor,evidence,
-                        {"packet_id":packet["packet_id"],"destination_org":packet["destination"]["org"],
-                         "disposition":"ALLOW"},frame["heartbeat_reference"]["epoch"])
+                        CROSSING_EMITTED_CLASS,predecessor,successor,evidence,organization_evidence,
+                        carried_epoch(frame["heartbeat_reference"],retry_entrypoint="org-kernel/kernel.py::record_emission"))
 
 def record_refusal(custody:dict[str,Any], item:dict[str,Any], reason:str, disposition:str, *,
                    service:dict[str,Any]|None, epoch:int|None)->dict[str,Any]:
@@ -963,7 +1012,8 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
         # the same frame again then builds the same answer frame, and publishing
         # it is a write-once no-op rather than a second answer stamped by
         # whatever clock this pass read. A caller-supplied sample still wins.
-        epoch=(item["frame"].get("heartbeat_reference") or {}).get("epoch")
+        epoch=carried_epoch(item["frame"].get("heartbeat_reference"),
+                            retry_entrypoint="org-kernel/kernel.py::consume_and_respond")
         answer_epoch=None if now_ns is not None else epoch
         # Recorded before anything leaves this node: no answer is published and
         # no consumption marker written for a crossing the organization has not

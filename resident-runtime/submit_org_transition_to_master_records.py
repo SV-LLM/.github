@@ -179,18 +179,24 @@ def main():
     # same frame -- a write-once no-op -- instead of a second record request
     # stamped by the host clock. Publication is fire-and-forget evidence: no
     # answer is requested and nothing waits for Master Records to record it.
-    # The head receipt's epoch is checked by the kernel's shared rule first: a
-    # segment whose head carries none, or an invalid one, is refused with the
-    # six fields and nothing is published, never stamped from the clock (B-P36e).
-    epoch = (receipts[-1].get("hb_reference") or {}).get("epoch")
-    refusal = K.writer_epoch_refusal(
-        epoch, retry_entrypoint=RETRY_ENTRYPOINT + " (a head --org-receipt carrying hb_reference.epoch)")
-    if refusal is not None:
-        print(json.dumps(refusal, sort_keys=True))
+    # The epoch is CARRIED from the segment's head receipt, never supplied: it is
+    # admitted only when that head's heartbeat reference passes the shared rule
+    # and is not clock-derived, and the emission records where it came from. A
+    # head with no epoch, an invalid one, or a clock reading is refused with the
+    # six fields and nothing is published (B-P36e, B-P36f).
+    head = receipts[-1]
+    try:
+        epoch = K.carried_epoch(head.get("hb_reference"),
+                                retry_entrypoint=RETRY_ENTRYPOINT + " (a head --org-receipt carrying hb_reference.epoch)")
+    except K.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
         raise SystemExit(1)
+    provenance = {"provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD", "source": "ORGANIZATION_LEDGER_HEAD",
+                  "head_receipt_sha256": head["receipt_sha256"], "epoch": epoch, "derived_from_clock": False}
     custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
                                  org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
-    published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=int(str(epoch)))
+    published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
+                                 epoch_provenance=provenance)
     print(json.dumps({"status": "RELEASED_ORGANIZATION_BATCH_PUBLISHED_FOR_DOWNSTREAM_RECORD",
                       "packet_id": packet["packet_id"], "receipt_count": len(receipts),
                       "frame_sha256": published["frame"]["frame_sha256"], "authority_effect": "NONE",

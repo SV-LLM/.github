@@ -338,7 +338,9 @@ def _record(transition_id: str, transition_class: str, predecessor: str, success
         transition_id, transition_class, predecessor, successor,
         dict(record), "NONE", hb_epoch=hb_epoch,
         idempotent_on=("frame_sha256", "payload_sha256") if idempotent else None)
-    epoch = repository_receipt["hb_reference"]["epoch"]
+    # CARRIED from the repository receipt; a clock-derived one is refused (B-P36f).
+    epoch = kernel.carried_epoch(repository_receipt["hb_reference"],
+                                 retry_entrypoint="resident-runtime/organization_egress_boundary.py::_record")
     organization_receipt = organization_ledger.append(
         repository_receipt, "REPO_STATE_PROPAGATION", predecessor, successor,
         {"operation": OPERATION_ID, "intended_action": record["intended_action"],
