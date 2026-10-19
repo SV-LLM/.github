@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 25,
+      "PROPER": 28,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
       "NAMING_ONLY": 26,
-      "TOTAL": 54
+      "TOTAL": 57
     }
   },
   "not_changed_with_reason": {
@@ -648,6 +648,27 @@
       "text": "\"resident-runtime/submit_org_transition_to_master_records.py\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-Labs.interlock-intr.json",
+      "line": 240,
+      "text": "\"master_records_in_path\": false,",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of StegVerse-Labs/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-org.interlock-intr.json",
+      "line": 240,
+      "text": "\"master_records_in_path\": false,",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of StegVerse-org/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-org.interlock-intr.json",
+      "line": 262,
+      "text": "\"master_records_in_path\": false,",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of StegVerse-org/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     }
   ]
 }
