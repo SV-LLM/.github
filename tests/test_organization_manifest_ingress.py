@@ -181,7 +181,7 @@ class ContractBinding(unittest.TestCase):
         self.assertEqual(record["sdk"]["commit"], SDK_PIN)
         entry = record["files"]["resident-runtime/organization_manifest_ingress.py"]
         self.assertEqual(entry["rule"], "declared_substitutions")
-        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 7)
+        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 10)
         boundary_ci = (ROOT / ".github/workflows/org-runtime-boundary.yml").read_text()
         self.assertIn("ref: " + REFERENCE_COMMIT, boundary_ci)
 
@@ -511,7 +511,9 @@ class DispatchGuards(unittest.TestCase):
         env["REPO_LEDGER_NAMESPACE"] = REPO_LOCATION["namespace"]
         done = self.space.step(CLOSE, env, INPUT_COMMUNICATION_ID="c", INPUT_PACKET_ID="")
         self.assertNotEqual(done.returncode, 0)
-        self.assertIn("DISPATCH_HB_EPOCH_INVALID", done.stdout)
+        refusal = json.loads(done.stdout)
+        self.assertEqual((refusal["failure_code"], refusal["failed_predicate"]),
+                         ("HB_EPOCH_INVALID", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
 
     def test_a_push_is_a_request_and_a_bare_dispatch_a_self_closure(self):
         text = WORKFLOW.read_text()

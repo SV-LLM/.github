@@ -71,6 +71,8 @@ jobs:
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_supplied_mesh_and_ledger_locations.py' -v
       - name: "Validate kernel parity with StegVerse-org PRs 93-97: processing selection, recorded crossings, supplied node state"
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_kernel_crossing_parity.py' -v
+      - name: Validate every --hb-epoch command line refuses through the kernel rule (B-P36c)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_cli_supplied_epoch.py' -v
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
         run: python -B resident-runtime/reference_adoption.py verify
       - name: Check out the recorded StegVerse-org reference commit

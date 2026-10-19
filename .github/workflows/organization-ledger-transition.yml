@@ -56,7 +56,7 @@ on:
         default: ''
         type: string
       hb_epoch:
-        description: 'supplied heartbeat epoch the receipts carry (mode=self-closure or mode=request; non-negative integer); no clock is read for it'
+        description: 'supplied heartbeat epoch the receipts carry (mode=self-closure or mode=request; ASCII digits, value >= 32); no clock is read for it'
         required: false
         default: ''
         type: string
@@ -289,11 +289,9 @@ jobs:
             packet_id="intr-destination-self-closure-${GITHUB_RUN_ID}"
           fi
           # Time is supplied with the dispatch. It is not sampled from a clock.
-          case "$HB_EPOCH" in
-            ''|*[!0-9]*)
-              echo '{"disposition":"FAIL_CLOSED","failure_code":"DISPATCH_HB_EPOCH_INVALID","failed_predicate":"HB_EPOCH_IS_SUPPLIED_AS_A_NON_NEGATIVE_INTEGER","retry_entrypoint":".github/workflows/organization-ledger-transition.yml","consequence_committed":false}'
-              exit 1 ;;
-          esac
+          # An absent or invalid epoch fails closed with the kernel's six-field
+          # refusal and nothing is appended (B-P36c).
+          python -B -c 'import importlib.util,json,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); r=k.writer_epoch_refusal(sys.argv[1] or None,retry_entrypoint=".github/workflows/organization-ledger-transition.yml (dispatch mode=self-closure with hb_epoch)"); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' "$HB_EPOCH" || exit 1
           python resident-runtime/intr_destination_ingress.py \
             --self-close \
             --hb-epoch "$HB_EPOCH" \

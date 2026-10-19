@@ -480,7 +480,9 @@ def main() -> int:
     parser.add_argument("--payload", type=Path)
     parser.add_argument("--registry", type=Path)
     parser.add_argument("--packet-id", default=None)
-    parser.add_argument("--hb-epoch", type=int, default=None)
+    parser.add_argument("--hb-epoch", default=None,
+                        help="heartbeat epoch from the carrier tick; required to append, "
+                             "never derived from the host clock")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--self-close", action="store_true",
                         help="append an intr-destination diagnostic self-closure")
@@ -491,6 +493,15 @@ def main() -> int:
     parser.add_argument("--repository-namespace")
     parser.add_argument("--closure", type=Path, help="closure result JSON to read back")
     args = parser.parse_args()
+    if not args.verify_self_closure:
+        # The raw text goes to the kernel rule; an int() here would admit '+33'.
+        kernel = _module("org_kernel_intr_destination", "org-kernel/kernel.py")
+        refusal = kernel.writer_epoch_refusal(
+            args.hb_epoch, retry_entrypoint="resident-runtime/intr_destination_ingress.py --hb-epoch")
+        if refusal is not None:
+            print(json.dumps(refusal, sort_keys=True))
+            return 1
+        args.hb_epoch = int(args.hb_epoch)
     try:
         if args.verify_self_closure:
             if not args.location or not args.repository_namespace or args.closure is None:

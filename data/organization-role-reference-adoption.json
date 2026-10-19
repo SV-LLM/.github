@@ -57,7 +57,22 @@
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
       "insertion_offset": 16759,
       "insertion_bytes": 2402,
-      "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c"
+      "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c",
+      "local_sha256": "sha256:e5bade3f7c210bbf4e4f348b14fb5103fbdd485fad4571899add5c8f301da3f4",
+      "substitutions": [
+        {
+          "reference": "    parser.add_argument(\"--hb-epoch\", type=int, default=None,\n                        help=\"heartbeat epoch; derived from the host clock, and marked as derived, when absent\")\n    args = parser.parse_args()\n",
+          "local": "    parser.add_argument(\"--hb-epoch\", default=None,\n                        help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\")\n    args = parser.parse_args()\n    # The raw text goes to the kernel rule; an int() here would admit '+33'.\n    refusal = kernel.writer_epoch_refusal(\n        args.hb_epoch, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py --hb-epoch\")\n    if refusal is not None:\n        print(json.dumps(refusal, sort_keys=True))\n        raise SystemExit(1)\n",
+          "count": 1,
+          "why": "the CLI takes the epoch as text and refuses an absent or invalid one with kernel.writer_epoch_refusal's six fields before anything is written, so the kernel rule, not argparse coercion, decides it ('+33', '\uff13\uff13', ' 33' are refused) (B-P36c); the help states the epoch is required"
+        },
+        {
+          "reference": "                        hb_epoch=args.hb_epoch)\n    except LedgerLocationRequired",
+          "local": "                        hb_epoch=int(args.hb_epoch))\n    except LedgerLocationRequired",
+          "count": 1,
+          "why": "the CLI passes the epoch the kernel rule admitted as its integer value"
+        }
+      ]
     },
     "resident-runtime/sdk_manifest_crossing.py": {
       "rule": "byte_identical",
@@ -101,7 +116,7 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:33542bfacf802e80fa2fdd2ffb5310e108d5fada207e947a6053b061c10cafbc",
+      "local_sha256": "sha256:6da5eefad4109553d7cc1926fb80c7ad54859e96011acae892c59a95e878af7b",
       "substitutions": [
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
@@ -120,6 +135,24 @@
           "local": "(boundary()[\"egress\"].get(\"capability_destination_bindings\") or [])",
           "count": 1,
           "why": "SV-LLM declares no outbound destination binding (tests/test_intr_destination_capability.py); without one the reference raised KeyError after the refusal was recorded, so a NON-ALLOW now stays the six-field receipt with disposition_delivery NON_ALLOW_DISPOSITION_BINDING_ABSENT, the reference's own outcome for an absent binding"
+        },
+        {
+          "reference": "    parser.add_argument(\"--hb-epoch\", type=int, default=None,\n                        help=\"heartbeat epoch; derived from the host clock, and marked as \"\n                             \"derived, when absent\")\n",
+          "local": "    parser.add_argument(\"--hb-epoch\", default=None,\n                        help=\"heartbeat epoch from the carrier tick; required, never derived \"\n                             \"from the host clock\")\n",
+          "count": 1,
+          "why": "the CLI takes the epoch as text, and the help states it is required (B-P36c)"
+        },
+        {
+          "reference": "    args = parser.parse_args()\n\n    result = receive(",
+          "local": "    args = parser.parse_args()\n    # The raw text goes to the kernel rule; an int() here would admit '+33'.\n    refusal = organization_ledger.kernel.writer_epoch_refusal(\n        args.hb_epoch, retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py --hb-epoch\")\n    if refusal is not None:\n        print(json.dumps(refusal, sort_keys=True))\n        return 1\n\n    result = receive(",
+          "count": 1,
+          "why": "the CLI takes the epoch as text and refuses an absent or invalid one with kernel.writer_epoch_refusal's six fields before anything is written, so the kernel rule, not argparse coercion, decides it ('+33', '\uff13\uff13', ' 33' are refused) (B-P36c)"
+        },
+        {
+          "reference": "packet_id=args.packet_id, hb_epoch=args.hb_epoch, mesh_root=args.mesh_root)",
+          "local": "packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)",
+          "count": 1,
+          "why": "the CLI passes the epoch the kernel rule admitted as its integer value"
         }
       ]
     }

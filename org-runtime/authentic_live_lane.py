@@ -70,9 +70,16 @@ def main() -> int:
     step = sub.add_parser("prepare")
     step.add_argument("--target", type=Path, required=True, help="the pinned Sandbox live/target.json")
     step.add_argument("--out", type=Path, required=True)
-    step.add_argument("--hb-epoch", type=int, default=None, help="heartbeat epoch from the carrier tick")
+    step.add_argument("--hb-epoch", default=None,
+                      help="heartbeat epoch from the carrier tick; required, never derived from the host clock")
     args = parser.parse_args()
-    result = prepare(json.loads(args.target.read_text()), hb_epoch=args.hb_epoch)
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal = crossing.kernel.writer_epoch_refusal(
+        args.hb_epoch, retry_entrypoint="org-runtime/authentic_live_lane.py prepare --hb-epoch")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        return 1
+    result = prepare(json.loads(args.target.read_text()), hb_epoch=int(args.hb_epoch))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, indent=2, sort_keys=True))

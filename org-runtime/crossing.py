@@ -342,8 +342,12 @@ def main()->int:
     i=sub.add_parser("ingress"); i.add_argument("--mesh-root",type=Path,required=True)
     i.add_argument("--node-state-root",type=Path,required=True)
     o=sub.add_parser("open-ledger")
-    for parser in (e,i,o): parser.add_argument("--hb-epoch",type=int,default=None,help="heartbeat epoch from the carrier tick")
+    for parser in (e,i,o): parser.add_argument("--hb-epoch",default=None,help="heartbeat epoch from the carrier tick; required, never derived from the host clock")
     ns=p.parse_args()
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal=kernel.writer_epoch_refusal(ns.hb_epoch,retry_entrypoint="org-runtime/crossing.py "+ns.cmd+" --hb-epoch")
+    if refusal is not None: print(json.dumps(refusal,sort_keys=True)); return 1
+    ns.hb_epoch=int(ns.hb_epoch)
     if ns.cmd=="open-ledger":
         out=open_organization_ledger(hb_epoch=ns.hb_epoch)
     elif ns.cmd=="egress":

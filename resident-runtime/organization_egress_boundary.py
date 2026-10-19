@@ -570,7 +570,8 @@ def main() -> int:
     parser.add_argument("--payload", type=Path)
     parser.add_argument("--standing", type=Path)
     parser.add_argument("--transition-reference", default="ecosystem.transition.interorg.v1")
-    parser.add_argument("--hb-epoch", type=int, default=None)
+    parser.add_argument("--hb-epoch", default=None,
+                        help="heartbeat epoch from the carrier tick; required, never derived from the host clock")
     parser.add_argument("--close", action="store_true")
     parser.add_argument("--packet-id")
     parser.add_argument("--communication-id")
@@ -578,6 +579,13 @@ def main() -> int:
     parser.add_argument("--mesh-root", type=Path)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal = kernel.writer_epoch_refusal(
+        args.hb_epoch, retry_entrypoint="resident-runtime/organization_egress_boundary.py --hb-epoch")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        return 1
+    args.hb_epoch = int(args.hb_epoch)
     if args.close:
         if not args.packet_id or not args.communication_id:
             raise SystemExit("--close requires --packet-id and --communication-id")

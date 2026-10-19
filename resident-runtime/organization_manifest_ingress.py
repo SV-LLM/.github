@@ -914,21 +914,27 @@ def main() -> int:
                         help="JSON declaring mode, node_ref and the predecessor key; "
                              "required unless the manifest declares its own chain position")
     parser.add_argument("--packet-id", default="organization-sdk-manifest-ingress")
-    parser.add_argument("--hb-epoch", type=int, default=None,
-                        help="heartbeat epoch; derived from the host clock, and marked as "
-                             "derived, when absent")
+    parser.add_argument("--hb-epoch", default=None,
+                        help="heartbeat epoch from the carrier tick; required, never derived "
+                             "from the host clock")
     parser.add_argument("--mesh-root", type=Path, default=None,
                         help="federation mesh this node was materialized with; a governance "
                              "request leaves on it")
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal = organization_ledger.kernel.writer_epoch_refusal(
+        args.hb_epoch, retry_entrypoint="resident-runtime/organization_manifest_ingress.py --hb-epoch")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        return 1
 
     result = receive(
         json.loads(args.manifest.read_text(encoding="utf-8")),
         registry=json.loads(args.registry.read_text(encoding="utf-8")),
         standing=(json.loads(args.standing.read_text(encoding="utf-8"))
                   if args.standing else None),
-        packet_id=args.packet_id, hb_epoch=args.hb_epoch, mesh_root=args.mesh_root)
+        packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

@@ -426,9 +426,15 @@ def main():
     parser.add_argument("--successor-org-state-sha256", required=True)
     parser.add_argument("--boundary-evidence-json", default="{}")
     parser.add_argument("--authority-effect", default="NONE")
-    parser.add_argument("--hb-epoch", type=int, default=None,
-                        help="heartbeat epoch; derived from the host clock, and marked as derived, when absent")
+    parser.add_argument("--hb-epoch", default=None,
+                        help="heartbeat epoch from the carrier tick; required, never derived from the host clock")
     args = parser.parse_args()
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal = kernel.writer_epoch_refusal(
+        args.hb_epoch, retry_entrypoint="resident-runtime/aggregate_repo_transition.py --hb-epoch")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        raise SystemExit(1)
     source_path = args.transition_receipt or args.repo_receipt
     if not source_path:
         raise SystemExit("transition receipt required")
@@ -440,7 +446,7 @@ def main():
         result = append(receipt, args.org_transition_class or default_class,
                         args.predecessor_org_state_sha256, args.successor_org_state_sha256,
                         json.loads(args.boundary_evidence_json), args.authority_effect,
-                        hb_epoch=args.hb_epoch)
+                        hb_epoch=int(args.hb_epoch))
     except LedgerLocationRequired as exc:
         print(json.dumps(location_refusal(exc), sort_keys=True))
         raise SystemExit(1)
