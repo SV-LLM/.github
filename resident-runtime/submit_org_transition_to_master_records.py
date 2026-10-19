@@ -179,10 +179,19 @@ def main():
     # same frame -- a write-once no-op -- instead of a second record request
     # stamped by the host clock. Publication is fire-and-forget evidence: no
     # answer is requested and nothing waits for Master Records to record it.
+    # The head receipt's epoch is checked by the kernel's shared rule first: a
+    # segment whose head carries none, or an invalid one, is refused with the
+    # six fields and nothing is published, never stamped from the clock (B-P36e).
+    epoch = (receipts[-1].get("hb_reference") or {}).get("epoch")
+    refusal = K.writer_epoch_refusal(
+        epoch, retry_entrypoint="resident-runtime/submit_org_transition_to_master_records.py "
+                                "(a head --org-receipt carrying hb_reference.epoch)")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        raise SystemExit(1)
     custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
                                  org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
-    published = K.publish_packet(packet, root=a.mesh_root, custody=custody,
-                                 epoch=(receipts[-1].get("hb_reference") or {}).get("epoch"))
+    published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=int(str(epoch)))
     print(json.dumps({"status": "RELEASED_ORGANIZATION_BATCH_PUBLISHED_FOR_DOWNSTREAM_RECORD",
                       "packet_id": packet["packet_id"], "receipt_count": len(receipts),
                       "frame_sha256": published["frame"]["frame_sha256"], "authority_effect": "NONE",

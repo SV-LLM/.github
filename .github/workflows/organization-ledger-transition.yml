@@ -255,10 +255,11 @@ jobs:
             # Time is supplied with the dispatch. It is not sampled from a clock,
             # so a request that would append without one, or with an invalid one,
             # fails closed here with the kernel's six-field refusal and nothing is
-            # received, appended or published (B-P31). The raw input text is the
-            # kernel rule's to decide: a push carries no input (HB_EPOCH_NOT_SUPPLIED),
-            # and a dispatched "" or "+33" is HB_EPOCH_INVALID (B-P36d).
-            python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=os.environ.get("HB_EPOCH") if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=request with hb_epoch)" || exit 1
+            # received, appended or published (B-P31). A push carries no input, and
+            # a dispatch string input cannot tell "" from absent, so both are
+            # HB_EPOCH_NOT_SUPPLIED; any other text is the kernel rule's to decide,
+            # so a dispatched "+33" is HB_EPOCH_INVALID (B-P36d).
+            python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=request with hb_epoch)" || exit 1
             # A refusal is recorded too; the publish step carries it, and the
             # readback step fails the run on a receipt it cannot find.
             python resident-runtime/organization_manifest_ingress.py \
@@ -292,9 +293,10 @@ jobs:
           fi
           # Time is supplied with the dispatch. It is not sampled from a clock.
           # An absent or invalid epoch fails closed with the kernel's six-field
-          # refusal and nothing is appended (B-P36c); the raw input text is the
-          # kernel rule's to decide, so a dispatched "" is HB_EPOCH_INVALID (B-P36d).
-          python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=os.environ.get("HB_EPOCH") if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=self-closure with hb_epoch)" || exit 1
+          # refusal and nothing is appended (B-P36c). A dispatched "" cannot be told
+          # from an absent input and is HB_EPOCH_NOT_SUPPLIED; any other text is the
+          # kernel rule's to decide (B-P36d).
+          python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=self-closure with hb_epoch)" || exit 1
           python resident-runtime/intr_destination_ingress.py \
             --self-close \
             --hb-epoch "$HB_EPOCH" \

@@ -19,6 +19,8 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -167,14 +169,53 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                     PEER, payload, standing=STANDING, capability="intr-destination", mesh_root=self.mesh,
                     hb_epoch=epoch), epoch, self.egress.repository_ledger.kernel.SuppliedEpochRefused)
 
-    def receipts_at(self, epoch):
-        found = {}
-        for path in files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger"):
+    def test_the_master_records_release_refuses_a_head_receipt_without_a_supplied_epoch(self):
+        # B-P36e: the release took its epoch from the head receipt and handed
+        # None to publish_packet, which then stamped the frame from the clock.
+        self.open_ledger()
+        genesis, = {r["receipt_sha256"]: r for r in self.documents(self.base / "org-ledger")
+                    if r.get("schema") == "stegverse.organization-transition-receipt/v1"}.values()
+        (self.base / "standing.json").write_text(json.dumps(STANDING))
+        for epoch in REFUSED:
+            with self.subTest(epoch=epoch):
+                receipt = {k: v for k, v in genesis.items() if k != "receipt_sha256"}
+                if epoch is None:
+                    receipt.pop("hb_reference")
+                else:
+                    receipt["hb_reference"] = {**receipt["hb_reference"], "epoch": epoch}
+                receipt["receipt_sha256"] = self.agg.sha(receipt)
+                path = self.base / "receipt.json"
+                path.write_text(json.dumps(receipt))
+                before = files_under(self.base)
+                done = subprocess.run(
+                    [sys.executable, "-B", str(self.root / "resident-runtime/submit_org_transition_to_master_records.py"),
+                     "--org-receipt", str(path), "--predecessor-ecosystem-state-sha256", "sha256:" + "0" * 64,
+                     "--successor-ecosystem-state-sha256", "sha256:" + "1" * 64,
+                     "--standing", str(self.base / "standing.json"), "--mesh-root", str(self.mesh)],
+                    capture_output=True, text=True, env=dict(os.environ), timeout=120)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                refusal = json.loads(done.stdout)
+                self.assertEqual(refusal["failure_code"],
+                                 "HB_EPOCH_NOT_SUPPLIED" if epoch is None else "HB_EPOCH_INVALID")
+                for field in SIX_FIELDS:
+                    self.assertTrue(refusal[field], field)
+                self.assertEqual(files_under(self.base), before, "a refused release published a frame")
+                path.unlink()
+
+    @staticmethod
+    def documents(root):
+        for path in files_under(root):
             try:
                 document = json.loads(Path(path).read_text())
             except ValueError:
                 continue
-            reference = document.get("hb_reference") if isinstance(document, dict) else None
+            if isinstance(document, dict):
+                yield document
+
+    def receipts_at(self, epoch):
+        found = {}
+        for document in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]:
+            reference = document.get("hb_reference")
             if isinstance(reference, dict) and reference.get("epoch") == epoch:
                 # A store keeps a receipt under its key and may mirror it at HEAD.
                 found[document["receipt_sha256"]] = document

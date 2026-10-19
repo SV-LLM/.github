@@ -7,9 +7,10 @@ finds every such gate in .github/workflows/organization-ledger-transition*.yml,
 checks that no other check (a shell case, a regex, an int()) reads the epoch,
 and runs each gate exactly as written:
 
-  absent (a push, or a dispatch with HB_EPOCH unset)  HB_EPOCH_NOT_SUPPLIED
-  "", "+33", " 33", "３３", "٣٣", "33.0", "31", "abc"  HB_EPOCH_INVALID
-  "4096"                                              passes, prints nothing
+  absent: a push, or a dispatch with HB_EPOCH unset or ""   HB_EPOCH_NOT_SUPPLIED
+    (a workflow_dispatch string input cannot tell "" from absent)
+  "+33", " 33", "３３", "٣٣", "33.0", "31", "abc"             HB_EPOCH_INVALID
+  "4096"                                                     passes, prints nothing
 
 No repository code reads STEGVERSE_HB_EPOCH; the test checks that too.
 Source validation only; no authority effect is claimed.
@@ -23,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = sorted((ROOT / ".github/workflows").glob("organization-ledger-transition*.yml"))
-INVALID = ("", "+33", " 33", "３３", "٣٣", "33.0", "31", "abc")
+INVALID = ("+33", " 33", "３３", "٣٣", "33.0", "31", "abc")
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
 GATE = re.compile(r"^\s*(python -B -c '.*writer_epoch_refusal.*) \|\| exit 1\s*$")
@@ -105,7 +106,8 @@ class WorkflowEpochGate(unittest.TestCase):
 
     def test_an_absent_epoch_is_not_supplied(self):
         for workflow, name, command in gates():
-            for event, epoch in (("workflow_dispatch", None), ("push", ""), ("push", "4096")):
+            for event, epoch in (("workflow_dispatch", None), ("workflow_dispatch", ""),
+                                 ("push", ""), ("push", "4096")):
                 with self.subTest(step=name, event=event, epoch=epoch):
                     self.assertRefused(self.run_gate(command, event, epoch), "HB_EPOCH_NOT_SUPPLIED")
 
