@@ -2,7 +2,7 @@
 """Every --hb-epoch command line hands the raw text to the kernel's supplied-epoch rule.
 
 B-P36c. argparse `type=int` (or any int() before the rule) read '+33',
-fullwidth '３３' and ' 33' as 33 and then wrote a receipt. Each CLI that can
+fullwidth '３３', Arabic-Indic '٣٣' and ' 33' as 33 and then wrote a receipt. Each CLI that can
 append now takes the epoch as text and refuses an absent or invalid one with
 kernel.writer_epoch_refusal's six-field FAIL_CLOSED, exits non-zero, and
 writes nothing: no ledger receipt and no --out file. '4096' is admitted.
@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DIGEST = "sha256:" + "0" * 64
-REFUSED = ("+33", "３３", " 33", "True", "abc", "33.7", None)
+REFUSED = ("+33", "３３", "٣٣", " 33", "True", "abc", "33.7", None)
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
 
