@@ -39,7 +39,7 @@ def ledger_persistence(store) -> str:
         else "EXECUTION_SCOPED_SAME_AS_REFERENCE"
 
 
-def prepare(target: dict, root: Path = ROOT) -> dict:
+def prepare(target: dict, root: Path = ROOT, *, hb_epoch: int | None = None) -> dict:
     target_id = target.get("target_id")
     if not isinstance(target_id, str) or not target_id:
         raise SystemExit("LIVE_TARGET_ID_REQUIRED")
@@ -50,10 +50,10 @@ def prepare(target: dict, root: Path = ROOT) -> dict:
     ledger = crossing.organization_ledger
     store = ledger.open_store(ledger.ledger_root())
     head = store.get(ledger.HEAD_KEY)
-    opened = crossing.open_organization_ledger(root) if head is None else None
+    opened = crossing.open_organization_ledger(root, hb_epoch=hb_epoch) if head is None else None
     outcome = {"disposition": "ALLOW", "intended_action": INTENDED_ACTION, "target_id": target_id}
     parent = crossing.record(PARENT_CLASS, subject={"intended_action": "AUTHENTIC_PARENT", "for": INTENDED_ACTION},
-                             outcome=outcome, root=root)
+                             outcome=outcome, root=root, hb_epoch=hb_epoch)
     return {"schema": "sv-llm.authentic-live-lane-organization-steps/v1", "organization": crossing.ORG,
             "ledger_opened_org_receipt_sha256": opened["org_receipt_sha256"] if opened else None,
             "continued_from_org_receipt_sha256": None if opened else head["receipt_sha256"],
@@ -70,8 +70,9 @@ def main() -> int:
     step = sub.add_parser("prepare")
     step.add_argument("--target", type=Path, required=True, help="the pinned Sandbox live/target.json")
     step.add_argument("--out", type=Path, required=True)
+    step.add_argument("--hb-epoch", type=int, default=None, help="heartbeat epoch from the carrier tick")
     args = parser.parse_args()
-    result = prepare(json.loads(args.target.read_text()))
+    result = prepare(json.loads(args.target.read_text()), hb_epoch=args.hb_epoch)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, indent=2, sort_keys=True))

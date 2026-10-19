@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -312,7 +313,7 @@ class AddressedAndClosedTests(RedirectedLedgers):
         super().setUp()
         # This kernel's custody requires a declared organization-ledger genesis.
         # The mesh and both ledgers stay in the temporary roots.
-        crossing.open_organization_ledger()
+        crossing.open_organization_ledger(hb_epoch=32)
 
     def publish(self, payload, service, packet_id, origin=PEER):
         packet = kernel.build_packet(
@@ -367,6 +368,9 @@ class AddressedAndClosedTests(RedirectedLedgers):
         self.assertIs(operation["organization_receipt_preserves_repository_receipt"], True)
         repository, = self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
                                     "stegverse.repo-transition-receipt/v1", OPERATION_ID)
+        # The receipt carries the consumed frame's epoch, not a clock reading.
+        self.assertEqual(repository["hb_reference"]["epoch"], 32)
+        self.assertIs(repository["hb_reference"]["derived_from_clock"], False)
         matched = [record for record in self.receipts(
             "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1")
             if record.get("repo_receipt_sha256") == repository["receipt_sha256"]]
@@ -584,6 +588,54 @@ class DiagnosticSelfClosureTests(RedirectedLedgers):
         self.assertEqual(fresh_tip, tip_after)
         subprocess.check_call(
             ["git", "--git-dir", str(fresh), "merge-base", "--is-ancestor", tip_before, fresh_tip])
+
+
+class SuppliedEpochTests(RedirectedLedgers):
+    """A ledger receipt's epoch is supplied by its caller, never read off a clock."""
+
+    SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
+                  "retry_entrypoint", "owning_existing_goal", "next_attempt")
+
+    def assertSixFields(self, refusal):
+        self.assertEqual(refusal["disposition"], "FAIL_CLOSED")
+        self.assertEqual(refusal["failure_code"], "HB_EPOCH_NOT_SUPPLIED_PATH_LIVE")
+        for field in self.SIX_FIELDS:
+            self.assertTrue(refusal.get(field), field)
+
+    def test_an_append_without_an_epoch_fails_closed_before_the_store_opens(self):
+        emit = ingress.repository_ledger
+
+        class Unopenable:
+            def __getattr__(self, name):
+                raise AssertionError("the store was touched: " + name)
+
+        def clock(*args, **kwargs):
+            raise AssertionError("a clock was read")
+        with mock.patch.object(emit.kernel, "hb_reference", clock):
+            with self.assertRaises(emit.HbEpochNotSupplied) as raised:
+                emit.append("T:no-epoch", "T", "sha256:" + "0" * 64, "sha256:" + "1" * 64,
+                            {}, "NONE", store=Unopenable())
+        self.assertSixFields(emit.epoch_not_supplied_refusal(raised.exception))
+        self.assertFalse(Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]).exists())
+
+    def test_the_emitter_cli_without_an_epoch_prints_the_refusal_and_writes_nothing(self):
+        run = subprocess.run(
+            ["python", str(ROOT / ".stegverse/transition-ledger/emit.py"),
+             "--transition-id", "T:no-epoch", "--transition-class", "T",
+             "--predecessor-state-sha256", "sha256:" + "0" * 64,
+             "--successor-state-sha256", "sha256:" + "1" * 64],
+            capture_output=True, text=True, env=dict(os.environ))
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertSixFields(json.loads(run.stdout))
+        self.assertFalse(Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]).exists())
+
+    def test_a_receiving_operation_handed_no_epoch_records_nothing(self):
+        with self.assertRaises(ingress.repository_ledger.HbEpochNotSupplied):
+            ingress.receive(diagnostic(), registry=REGISTRY, packet_id="no-epoch-diagnostic")
+        self.assertEqual(self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
+                                       "stegverse.repo-transition-receipt/v1"), [])
+        self.assertEqual(self.receipts("STEGVERSE_ORG_LEDGER_ROOT",
+                                       "stegverse.organization-transition-receipt/v1"), [])
 
 
 class LedgerWriterWorkflowTests(unittest.TestCase):

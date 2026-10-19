@@ -242,7 +242,7 @@ def dispatch(root:Path, packet:dict[str,Any], *, custody:dict[str,Any]|None=None
         # buried in the application result. Loaded only for this role.
         try:
             application_result=capability_ingress(root).receive(
-                root,service,packet,registry=registry,mesh_root=mesh_root)
+                root,service,packet,registry=registry,mesh_root=mesh_root,hb_epoch=epoch)
         except SystemExit as refused:
             raise ValueError("capability_ingress_refused:"+str(refused)) from None
     else:
