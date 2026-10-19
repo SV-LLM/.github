@@ -136,11 +136,11 @@ class ProcessingSelection(unittest.TestCase):
         self.assertTrue(all(s["boundary_role"].startswith("BOUNDARY_LOCAL_") for s in services))
         self.assertTrue(all("admits_processing" not in s for s in services))
         # process_boundary.py is the StegVerse-org reference processor adopted
-        # byte-identical for the SDK manifest crossing
-        # (data/organization-role-reference-adoption.json). Only that crossing
-        # runs it; the kernel's dispatch does not.
+        # for the SDK manifest crossing (data/organization-role-reference-adoption.json),
+        # with the PB-EXIT-SPLIT exit codes as declared substitutions. Only that
+        # crossing runs it; the kernel's dispatch does not.
         adopted = json.loads((REPO / "data/organization-role-reference-adoption.json").read_text())["files"]
-        self.assertEqual(adopted["org-boundary/runtime/process_boundary.py"]["rule"], "byte_identical")
+        self.assertEqual(adopted["org-boundary/runtime/process_boundary.py"]["rule"], "declared_substitutions")
         self.assertNotIn("process_boundary", (REPO / "org-kernel/kernel.py").read_text())
         self.assertNotIn("process_boundary", (REPO / "org-runtime/crossing.py").read_text())
 

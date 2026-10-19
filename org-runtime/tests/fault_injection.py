@@ -59,14 +59,39 @@ def _wrap(name):
     setattr(os, name, call)
 
 
+def _wrap_path(name):
+    """Path.write_text / Path.read_text, for a CLI that writes or reads outside the stores."""
+    original = _ORIGINAL.setdefault("Path." + name, getattr(Path, name))
+
+    def call(self, *args, **kwargs):
+        root = os.environ.get("STEGVERSE_FAULT_ROOT")
+        counter = os.environ.get("STEGVERSE_FAULT_COUNTER")
+        match = os.environ.get("STEGVERSE_FAULT_MATCH")
+        target = str(Path(self).resolve())
+        if not root or not counter or not target.startswith(root) or (match and match not in target):
+            return original(self, *args, **kwargs)
+        number = _count(counter)
+        at = os.environ.get("STEGVERSE_FAULT_AT")
+        if at is not None and number == int(at):
+            raise OSError("injected fault in Path." + name + " " + str(number))
+        return original(self, *args, **kwargs)
+    setattr(Path, name, call)
+
+
 def install():
+    """os.replace and os.link always; Path.write_text / read_text when STEGVERSE_FAULT_OPS names them."""
     _wrap("replace")
     _wrap("link")
+    for op in filter(None, os.environ.get("STEGVERSE_FAULT_OPS", "").split(",")):
+        _wrap_path(op)
 
 
 def uninstall():
     for name, original in _ORIGINAL.items():
-        setattr(os, name, original)
+        if name.startswith("Path."):
+            setattr(Path, name[len("Path."):], original)
+        else:
+            setattr(os, name, original)
 
 
 def directory():
