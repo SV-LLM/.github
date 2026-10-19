@@ -7,7 +7,7 @@ from __future__ import annotations
 import re, unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 USES = re.compile(r"^\s*-?\s*uses:\s*([^\s#]+)", re.M)
 PINNED = re.compile(r"^[^@]+@[0-9a-f]{40}$")
 
