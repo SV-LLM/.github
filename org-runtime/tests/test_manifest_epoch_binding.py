@@ -60,10 +60,24 @@ class ManifestEpochBinding(unittest.TestCase):
                 with self.subTest(operation=path):
                     workflow = (ROOT / source["dispatcher"]).read_text()
                     self.assertRegex(workflow, r"\n      " + re.escape(source["input"]) + r":\n")
+                    self.assertRegex(workflow, r"\n  workflow_dispatch:\n")
                     self.assertRegex(workflow, re.escape("python " + op["operation"])
-                                     + r" \\\n(\s+--\S+.*\\\n)*?\s+--hb-epoch \"\$HB_EPOCH\"")
+                                     + r"[^\n]*\\\n(\s+\S.*\\\n)*?\s+--hb-epoch \"\$HB_EPOCH\"")
                     checked += 1
-        self.assertGreaterEqual(checked, 2)
+        self.assertGreaterEqual(checked, 4)
+
+    def test_every_binding_names_an_in_tree_workflow_dispatch(self):
+        # 08:32Z / 08:43Z: an epoch-requiring entrypoint is dispatched in-tree, by a
+        # workflow_dispatch that supplies hb_epoch; a host outside the tree is not one.
+        for path, op in operations(INTERLOCK):
+            binding = op.get("hb_epoch_binding")
+            if not binding:
+                continue
+            with self.subTest(operation=path):
+                dispatchers = [s["dispatcher"] for s in binding["sources"] if s["from"] == "dispatch_input"]
+                self.assertTrue(dispatchers, "MANIFEST_DISPATCHER_NOT_IN_TREE: " + path)
+                for dispatcher in dispatchers:
+                    self.assertTrue((ROOT / dispatcher).is_file(), dispatcher)
 
     def test_the_activation_crossing_surface_is_a_bound_operation(self):
         surface = ACTIVATION["crossing_surface"]

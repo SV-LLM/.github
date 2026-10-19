@@ -23,7 +23,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS = sorted((ROOT / ".github/workflows").glob("organization-ledger-transition*.yml"))
+WORKFLOWS = sorted([*(ROOT / ".github/workflows").glob("organization-ledger-transition*.yml"),
+                    ROOT / ".github/workflows/organization-crossing-dispatch.yml"])
 INVALID = ("+33", " 33", "３３", "٣٣", "33.0", "31", "abc")
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
@@ -66,7 +67,7 @@ class WorkflowEpochGate(unittest.TestCase):
         return subprocess.run(["bash", "--noprofile", "--norc", "-c", command], cwd=ROOT, env=env,
                               capture_output=True, text=True, timeout=60)
 
-    def assertRefused(self, done, failure_code):
+    def assertRefused(self, done, failure_code, workflow="organization-ledger-transition.yml"):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         refusal = json.loads(done.stdout)
         self.assertEqual(refusal["disposition"], "FAIL_CLOSED")
@@ -74,13 +75,13 @@ class WorkflowEpochGate(unittest.TestCase):
         self.assertEqual(refusal["failed_predicate"], "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH")
         for field in SIX_FIELDS:
             self.assertTrue(refusal[field], field)
-        self.assertIn("organization-ledger-transition.yml", refusal["retry_entrypoint"])
+        self.assertIn(workflow, refusal["retry_entrypoint"])
         self.assertIs(refusal["derived_from_clock"], False)
 
     def test_each_appending_lane_has_one_kernel_gate(self):
         lanes = {name for _, name, _ in gates()}
-        self.assertEqual(len(gates()), 2, gates())
-        self.assertEqual(len(lanes), 2, lanes)
+        self.assertEqual(len(gates()), 3, gates())
+        self.assertEqual(len(lanes), 3, lanes)
 
     def test_no_other_check_reads_the_epoch(self):
         for workflow, name, run in steps():
@@ -109,13 +110,13 @@ class WorkflowEpochGate(unittest.TestCase):
             for event, epoch in (("workflow_dispatch", None), ("workflow_dispatch", ""),
                                  ("push", ""), ("push", "4096")):
                 with self.subTest(step=name, event=event, epoch=epoch):
-                    self.assertRefused(self.run_gate(command, event, epoch), "HB_EPOCH_NOT_SUPPLIED")
+                    self.assertRefused(self.run_gate(command, event, epoch), "HB_EPOCH_NOT_SUPPLIED", workflow)
 
     def test_an_invalid_dispatched_epoch_is_invalid(self):
         for workflow, name, command in gates():
             for epoch in INVALID:
                 with self.subTest(step=name, epoch=epoch):
-                    self.assertRefused(self.run_gate(command, "workflow_dispatch", epoch), "HB_EPOCH_INVALID")
+                    self.assertRefused(self.run_gate(command, "workflow_dispatch", epoch), "HB_EPOCH_INVALID", workflow)
 
     def test_4096_passes(self):
         for workflow, name, command in gates():

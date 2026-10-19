@@ -562,6 +562,158 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                         self.assertNotIn(frame["packet_id"], ledgered)
                 self.assertEqual(run(), [])
 
+    def test_a_malformed_frames_file_never_starves_the_scan(self):
+        # F-SCAN: a frames.d file that is not a frame object is quarantined by name
+        # (FRAME_INGEST_FAILED) and the valid frame behind it is still ledgered.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                frames = self.mesh / "frames.d"
+                frames.mkdir(parents=True, exist_ok=True)
+                (frames / "000-not-json.json").write_text("{not json")
+                (frames / "001-a-list.json").write_text("[1,2,3]")
+                valid = self.inbound(k, "f-scan-valid", epoch=4096)
+                self.no_clock()
+                node = self.base / "node"
+                if route == "consume_and_respond":
+                    run = lambda: [row["result"] for row in k.consume_and_respond(
+                        self.root, mesh_root=self.mesh, node_state_root=node,
+                        repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")]
+                else:
+                    run = lambda: self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
+                                                        hb_epoch="4096")
+                results = run()
+                bad = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual(len(bad), 2, results)
+                for r in bad:
+                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"), r)
+                    for field in SIX_FIELDS:
+                        self.assertTrue(r[field], field)
+                ledgered = json.dumps([*self.documents(self.base / "repo-ledger"),
+                                       *self.documents(self.base / "org-ledger")])
+                self.assertIn(valid["packet_id"], ledgered)
+                self.assertEqual(run(), [])
+
+    def consume_route(self, k, route, node):
+        if route == "consume_and_respond":
+            return lambda: [row["result"] for row in k.consume_and_respond(
+                self.root, mesh_root=self.mesh, node_state_root=node,
+                repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")]
+        return lambda: self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096")
+
+    def test_each_corrupt_frames_file_is_quarantined_by_name(self):
+        # B-P36p: a read error, non-UTF-8, non-JSON and an oversized file are each
+        # quarantined by filename (six fields, 0 ledger files); the valid frame is ledgered.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                frames = self.mesh / "frames.d"
+                frames.mkdir(parents=True, exist_ok=True)
+                (frames / "000-read-error.json").write_text("{}")
+                (frames / "001-not-utf8.json").write_bytes(b'{"\xff\xfe": 1}')
+                (frames / "002-not-json.json").write_text("{not json")
+                (frames / "003-oversized.json").write_text('{"pad": "' + "x" * k.MAX_FRAME_FILE_BYTES + '"}')
+                valid = self.inbound(k, "b-p36p-valid", epoch=4096)
+                original = k.PosixStateStore.get
+
+                def get(store, key):
+                    if key.endswith("000-read-error.json"):
+                        raise OSError("simulated read error")
+                    return original(store, key)
+                patcher = mock.patch.object(k.PosixStateStore, "get", get)
+                patcher.start()
+                self.addCleanup(patcher.stop)
+                self.no_clock()
+                run = self.consume_route(k, route, self.base / "node")
+                results = run()
+                bad = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual(len(bad), 4, results)
+                for r in bad:
+                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"), r)
+                    for field in SIX_FIELDS:
+                        self.assertTrue(r[field], field)
+                markers = [json.loads(Path(f).read_text()) for f in files_under(self.base / "node")]
+                names = {m.get("frame_name") for m in markers if m.get("failure_code") == "FRAME_REFUSED_QUARANTINED"}
+                self.assertEqual(len(names), 4, markers)
+                ledgered = json.dumps([*self.documents(self.base / "repo-ledger"),
+                                       *self.documents(self.base / "org-ledger")])
+                self.assertIn(valid["packet_id"], ledgered)
+                self.assertEqual(run(), [])
+                patcher.stop()
+
+    def test_a_wrong_typed_field_is_quarantined_on_either_side_of_a_valid_frame(self):
+        # F-TYPE: the per-frame guard is total. A wrong-typed packet_base64 raises
+        # AttributeError in recovery; it is FRAME_INGEST_FAILED with the class as
+        # failed_predicate, quarantined, never re-offered, and the valid frame is ledgered.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                bad = [self.reframed(k, name, lambda ref: ref) for name in ("000-f-type", "zzz-f-type")]
+                for frame in bad:  # re-publish each with packet_base64 of the wrong type
+                    body = {key: value for key, value in frame.items() if key != "frame_sha256"}
+                    body["packet_base64"] = 123
+                    k._publish_frame({**body, "frame_sha256": k.sha(body)}, root=self.mesh)
+                valid = self.inbound(k, "f-type-valid", epoch=4096)
+                self.no_clock()
+                run = self.consume_route(k, route, self.base / "node")
+                results = run()
+                typed = [r for r in results if r.get("failed_predicate") == "AttributeError"]
+                self.assertEqual(len(typed), 2, results)
+                for r in typed:
+                    self.assertEqual(r["failure_code"], "FRAME_REFUSED_QUARANTINED")
+                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"))
+                self.assertIn(valid["packet_id"], json.dumps([*self.documents(self.base / "repo-ledger")]))
+                self.assertEqual([r for r in run() if r.get("failed_predicate") == "AttributeError"], [])
+
+    def test_an_io_failure_in_our_own_ledger_leaves_the_frame_pending(self):
+        # F-TYPE IO addendum: an OSError writing this organization's ledger is
+        # six-field FRAME_DISPATCH_IO_FAILED, writes no marker, and the next cycle
+        # consumes the frame exactly once.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        valid = self.inbound(k, "b-p36-io-valid", epoch=4096)
+        original = k.crossing_custody
+        failures = {"left": 1}
+
+        def custody_with_one_failure(*args, **kwargs):
+            custody = original(*args, **kwargs)
+            store = custody["organization_store"]
+            append = store.append_transaction
+
+            def flaky(*a, **kw):
+                if failures["left"]:
+                    failures["left"] -= 1
+                    raise OSError("simulated ledger write failure")
+                return append(*a, **kw)
+            store.append_transaction = flaky
+            return custody
+        node = self.base / "node"
+        ledgers = {"repo_ledger_root": self.base / "repo-ledger", "org_ledger_root": self.base / "org-ledger"}
+        with mock.patch.object(k, "crossing_custody", custody_with_one_failure):
+            first = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
+        row, = first
+        self.assertEqual(row["result"]["failure_code"], "FRAME_DISPATCH_IO_FAILED")
+        for field in SIX_FIELDS:
+            self.assertTrue(row["result"][field], field)
+        self.assertIsNone(row["seen_marker"])
+        self.assertEqual(files_under(node / "federation") if (node / "federation").exists() else [], [])
+        second = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
+        self.assertEqual([r["result"].get("status") for r in second], ["CONSUMED"], second)
+        consumed = {d["receipt_sha256"]: d for d in self.documents(self.base / "repo-ledger")
+                    if d.get("transition_class") == "ORGANIZATION_FEDERATION_CROSSING_CONSUMED"
+                    and valid["frame_sha256"] in json.dumps(d)}
+        self.assertEqual(len(consumed), 1, consumed)
+        organization = {d["receipt_sha256"]: d for d in self.documents(self.base / "org-ledger")
+                        if d.get("source_transition_sha256") in consumed}
+        self.assertEqual(len(organization), 1, organization)
+        self.assertEqual(k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers), [])
+
     def test_a_malformed_clock_frame_is_quarantined_not_raised(self):
         # F-S1a: a clock-flagged frame with a malformed epoch is a six-field
         # refusal and quarantined on every consume route.

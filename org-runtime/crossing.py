@@ -358,7 +358,11 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
     # records every disposition below, so it holds the organization's custody.
     custody=carrier_custody(root)
     results=[]
-    for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state)):
+    for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state),
+                                             include_unreadable=True):
+        if "scan_error" in item:  # an unreadable frames.d file is quarantined by name (F-SCAN)
+            refusal=kernel.frame_failure_refusal(item["scan_error"],retry_entrypoint="org-runtime/crossing.py::ingress")
+            results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
         # The frame's epoch, if it lends one. An unmarked reference, an invalid one
         # or an unverified CARRIED claim is quarantined: a six-field seen-marker,
         # no receipt, never retried (B-P36j/k). A clock-flagged frame is consumed
@@ -375,7 +379,10 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
                 refusal.update(failure_code=kernel.CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM,
                                detail="crossing.ingress records through the emitter CLI, which takes no CARRIED provenance",
                                required_evidence_or_repair="crossing.record carries hb_provenance to both writers (WU-B13 slice c)")
-        except Exception as exc:  # one frame's failure is that frame's refusal (B-P36o)
+        except OSError as exc:  # this organization's own storage, not the frame: it stays pending
+            results.append({"transition_class":INGRESS_REFUSED,"packet_id":item["frame"].get("packet_id"),
+                            **kernel.io_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")}); continue
+        except Exception as exc:  # one frame's failure is that frame's refusal; the guard is total (B-P36o, F-TYPE)
             refusal=kernel.frame_failure_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")
         if refusal is not None:
             results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
@@ -384,6 +391,9 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
             # written and the frame is not marked, so a pass at its epoch takes it.
             results.append(epoch_conflict(item["frame"],hb_epoch,frame_epoch)); continue
         try: result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
+        except OSError as exc:  # dispatch or ledger IO here: no marker, the frame stays pending
+            results.append({"transition_class":INGRESS_REFUSED,"packet_id":item["frame"].get("packet_id"),
+                            **kernel.io_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")}); continue
         except Exception as exc:  # any other per-frame error: quarantined, the pass goes on (B-P36o)
             refusal=kernel.frame_failure_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")
             results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue

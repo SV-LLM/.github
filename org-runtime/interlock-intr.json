@@ -47,6 +47,12 @@
         "rule": "org-kernel/kernel.py::supplied_epoch_failure",
         "sources": [
           {
+            "from": "dispatch_input",
+            "dispatcher": ".github/workflows/organization-crossing-dispatch.yml",
+            "input": "hb_epoch",
+            "invocation": "org-runtime/crossing.py ingress --hb-epoch \"$HB_EPOCH\""
+          },
+          {
             "from": "SUPPLIED_BY_MATERIALIZER_AS_hb_epoch",
             "invocation": "org-runtime/crossing.py ingress --hb-epoch"
           }
@@ -238,6 +244,12 @@
         "unsupplied_failure_code": "HB_EPOCH_NOT_SUPPLIED",
         "rule": "org-kernel/kernel.py::supplied_epoch_failure",
         "sources": [
+          {
+            "from": "dispatch_input",
+            "dispatcher": ".github/workflows/organization-crossing-dispatch.yml",
+            "input": "hb_epoch",
+            "invocation": "org-runtime/crossing.py egress --hb-epoch \"$HB_EPOCH\""
+          },
           {
             "from": "SUPPLIED_BY_MATERIALIZER_AS_hb_epoch",
             "invocation": "org-runtime/crossing.py egress --hb-epoch"

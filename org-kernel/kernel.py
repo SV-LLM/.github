@@ -362,6 +362,7 @@ def ingest_refusal(frame:Any, epoch:int|None, provenance:dict[str,Any]|None, reg
             return refusal
     return None
 
+FRAME_DISPATCH_IO_FAILED="FRAME_DISPATCH_IO_FAILED"
 HB_REFERENCE_INVALID="HB_REFERENCE_INVALID"
 FRAME_INTEGRITY_INVALID="FRAME_INTEGRITY_INVALID"
 FRAME_INGEST_FAILED="FRAME_INGEST_FAILED"
@@ -394,6 +395,19 @@ def frame_failure_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,
                    next_attempt="none for this frame: it is quarantined; later frames proceed")
     return refusal
 
+def io_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
+    """An OSError in this organization's own dispatch or state: six-field FRAME_DISPATCH_IO_FAILED.
+
+    Not the frame's defect, so no quarantine marker is written: the frame stays
+    pending, and the idempotent appends consume it exactly once on a later cycle.
+    """
+    refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+    refusal.update(failure_code=FRAME_DISPATCH_IO_FAILED,failed_predicate=type(exc).__name__,
+                   detail=type(exc).__name__+": "+str(exc),
+                   required_evidence_or_repair="this organization's own dispatch or ledger storage is writable",
+                   next_attempt="the frame is still pending; the next cycle consumes it, once")
+    return refusal
+
 def admit_frame(frame:Any, *, custody:dict[str,Any], registry:dict[str,Any],
                 retry_entrypoint:str)->tuple[int|None,dict[str,Any]|None,dict[str,Any]|None]:
     """(epoch, provenance, refusal) for one consumed frame; never raises for the frame itself.
@@ -407,7 +421,9 @@ def admit_frame(frame:Any, *, custody:dict[str,Any], registry:dict[str,Any],
         recover_packet(frame)
         epoch,provenance=ingest_epoch(frame,custody=custody,retry_entrypoint=retry_entrypoint)
         return epoch,provenance,ingest_refusal(frame,epoch,provenance,registry,retry_entrypoint=retry_entrypoint)
-    except Exception as exc:  # one frame's failure is that frame's refusal
+    except OSError as exc:  # this organization's own storage (a CARRIED head read), not the frame
+        return None,None,io_refusal(exc,retry_entrypoint=retry_entrypoint)
+    except Exception as exc:  # one frame's failure is that frame's refusal; the guard is total (F-TYPE)
         return None,None,frame_failure_refusal(exc,retry_entrypoint=retry_entrypoint)
 
 def quarantine_frame(repo_root:Path, item:dict[str,Any], refusal:dict[str,Any], *, store:Any)->dict[str,Any]:
@@ -628,7 +644,8 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "SHARED_VALIDATOR_SHA256",
          "require_supplied_source","carried_hb_reference",
          "frame_epoch","quarantine_frame","ingest_epoch","ingest_refusal",
-         "admit_frame","frame_failure_refusal"]
+         "admit_frame","frame_failure_refusal","io_refusal",
+         "MAX_FRAME_FILE_BYTES"]
 
 
 # --- Federation mesh v1.1 additions ---
@@ -691,16 +708,38 @@ def _publish_frame(frame:dict[str,Any], *, root:Path|None=None, store:Any|None=N
         raise ValueError("federation_frame_write_once_collision")
     return Path(target.locator(key))
 
+# The declared cap on one frames.d file; a larger file is quarantined unread (B-P36p).
+MAX_FRAME_FILE_BYTES=1_048_576
+
 def scan_addressed_frames(organization:str, *, root:Path|None=None, store:Any|None=None,
-                          seen:set[str]|None=None)->list[dict[str,Any]]:
-    """Frames in the mesh addressed to `organization` and not already consumed."""
+                          seen:set[str]|None=None, include_unreadable:bool=False)->list[dict[str,Any]]:
+    """Frames in the mesh addressed to `organization` and not already consumed.
+
+    Each file is read on its own. A file that does not parse as a frame object
+    is skipped, or, with `include_unreadable`, returned with `scan_error` so a
+    consuming loop quarantines it by name: one malformed file never stops a
+    scan (F-SCAN).
+    """
     target=store or mesh_store(root)
     consumed=seen or set()
     out=[]
     for key in target.list_prefix(node_store_module.MESH_FRAME_PREFIX):
         if node_store_module.frame_name(key) in consumed:
             continue
-        frame=target.get(key)
+        try:
+            # Each file on its own: a read error, non-UTF-8, non-JSON, a file over
+            # the declared size cap, or a non-object is this file's refusal (B-P36p).
+            located=Path(target.locator(key))
+            if located.is_file() and located.stat().st_size>MAX_FRAME_FILE_BYTES:
+                raise ValueError("frame_file_exceeds_size_cap:"+str(MAX_FRAME_FILE_BYTES))
+            frame=target.get(key)
+            if frame is not None and not isinstance(frame,dict):
+                raise TypeError("frame_is_not_an_object")
+        except Exception as exc:  # this file's failure is this file's refusal
+            if include_unreadable:
+                out.append({"key":key,"name":node_store_module.frame_name(key),"path":target.locator(key),
+                            "frame":{},"scan_error":exc})
+            continue
         if frame is not None and frame.get("destination_org")==organization:
             out.append({"key":key,"name":node_store_module.frame_name(key),
                         "path":target.locator(key),"frame":frame})
@@ -804,13 +843,16 @@ def consume_addressed_frames(repo_root:Path, *, mesh_root:Path|None=None, seen:s
     # dispatch refuses that one by name when none was supplied.
     node_state=addressed_node_state_store(node_state_root) if node_state_root is not None else None
     results=[]
-    for item in scan_addressed_frames(organization,root=mesh_root,seen=seen):
+    for item in scan_addressed_frames(organization,root=mesh_root,seen=seen,include_unreadable=True):
         entry="org-kernel/kernel.py::consume_addressed_frames"
-        epoch,provenance,refusal=admit_frame(item["frame"],custody=custody,registry=registry,retry_entrypoint=entry)
+        epoch,provenance,refusal=(None,None,frame_failure_refusal(item["scan_error"],retry_entrypoint=entry)) \
+            if "scan_error" in item else admit_frame(item["frame"],custody=custody,registry=registry,retry_entrypoint=entry)
         if refusal is None:
             try:
                 result,recorded=ingest_recorded(repo_root,item,custody,registry,node_state=node_state,
                                                 epoch=epoch,mesh_root=mesh_root,hb_provenance=provenance)
+            except OSError as exc:
+                refusal=io_refusal(exc,retry_entrypoint=entry)
             except Exception as exc:
                 if any(marker in str(exc) for marker in CUSTODY_REFUSALS):
                     raise
@@ -818,7 +860,9 @@ def consume_addressed_frames(repo_root:Path, *, mesh_root:Path|None=None, seen:s
         if refusal is not None:
             # Terminal when node state can hold the quarantine; without it the
             # refusal is returned, nothing is written, and the cycle goes on.
-            results.append(quarantine_frame(repo_root,item,refusal,store=node_state) if node_state is not None
+            pending=refusal["failure_code"]==FRAME_DISPATCH_IO_FAILED  # no marker: the frame stays pending
+            results.append(quarantine_frame(repo_root,item,refusal,store=node_state)
+                           if node_state is not None and not pending
                            else {"path":item["path"],"result":{"status":"REFUSED",**refusal},"organization_record":None})
             continue
         results.append({"path":item["path"],"result":result,"organization_record":recorded})
@@ -1261,14 +1305,15 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
     durable_seen=federation_seen_frame_names(repo_root,store=node_state)
     effective_seen=set(seen or set())|durable_seen
     out=[]
-    for item in scan_addressed_frames(organization,root=mesh_root,seen=effective_seen):
+    for item in scan_addressed_frames(organization,root=mesh_root,seen=effective_seen,include_unreadable=True):
         # An answer is stamped with the epoch of the frame it answers. Consuming
         # the same frame again then builds the same answer frame, and publishing
         # it is a write-once no-op rather than a second answer stamped by
         # whatever clock this pass read. The frame's validated epoch is SUPPLIED
         # for the answer, so a caller's sample never reaches the clock default.
         entry="org-kernel/kernel.py::consume_and_respond"
-        epoch,provenance,refusal=admit_frame(item["frame"],custody=custody,registry=registry,retry_entrypoint=entry)
+        epoch,provenance,refusal=(None,None,frame_failure_refusal(item["scan_error"],retry_entrypoint=entry)) \
+            if "scan_error" in item else admit_frame(item["frame"],custody=custody,registry=registry,retry_entrypoint=entry)
         answer_epoch=epoch
         # Recorded before anything leaves this node: no answer is published and
         # no consumption marker written for a crossing the organization has not
@@ -1278,12 +1323,18 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
             try:
                 result,recorded=ingest_recorded(repo_root,item,custody,registry,node_state=node_state,
                                                 epoch=epoch,mesh_root=mesh_root,hb_provenance=provenance)
+            except OSError as exc:
+                refusal=io_refusal(exc,retry_entrypoint=entry)
             except Exception as exc:
                 if any(marker in str(exc) for marker in CUSTODY_REFUSALS):
                     raise
                 refusal=frame_failure_refusal(exc,retry_entrypoint=entry)
         if refusal is not None:
-            out.append(quarantine_frame(repo_root,item,refusal,store=node_state))
+            if refusal["failure_code"]==FRAME_DISPATCH_IO_FAILED:  # no marker: the frame stays pending
+                out.append({"path":item["path"],"result":{"status":"REFUSED",**refusal},"response_publication":None,
+                            "organization_record":None,"seen_marker":None})
+            else:
+                out.append(quarantine_frame(repo_root,item,refusal,store=node_state))
             continue
         if result.get("status")=="REFUSED" and result["disposition"]!="DENY":
             # FAIL_CLOSED: recorded, not marked, offered again on the next pass.
