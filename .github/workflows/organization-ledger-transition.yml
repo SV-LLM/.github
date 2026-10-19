@@ -253,13 +253,10 @@ jobs:
               continue
             fi
             # Time is supplied with the dispatch. It is not sampled from a clock,
-            # so a request that would append without one fails closed here and
-            # nothing is received, appended or published (B-P31).
-            case "$HB_EPOCH" in
-              ''|*[!0-9]*)
-                echo '{"disposition":"FAIL_CLOSED","failure_code":"HB_EPOCH_NOT_SUPPLIED_PATH_LIVE","failed_predicate":"HB_EPOCH_IS_SUPPLIED_AS_A_NON_NEGATIVE_INTEGER","required_evidence_or_repair":"dispatch mode=request with hb_epoch; a receipt epoch is never derived from a host clock","retry_entrypoint":".github/workflows/organization-ledger-transition.yml","owning_existing_goal":"StegVerse-Labs/.github#2897 / StegVerse-org/.github#162 P0-runtime-and-custody","next_attempt":"rerun as a dispatch naming this request and an hb_epoch; nothing was appended","consequence_committed":false}'
-                exit 1 ;;
-            esac
+            # so a request that would append without one, or with an invalid one,
+            # fails closed here with the kernel's six-field refusal and nothing is
+            # received, appended or published (B-P31).
+            python -B -c 'import importlib.util,json,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); r=k.writer_epoch_refusal(sys.argv[1] or None,retry_entrypoint=".github/workflows/organization-ledger-transition.yml (dispatch mode=request with hb_epoch)"); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' "$HB_EPOCH" || exit 1
             # A refusal is recorded too; the publish step carries it, and the
             # readback step fails the run on a receipt it cannot find.
             python resident-runtime/organization_manifest_ingress.py \

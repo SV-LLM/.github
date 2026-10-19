@@ -13,37 +13,37 @@
     ".stegverse/transition-ledger/emit.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e",
-      "local_sha256": "sha256:4a33d3524e4086aca47a0d57c95682138915952fb7cd9beb92ed43fd6d8119c4",
+      "local_sha256": "sha256:4b2ac6a497f6e786e889a79c3ee8b455627cdfa289d7f773d30e550d92a2f423",
       "substitutions": [
         {
           "reference": "_ABSENT=object()\ndef append(",
-          "local": "# SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n# a receipt with no supplied epoch used to fall back to kernel.hb_reference(),\n# which reads the host clock, so the receipt's time base depended on that host's\n# clock discipline and a replay at another moment minted a different receipt.\n# The epoch is now required from the caller: an append without one fails closed\n# before the store is opened, and no clock is read.\nEPOCH_NOT_SUPPLIED=\"HB_EPOCH_SUPPLIED_BY_CALLER\"\nclass HbEpochNotSupplied(ValueError):\n \"\"\"An append was attempted with no supplied heartbeat epoch.\"\"\"\n failed_predicate=EPOCH_NOT_SUPPLIED\n failure_code=\"HB_EPOCH_NOT_SUPPLIED_PATH_LIVE\"\n def __init__(self,transition_id,transition_class):\n  super().__init__(self.failure_code+\": \"+self.failed_predicate+\": \"+repr(transition_id))\n  self.transition_id=transition_id;self.transition_class=transition_class\ndef epoch_not_supplied_refusal(exc):\n \"\"\"The append attempt's own disposition when no epoch was supplied.\"\"\"\n return {\"schema\":\"stegverse.repo-ledger-append-refusal/v1\",\"repository\":C[\"repository\"],\"disposition\":\"FAIL_CLOSED\",\"transition_id\":exc.transition_id,\"transition_class\":exc.transition_class,\"failure_code\":exc.failure_code,\"failed_predicate\":exc.failed_predicate,\"required_evidence_or_repair\":\"supply hb_epoch from the carrier tick; the ledger never derives an epoch from a host clock\",\"retry_entrypoint\":\".stegverse/transition-ledger/emit.py::append\",\"owning_existing_goal\":\"StegVerse-Labs/.github#2897 / StegVerse-org/.github#162 P0-runtime-and-custody\",\"next_attempt\":\"rerun the same append with hb_epoch supplied; the store was not opened and nothing was appended\",\"consequence_committed\":False,\"authority_effect\":\"NONE_REFUSAL_ONLY\"}\n_ABSENT=object()\ndef append(",
+          "local": "# SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n# a receipt with no supplied epoch used to fall back to kernel.hb_reference(),\n# which reads the host clock, so the receipt's time base depended on that host's\n# clock discipline and a replay at another moment minted a different receipt.\n# The epoch is now required from the caller and checked by the kernel's shared\n# supplied-epoch rule: an absent or invalid one fails closed with the kernel's\n# six-field refusal before the store is opened, and no clock is read.\n_ABSENT=object()\nEPOCH_RETRY_ENTRYPOINT=\".stegverse/transition-ledger/emit.py::append (hb_epoch=, or --hb-epoch)\"\nRepoLedgerEpochRefused=kernel.SuppliedEpochRefused\ndef append(",
           "count": 1,
-          "why": "declares the HB_EPOCH_NOT_SUPPLIED_PATH_LIVE refusal and its six fields (B-P31; ports StegVerse-Labs WU-B13a as carried by StegGhost/.github#23)"
+          "why": "declares the kernel's six-field supplied-epoch refusal (kernel.SuppliedEpochRefused, HB_EPOCH_NOT_SUPPLIED / HB_EPOCH_INVALID, SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH) and its retry entrypoint, as StegVerse-Labs/.github@bc608a3 (WU-B13a) does (B-P31, converged by B-P36)"
         },
         {
           "reference": " so no receipt is ever minted on top of a broken chain.\n \"\"\"\n target=store",
-          "local": " so no receipt is ever minted on top of a broken chain.\n\n `hb_epoch` is required. Without it the attempt raises `HbEpochNotSupplied`\n before the store is opened; no clock is read and nothing is written.\n \"\"\"\n if hb_epoch is None:raise HbEpochNotSupplied(transition_id,transition_class)\n target=store",
+          "local": " so no receipt is ever minted on top of a broken chain.\n\n `hb_epoch` is required. An absent or invalid one raises\n `RepoLedgerEpochRefused` (kernel.SuppliedEpochRefused) before the store is\n opened; no clock is read and nothing is written.\n \"\"\"\n hb=kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)\n target=store",
           "count": 1,
-          "why": "append fails closed before the store is opened when no epoch is supplied"
+          "why": "append refuses an absent or invalid epoch through kernel.supplied_hb_reference before the store is opened"
         },
         {
           "reference": "\"hb_reference\":kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference(),",
-          "local": "\"hb_reference\":kernel.hb_reference(epoch=hb_epoch),",
+          "local": "\"hb_reference\":hb,",
           "count": 1,
-          "why": "the host-clock fallback (kernel.hb_reference() with no epoch) is unreachable and removed"
+          "why": "the host-clock fallback (kernel.hb_reference() with no epoch) is removed; the receipt carries the supplied reference"
         },
         {
-          "reference": "help=\"heartbeat epoch; derived from the host clock, and marked as derived, when absent\")",
-          "local": "help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\")",
+          "reference": "p.add_argument(\"--hb-epoch\",type=int,default=None,help=\"heartbeat epoch; derived from the host clock, and marked as derived, when absent\")",
+          "local": "p.add_argument(\"--hb-epoch\",default=None,help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\")",
           "count": 1,
-          "why": "the CLI help states the epoch is required"
+          "why": "the CLI takes the epoch as text so the kernel rule, not argparse coercion, decides it ('+33' is refused), and the help states it is required"
         },
         {
           "reference": "  print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)\n print(",
-          "local": "  print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)\n except HbEpochNotSupplied as exc:\n  print(json.dumps(epoch_not_supplied_refusal(exc),sort_keys=True));raise SystemExit(1)\n print(",
+          "local": "  print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)\n except RepoLedgerEpochRefused as exc:\n  print(json.dumps(exc.refusal,sort_keys=True));raise SystemExit(1)\n print(",
           "count": 1,
-          "why": "the CLI prints the six-field refusal and exits 1"
+          "why": "the CLI prints the kernel's six-field refusal and exits 1"
         }
       ]
     },
@@ -78,11 +78,11 @@
     "org-boundary/runtime/capability_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:731dab382f43ff3321f6e039cee1be338099345bf4b0e8fec89e7de1a72bca44",
-      "local_sha256": "sha256:e9021ddbc63642ad82c7b7ce0fa813609a7e5ce2c0a224a41cdc7bf6c7dd57e7",
+      "local_sha256": "sha256:2a25d406e1be85831380d1f9efc75f29ce4b8fdea09bbe5ab155b3dc5ddfda7a",
       "substitutions": [
         {
           "reference": "            mesh_root: Path | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n",
-          "local": "            mesh_root: Path | None = None, hb_epoch: int | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n\n    SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n    ``hb_epoch`` is the epoch of the frame being consumed, forwarded so the\n    operation's ledger receipts carry a supplied epoch. Without one the\n    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED_PATH_LIVE); no clock is read.\n",
+          "local": "            mesh_root: Path | None = None, hb_epoch: int | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n\n    SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n    ``hb_epoch`` is the epoch of the frame being consumed, forwarded so the\n    operation's ledger receipts carry a supplied epoch. Without one the\n    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.\n",
           "count": 1,
           "why": "receive accepts the consumed frame's epoch"
         },
@@ -174,7 +174,7 @@
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
         "identity checks name SV-LLM/.github",
-        "a request is received only at a supplied hb_epoch: one that would append without one fails closed HB_EPOCH_NOT_SUPPLIED_PATH_LIVE before it is received (B-P31), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
+        "a request is received only at a supplied hb_epoch: one that would append without one (HB_EPOCH_NOT_SUPPLIED) or with an invalid one (HB_EPOCH_INVALID) fails closed with kernel.writer_epoch_refusal's six fields before it is received (B-P31, B-P36), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
       ]
     }
   }

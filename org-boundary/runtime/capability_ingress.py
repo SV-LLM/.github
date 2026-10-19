@@ -262,7 +262,7 @@ def receive(root: Path, service: Mapping[str, Any], packet: Mapping[str, Any], *
     SV-LLM declared substitution (data/organization-role-reference-adoption.json):
     ``hb_epoch`` is the epoch of the frame being consumed, forwarded so the
     operation's ledger receipts carry a supplied epoch. Without one the
-    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED_PATH_LIVE); no clock is read.
+    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.
 
     The operation records its own dispositions at both ledger levels; this
     returns what it reported. A refusal is returned as the operation stated it,

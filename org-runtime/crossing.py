@@ -132,7 +132,7 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
     """Append one transition to the repository ledger, then the organization ledger.
 
     ``hb_epoch`` is the caller's supplied heartbeat epoch. The repository
-    emitter refuses an append without one (HB_EPOCH_NOT_SUPPLIED_PATH_LIVE)
+    emitter refuses an append without one (HB_EPOCH_NOT_SUPPLIED, six fields)
     before its store is opened, so no receipt is stamped from a host clock.
     The organization receipt takes the repository receipt's epoch.
 

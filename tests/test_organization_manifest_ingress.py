@@ -608,7 +608,8 @@ class EndToEndDryRun(unittest.TestCase):
         received = space.step(RECEIVE, env)
         self.assertNotEqual(received.returncode, 0)
         refusal = json.loads(received.stdout.strip().splitlines()[-1])
-        self.assertEqual(refusal["failure_code"], "HB_EPOCH_NOT_SUPPLIED_PATH_LIVE")
+        self.assertEqual(refusal["failure_code"], "HB_EPOCH_NOT_SUPPLIED")
+        self.assertEqual(refusal["failed_predicate"], "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH")
         for field in ("failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
                       "owning_existing_goal", "next_attempt"):
             self.assertTrue(refusal[field], field)
