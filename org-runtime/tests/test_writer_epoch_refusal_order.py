@@ -314,35 +314,108 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         for receipt in receipts:
             self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
 
-    def test_a_clock_stamped_frame_carries_no_epoch_into_a_receipt(self):
-        # B-P36f: an ingress forwards a frame's epoch only when it is CARRIED, not
-        # clock-derived. The kernel's consumer refuses the frame and writes
-        # nothing; crossing.ingress records the refusal at its supplied epoch,
-        # and no receipt takes the clock epoch.
-        self.open_ledger()
-        k, custody = self.kernel_custody()
+    def inbound(self, k, packet_id, **reference):
+        """Publish a monitor request addressed to SV-LLM with the given frame reference."""
         packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
                                 destination_service="sv-llm.org-control",
-                                payload={"message_class": "ecosystem.monitor.request", "subject": "b-p36f"},
-                                standing=STANDING, packet_id="b-p36f-clock-frame")
-        frame = k.carrier_frame(packet, now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
-        clock_epoch = frame["heartbeat_reference"]["epoch"]
-        self.assertIs(frame["heartbeat_reference"]["derived_from_clock"], True)
+                                payload={"message_class": "ecosystem.monitor.request", "subject": packet_id},
+                                standing=STANDING, packet_id=packet_id)
+        frame = k.carrier_frame(packet, **reference)
         k._publish_frame(frame, root=self.mesh)
+        return frame
+
+    def forged(self, k, packet_id):
+        """A frame that self-asserts a CARRIED provenance naming an invented ledger head."""
+        packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
+                                destination_service="sv-llm.org-control",
+                                payload={"message_class": "ecosystem.monitor.request", "subject": packet_id},
+                                standing=STANDING, packet_id=packet_id)
+        frame = k.carrier_frame(packet, epoch=4096)
+        body = {key: value for key, value in frame.items() if key != "frame_sha256"}
+        body["heartbeat_reference"] = {**body["heartbeat_reference"], "source": "ORGANIZATION_LEDGER_HEAD",
+                                       "head_receipt_sha": "sha256:" + "f" * 64}
+        frame = {**body, "frame_sha256": k.sha(body)}
+        k._publish_frame(frame, root=self.mesh)
+        return frame
+
+    def test_a_refused_frame_is_quarantined_and_never_blocks_a_later_cycle(self):
+        # B-P36j: a CLOCK frame in a mixed batch gets a six-field quarantine
+        # seen-marker and nothing else; the valid frame is consumed; a second
+        # cycle proceeds without retrying the CLOCK frame; nothing is clock-stamped.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        clock = self.inbound(k, "b-p36j-clock", now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
+        self.inbound(k, "b-p36j-valid", epoch=4096)
+        clock_epoch = clock["heartbeat_reference"]["epoch"]
+        self.no_clock()
+        node = self.base / "node"
+        ledgers = {"repo_ledger_root": self.base / "repo-ledger", "org_ledger_root": self.base / "org-ledger"}
+        first = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
+        by_packet = {row["result"].get("packet", {}).get("packet_id") or row["path"]: row for row in first}
+        quarantined = [row for row in first if row["result"].get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+        self.assertEqual(len(quarantined), 1, first)
+        for field in SIX_FIELDS:
+            self.assertTrue(quarantined[0]["result"][field], field)
+        self.assertIsNone(quarantined[0]["organization_record"])
+        marker = json.loads(Path(quarantined[0]["seen_marker"]).read_text())
+        self.assertEqual((marker["status"], marker["failure_code"]), ("REFUSED", "FRAME_REFUSED_QUARANTINED"))
+        self.assertEqual(len([row for row in first if row["result"].get("status") == "CONSUMED"]), 1, by_packet)
         before = files_under(self.base)
-        with self.assertRaises(k.SuppliedEpochRefused) as raised:
-            k.consume_addressed_frames(self.root, mesh_root=self.mesh, repo_ledger_root=self.base / "repo-ledger",
-                                       org_ledger_root=self.base / "org-ledger")
-        self.assertEqual(raised.exception.refusal["failure_code"], "HB_EPOCH_INVALID")
+        second = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
+        self.assertEqual(second, [])
         self.assertEqual(files_under(self.base), before)
-        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root,
-                                    hb_epoch="4096")
-        self.assertEqual([(r["disposition"], r["failed_predicate"]) for r in out],
-                         [("DENY", "BOUNDARY_DISPATCH_REFUSED")], out)
-        self.assertIn("HB_EPOCH_INVALID", json.dumps(out[0]))
         self.assertEqual(self.receipts_at(clock_epoch), [])
-        for receipt in self.receipts_at(4096):
-            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+        references = [d["hb_reference"] for d in [*self.documents(self.base / "repo-ledger"),
+                                                   *self.documents(self.base / "org-ledger")] if "hb_reference" in d]
+        for reference in references:
+            self.assertIs(reference["derived_from_clock"], False)
+            self.assertNotIn("sampled_unix_ns", reference)
+
+    def test_crossing_ingress_quarantines_a_clock_frame_without_a_receipt(self):
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        clock = self.inbound(k, "b-p36j-crossing-clock", now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
+        node = self.base / "node"
+        receipts_before = len(list(self.documents(self.base / "repo-ledger")))
+        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096")
+        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
+        self.assertEqual(len(list(self.documents(self.base / "repo-ledger"))), receipts_before)
+        self.assertEqual(self.receipts_at(clock["heartbeat_reference"]["epoch"]), [])
+        self.assertEqual(self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
+                                               hb_epoch="4096"), [])
+
+    def test_a_forged_carried_frame_is_refused_on_every_route(self):
+        # B-P36k: a self-asserted CARRIED claim is verified against this
+        # organization's ledger head; a forged sha is refused, never stripped
+        # to SUPPLIED, and nothing but the quarantine marker is written.
+        self.open_ledger()
+        k, custody = self.kernel_custody()
+        ledgers = {"repo_ledger_root": self.base / "repo-ledger", "org_ledger_root": self.base / "org-ledger"}
+        frame = self.forged(k, "b-p36k-forged")
+        self.no_clock()
+        ledger_files = lambda: files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger")
+        before = ledger_files()
+        with self.assertRaises(k.SuppliedEpochRefused) as raised:
+            k.ingest_frame(self.root, frame, **ledgers)
+        self.assertEqual(raised.exception.refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
+        self.assertEqual(ledger_files(), before)
+        rows = k.consume_addressed_frames(self.root, mesh_root=self.mesh, **ledgers)
+        self.assertEqual([r["result"]["failure_code"] for r in rows], ["CARRIED_PROVENANCE_UNVERIFIED"])
+        self.assertEqual(ledger_files(), before)
+        for name, run in (("consume_and_respond", lambda node: k.consume_and_respond(
+                              self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)),
+                          ("crossing.ingress", lambda node: self.crossing.ingress(
+                              mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096"))):
+            with self.subTest(route=name):
+                node = self.base / ("node-" + name)
+                out = run(node)
+                results = [row.get("result", row) for row in out]
+                self.assertEqual([r["failure_code"] for r in results], ["FRAME_REFUSED_QUARANTINED"], out)
+                self.assertIn("CARRIED_PROVENANCE_UNVERIFIED", results[0]["detail"])
+                self.assertEqual(ledger_files(), before)
+                written = files_under(node)
+                self.assertEqual(len(written), 1, written)
+                self.assertEqual(json.loads(Path(written[0]).read_text())["failure_code"], "FRAME_REFUSED_QUARANTINED")
 
     def test_an_unmarked_reference_is_refused(self):
         # B-P36h (P): a heartbeat reference must mark derived_from_clock exactly

@@ -352,6 +352,11 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
     custody=carrier_custody(root)
     results=[]
     for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state)):
+        # A frame whose epoch is CLOCK, unmarked, invalid or an unverified CARRIED
+        # claim is quarantined: a six-field seen-marker, no receipt, never retried (B-P36j/k).
+        try: kernel.frame_epoch(item["frame"],custody=custody,retry_entrypoint="org-runtime/crossing.py::ingress")
+        except kernel.SuppliedEpochRefused as exc:
+            results.append(kernel.quarantine_frame(root,item,exc.refusal,store=node_state)["result"]); continue
         result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
         kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)
