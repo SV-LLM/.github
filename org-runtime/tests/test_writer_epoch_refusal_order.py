@@ -502,6 +502,94 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         self.assertIn("HB_EPOCH_PROVENANCE_UNMARKED", out[0]["detail"])
         self.assertEqual([d for d in self.documents(self.base / "repo-ledger") if unmarked["packet_id"] in json.dumps(d)], [])
 
+    def bad_frames(self, k):
+        """One frame of each B-P36o kind, re-digested where the defect is not the digest itself."""
+        def build(packet_id, edit, redigest=True):
+            packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
+                                    destination_service="sv-llm.org-control",
+                                    payload={"message_class": "ecosystem.monitor.request", "subject": packet_id},
+                                    standing=STANDING, packet_id=packet_id)
+            body = {key: value for key, value in k.carrier_frame(packet, epoch=4096).items() if key != "frame_sha256"}
+            body = edit(body)
+            frame = {**body, "frame_sha256": k.sha(body) if redigest else "sha256:" + "0" * 64}
+            k._publish_frame(frame, root=self.mesh)
+            return frame
+        reference = lambda body, **change: {**body, "heartbeat_reference": {**body["heartbeat_reference"], **change}}
+        return {
+            "HB_REFERENCE_INVALID": [build("b-p36o-generation", lambda b: reference(b, generation=4095)),
+                                     build("b-p36o-id", lambda b: reference(b, heartbeat_id="HB:1"))],
+            "FRAME_INTEGRITY_INVALID": [build("b-p36o-frame-sha", lambda b: b, redigest=False),
+                                        build("b-p36o-packet-sha", lambda b: {**b, "packet_sha256": "sha256:" + "1" * 64})],
+            "FRAME_INGEST_FAILED": [build("b-p36o-adapter", lambda b: {**b, "packet_base64": "!!not-base64!!"})],
+        }
+
+    def test_one_bad_frame_never_stops_a_consume_cycle(self):
+        # B-P36o: any error ingesting one frame is a six-field refusal plus the
+        # terminal quarantine marker; the valid frame is ledgered, a second cycle
+        # offers none of the bad ones, and no clock is read.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                bad = self.bad_frames(k)
+                valid = self.inbound(k, "b-p36o-valid", epoch=4096)
+                self.no_clock()
+                node = self.base / "node"
+                if route == "consume_and_respond":
+                    run = lambda: k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node,
+                                                        repo_ledger_root=self.base / "repo-ledger",
+                                                        org_ledger_root=self.base / "org-ledger")
+                    results = [row["result"] for row in run()]
+                else:
+                    run = lambda: self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
+                                                        hb_epoch="4096")
+                    results = run()
+                refused = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual(len(refused), sum(len(v) for v in bad.values()), results)
+                for code, frames in bad.items():
+                    hits = [r for r in refused if r["detail"].startswith(code)]
+                    self.assertEqual(len(hits), len(frames), (code, refused))
+                for r in refused:
+                    for field in SIX_FIELDS:
+                        self.assertTrue(r[field], field)
+                adapter, = [r for r in refused if r["detail"].startswith("FRAME_INGEST_FAILED")]
+                self.assertEqual(adapter["failed_predicate"], "Error")
+                ledgered = json.dumps([*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")])
+                self.assertIn(valid["packet_id"], ledgered)
+                for frames in bad.values():
+                    for frame in frames:
+                        self.assertNotIn(frame["packet_id"], ledgered)
+                self.assertEqual(run(), [])
+
+    def test_a_malformed_clock_frame_is_quarantined_not_raised(self):
+        # F-S1a: a clock-flagged frame with a malformed epoch is a six-field
+        # refusal and quarantined on every consume route.
+        for epoch in ("abc", None, 5):
+            for route in ("consume_and_respond", "crossing.ingress"):
+                with self.subTest(epoch=epoch, route=route):
+                    self.setUp()
+                    self.open_ledger()
+                    k, _ = self.kernel_custody()
+                    def edit(ref):
+                        ref = {**ref, "derived_from_clock": True, "sampled_unix_ns": k.HB_ANCHOR_UNIX_NS}
+                        if epoch is None:
+                            ref.pop("epoch")
+                        else:
+                            ref["epoch"] = epoch
+                        return ref
+                    self.reframed(k, "f-s1a-" + str(epoch), edit)
+                    node = self.base / "node"
+                    if route == "consume_and_respond":
+                        results = [row["result"] for row in k.consume_and_respond(
+                            self.root, mesh_root=self.mesh, node_state_root=node,
+                            repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")]
+                    else:
+                        results = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
+                                                        hb_epoch="4096")
+                    self.assertEqual([r["failure_code"] for r in results], ["FRAME_REFUSED_QUARANTINED"], results)
+                    self.assertRegex(results[0]["detail"], "^(HB_EPOCH_INVALID|HB_EPOCH_NOT_SUPPLIED)")
+
     def test_a_forged_carried_frame_is_refused_on_every_route(self):
         # B-P36k: a self-asserted CARRIED claim is verified against this
         # organization's ledger head; a forged sha is refused, never stripped

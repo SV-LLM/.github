@@ -366,6 +366,7 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
         # A verified CARRIED frame is quarantined here: this route's receipts
         # (the emitter CLI) take no provenance, and stripping it is laundering (B-P36m).
         try:
+            kernel.recover_packet(item["frame"])  # digests and heartbeat reference first (B-P36o)
             frame_epoch,provenance=kernel.ingest_epoch(item["frame"],custody=custody,
                                                        retry_entrypoint="org-runtime/crossing.py::ingress")
             refusal=None
@@ -374,15 +375,18 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
                 refusal.update(failure_code=kernel.CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM,
                                detail="crossing.ingress records through the emitter CLI, which takes no CARRIED provenance",
                                required_evidence_or_repair="crossing.record carries hb_provenance to both writers (WU-B13 slice c)")
-        except kernel.SuppliedEpochRefused as exc:
-            refusal=exc.refusal
+        except Exception as exc:  # one frame's failure is that frame's refusal (B-P36o)
+            refusal=kernel.frame_failure_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")
         if refusal is not None:
             results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
         if frame_epoch is not None and frame_epoch!=hb_epoch:
             # B-P36l: the supplied epoch and the frame's disagree. Nothing is
             # written and the frame is not marked, so a pass at its epoch takes it.
             results.append(epoch_conflict(item["frame"],hb_epoch,frame_epoch)); continue
-        result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
+        try: result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
+        except Exception as exc:  # any other per-frame error: quarantined, the pass goes on (B-P36o)
+            refusal=kernel.frame_failure_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")
+            results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
         kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)
     return results
