@@ -119,6 +119,10 @@ HB_EPOCH_PROVENANCE_UNMARKED="HB_EPOCH_PROVENANCE_UNMARKED"
 HB_EPOCH_PREDICATE="SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"
 HB_EPOCH_OWNING_EXISTING_GOAL="INTERLOCK-INTR-RUNTIME-INDEPENDENT-PROTOCOL-001"
 
+# sha256 of inspect.getsource(supplied_epoch_failure), the FINAL shared rule of
+# StegVerse-Labs/.github#3282 @e1b3ac8, held byte-identical here.
+SHARED_VALIDATOR_SHA256="ad8ff52936d5bcd9a2ad6caceb2d9a637a099518989b34bbb3370301c7a4cce2"
+
 def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, str] | None:
     """The shared supplied-epoch rule (SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH).
 
@@ -152,26 +156,8 @@ def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, s
             and reference["derived_from_clock"] is not False:
         return "HB_EPOCH_INVALID", ("the carrier's derived_from_clock is not exactly false; "
                                     "a clock-derived epoch is not a supplied one")
-    return None
-
-def reference_provenance_failure(reference: Any) -> tuple[str, str] | None:
-    """The shared companion to supplied_epoch_failure: how a heartbeat reference marks its provenance.
-
-    Called right after supplied_epoch_failure by every caller that holds a
-    reference. In order: not an object is HB_EPOCH_INVALID; derived_from_clock
-    present and not False is HB_EPOCH_INVALID; a sampled_unix_ns is
-    HB_EPOCH_INVALID (a clock sample, never SUPPLIED); derived_from_clock
-    absent is HB_EPOCH_PROVENANCE_UNMARKED. Returns None for a SUPPLIED or
-    CARRIED reference. No clock is read.
-    """
-    if not isinstance(reference, dict):
-        return "HB_EPOCH_INVALID", "the heartbeat reference is not an object"
-    if "derived_from_clock" in reference and reference["derived_from_clock"] is not False:
-        return "HB_EPOCH_INVALID", "the heartbeat reference is clock-derived (derived_from_clock is not false)"
-    if "sampled_unix_ns" in reference:
-        return "HB_EPOCH_INVALID", "the heartbeat reference carries a clock sample (sampled_unix_ns)"
-    if "derived_from_clock" not in reference:
-        return HB_EPOCH_PROVENANCE_UNMARKED, "the heartbeat reference does not mark derived_from_clock"
+    if reference is not None and "sampled_unix_ns" in reference: return "HB_EPOCH_INVALID", "the carrier's heartbeat reference carries sampled_unix_ns; a sampled clock value is CLOCK, never a supplied epoch"
+    if reference is not None and "derived_from_clock" not in reference: return "HB_EPOCH_PROVENANCE_UNMARKED", "the carrier's heartbeat reference carries no derived_from_clock; an unmarked clock value is laundering, and a carrier cannot self-assert CARRIED provenance"
     return None
 
 class SuppliedEpochRefused(ValueError):
@@ -227,7 +213,7 @@ def carried_epoch(reference:Any, *, retry_entrypoint:str)->int:
     clock epoch is never re-stamped derived_from_clock false. No clock is read.
     """
     epoch=reference.get("epoch") if isinstance(reference,dict) else None
-    failure=supplied_epoch_failure(epoch,reference) or reference_provenance_failure(reference)
+    failure=supplied_epoch_failure(epoch,reference)
     if failure is None:
         return int(str(epoch))
     refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
@@ -266,7 +252,7 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
     A writer handed a CARRIED provenance ({source, head_receipt_sha}) checks it
     itself before anything is written: the source is ORGANIZATION_LEDGER_HEAD,
     head_receipt_sha is the current head of `store`, that head's heartbeat
-    reference is SUPPLIED (passes the shared rule and its companion), and the
+    reference is SUPPLIED (passes supplied_epoch_failure), and the
     epoch is the head's. The reference returned is the supplied one plus
     `source` and `head_receipt_sha` (derived_from_clock false). Anything else
     is six-field CARRIED_PROVENANCE_UNVERIFIED. No clock is read.
@@ -283,7 +269,7 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
     else:
         reference=head_receipt.get("hb_reference")
         failure=supplied_epoch_failure((reference or {}).get("epoch") if isinstance(reference,dict) else None,
-                                       reference) or reference_provenance_failure(reference)
+                                       reference)
         if failure is not None:
             detail="the ledger head's epoch is not SUPPLIED: "+failure[1]
         elif reference["epoch"]!=epoch:
@@ -302,7 +288,7 @@ FRAME_REFUSED_QUARANTINED="FRAME_REFUSED_QUARANTINED"
 def frame_epoch(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->int:
     """The epoch a consumed frame carries, admitted only when SUPPLIED or a verified CARRIED.
 
-    The frame's heartbeat reference passes the shared rule and its companion
+    The frame's heartbeat reference passes the shared rule, supplied_epoch_failure
     (carried_epoch). A reference that self-asserts a CARRIED provenance
     (source, head_receipt_sha) is verified against this organization's
     current ledger head (carried_hb_reference) and refused
@@ -528,7 +514,7 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "crossing_custody","require_custody","carry_packet",
          "HB_EPOCH_NOT_SUPPLIED","HB_EPOCH_INVALID","supplied_epoch_failure",
          "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference","carried_epoch",
-         "reference_provenance_failure",
+         "SHARED_VALIDATOR_SHA256",
          "require_supplied_source","carried_hb_reference",
          "frame_epoch","quarantine_frame"]
 

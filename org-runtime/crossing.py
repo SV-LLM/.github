@@ -292,11 +292,9 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
             # and refuses a selection the addressed service does not admit.
             # The consumed frame's epoch, as the kernel's own ingest passes it, so a
             # receiving operation's receipts carry a supplied epoch.
-            # A clock-stamped frame carries no epoch (B-P36f): carried_epoch refuses it,
-            # and the refusal is recorded at the caller's supplied epoch.
-            try: result=kernel.dispatch(root,packet,custody=custody,node_state=node_state,
-                                        epoch=kernel.carried_epoch(frame.get("heartbeat_reference"),
-                                                                   retry_entrypoint="org-runtime/crossing.py::ingress"))
+            # Dispatched at the supplied epoch: the frame's own epoch, when it lends
+            # one, was checked equal to it by ingress (B-P36l); a clock-flagged frame lends none.
+            try: result=kernel.dispatch(root,packet,custody=custody,node_state=node_state,epoch=hb_epoch)
             except ValueError as exc: raise Refused("BOUNDARY_DISPATCH_REFUSED",str(exc))
             outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
                      "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"],
@@ -323,6 +321,21 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
              "materialization_sha256":sha(materialized),**{key:selected[key] for key in SELECTION_FIELDS}}
     return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":path,
             **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
+
+def clock_flagged(reference:Any, refusal:dict[str,Any])->bool:
+    """A reference the shared rule refused as CLOCK: derived_from_clock not false, or a clock sample."""
+    return refusal.get("failure_code")=="HB_EPOCH_INVALID" and isinstance(reference,dict) and (
+        ("derived_from_clock" in reference and reference["derived_from_clock"] is not False)
+        or "sampled_unix_ns" in reference)
+
+def epoch_conflict(frame:dict[str,Any], supplied:int, carried:int)->dict[str,Any]:
+    """The six-field HB_EPOCH_CONFLICT of an ingress handed an epoch its frame contradicts."""
+    refusal=kernel.writer_epoch_refusal(None,retry_entrypoint="org-runtime/crossing.py::ingress (--hb-epoch)")
+    refusal.update(failure_code="HB_EPOCH_CONFLICT",
+                   detail="the supplied hb_epoch "+str(supplied)+" is not the frame's epoch "+str(carried),
+                   required_evidence_or_repair="supply the frame's own epoch, or let the frame lend none",
+                   next_attempt="run ingress again with --hb-epoch "+str(carried)+"; nothing was written and the frame is not marked")
+    return {"transition_class":INGRESS_REFUSED,"packet_id":frame.get("packet_id"),**refusal}
 
 def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Path=ROOT,
             hb_epoch:int|None=None)->list[dict[str,Any]]:
@@ -352,11 +365,19 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
     custody=carrier_custody(root)
     results=[]
     for item in kernel.scan_addressed_frames(ORG,root=mesh_root,seen=kernel.federation_seen_frame_names(root,store=node_state)):
-        # A frame whose epoch is CLOCK, unmarked, invalid or an unverified CARRIED
-        # claim is quarantined: a six-field seen-marker, no receipt, never retried (B-P36j/k).
-        try: kernel.frame_epoch(item["frame"],custody=custody,retry_entrypoint="org-runtime/crossing.py::ingress")
+        # The frame's epoch, if it lends one. An unmarked reference, an invalid one
+        # or an unverified CARRIED claim is quarantined: a six-field seen-marker,
+        # no receipt, never retried (B-P36j/k). A clock-flagged frame is consumed
+        # but lends no epoch: it is recorded at the supplied one (S1).
+        frame_epoch=None
+        try: frame_epoch=kernel.frame_epoch(item["frame"],custody=custody,retry_entrypoint="org-runtime/crossing.py::ingress")
         except kernel.SuppliedEpochRefused as exc:
-            results.append(kernel.quarantine_frame(root,item,exc.refusal,store=node_state)["result"]); continue
+            if not clock_flagged(item["frame"].get("heartbeat_reference"),exc.refusal):
+                results.append(kernel.quarantine_frame(root,item,exc.refusal,store=node_state)["result"]); continue
+        if frame_epoch is not None and frame_epoch!=hb_epoch:
+            # B-P36l: the supplied epoch and the frame's disagree. Nothing is
+            # written and the frame is not marked, so a pass at its epoch takes it.
+            results.append(epoch_conflict(item["frame"],hb_epoch,frame_epoch)); continue
         result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
         kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)

@@ -371,18 +371,45 @@ class WriterEpochRefusalOrder(unittest.TestCase):
             self.assertIs(reference["derived_from_clock"], False)
             self.assertNotIn("sampled_unix_ns", reference)
 
-    def test_crossing_ingress_quarantines_a_clock_frame_without_a_receipt(self):
+    def test_crossing_ingress_consumes_a_clock_frame_lending_no_epoch(self):
+        # S1 (07:48Z): a clock-flagged frame is consumed but lends no epoch; it is
+        # recorded at the supplied one, and no receipt takes the clock epoch.
         self.open_ledger()
         k, _ = self.kernel_custody()
-        clock = self.inbound(k, "b-p36j-crossing-clock", now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
+        clock = self.inbound(k, "b-p36s1-crossing-clock", now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
         node = self.base / "node"
-        receipts_before = len(list(self.documents(self.base / "repo-ledger")))
         out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096")
-        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
-        self.assertEqual(len(list(self.documents(self.base / "repo-ledger"))), receipts_before)
+        self.assertEqual([r["disposition"] for r in out], ["ALLOW"], out)
         self.assertEqual(self.receipts_at(clock["heartbeat_reference"]["epoch"]), [])
+        self.assertTrue(self.receipts_at(4096))
+        for receipt in self.receipts_at(4096):
+            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
         self.assertEqual(self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
                                                hb_epoch="4096"), [])
+
+    def test_crossing_ingress_refuses_an_epoch_its_frame_contradicts(self):
+        # B-P36l: an explicit hb_epoch that differs from the frame's is
+        # HB_EPOCH_CONFLICT, nothing is written and the frame is not marked; an
+        # invalid explicit epoch is HB_EPOCH_INVALID whatever the frame says.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        self.inbound(k, "b-p36l-frame", epoch=4096)
+        node = self.base / "node"
+        before = files_under(self.base)
+        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="32")
+        self.assertEqual([r["failure_code"] for r in out], ["HB_EPOCH_CONFLICT"], out)
+        for field in SIX_FIELDS:
+            self.assertTrue(out[0][field], field)
+        self.assertEqual(files_under(self.base), before)
+        for epoch in ("+33", "abc", None):
+            with self.subTest(epoch=epoch):
+                with self.assertRaises(ValueError) as raised:
+                    self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch=epoch)
+                self.assertEqual(raised.exception.refusal["failure_code"],
+                                 "HB_EPOCH_NOT_SUPPLIED" if epoch is None else "HB_EPOCH_INVALID")
+                self.assertEqual(files_under(self.base), before)
+        taken = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096")
+        self.assertEqual([r["disposition"] for r in taken], ["ALLOW"], taken)
 
     def test_a_forged_carried_frame_is_refused_on_every_route(self):
         # B-P36k: a self-asserted CARRIED claim is verified against this
@@ -417,25 +444,31 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 self.assertEqual(len(written), 1, written)
                 self.assertEqual(json.loads(Path(written[0]).read_text())["failure_code"], "FRAME_REFUSED_QUARANTINED")
 
-    def test_an_unmarked_reference_is_refused(self):
-        # B-P36h (P): a heartbeat reference must mark derived_from_clock exactly
-        # false, or carry a CARRIED provenance; an unmarked one is refused.
+    def test_the_shared_rule_is_the_pinned_final_text(self):
+        # StegVerse-Labs/.github#3282 FINAL: sha256(inspect.getsource(supplied_epoch_failure)).
+        import hashlib
+        import inspect
         k = self.crossing.kernel
-        # 07:34Z: supplied_epoch_failure stays at its pinned text; the companion
-        # reference_provenance_failure decides provenance, in its ruled order.
+        self.assertEqual(k.SHARED_VALIDATOR_SHA256, "ad8ff52936d5bcd9a2ad6caceb2d9a637a099518989b34bbb3370301c7a4cce2")
+        self.assertEqual(hashlib.sha256(inspect.getsource(k.supplied_epoch_failure).encode()).hexdigest(),
+                         k.SHARED_VALIDATOR_SHA256)
+        self.assertFalse(hasattr(k, "reference_provenance_failure"))
+
+    def test_the_shared_rule_marks_provenance_in_its_final_order(self):
+        k = self.crossing.kernel
         supplied = k.hb_reference(epoch=4096)
         unmarked = {k_: v for k_, v in supplied.items() if k_ != "derived_from_clock"}
-        self.assertIsNone(k.supplied_epoch_failure(4096, unmarked))
-        for reference, code in (([], "HB_EPOCH_INVALID"),
-                                ({**supplied, "derived_from_clock": True}, "HB_EPOCH_INVALID"),
-                                ({**supplied, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
-                                ({**unmarked, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
-                                (unmarked, "HB_EPOCH_PROVENANCE_UNMARKED")):
-            with self.subTest(reference=reference):
-                self.assertEqual(k.reference_provenance_failure(reference)[0], code)
-        self.assertIsNone(k.reference_provenance_failure(supplied))
-        self.assertIsNone(k.reference_provenance_failure(
-            {**supplied, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": "sha256:" + "0" * 64}))
+        forged = {**unmarked, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": "sha256:" + "f" * 64}
+        for name, reference, code in (("no flag + sampled", {**unmarked, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
+                                      ("fabricated head, no flag", forged, "HB_EPOCH_PROVENANCE_UNMARKED"),
+                                      ("false + sampled", {**supplied, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
+                                      ("true", {**supplied, "derived_from_clock": True}, "HB_EPOCH_INVALID"),
+                                      ("not an object", [], "HB_EPOCH_INVALID"),
+                                      ("unmarked", unmarked, "HB_EPOCH_PROVENANCE_UNMARKED")):
+            with self.subTest(reference=name):
+                self.assertEqual(k.supplied_epoch_failure(4096, reference)[0], code)
+        self.assertIsNone(k.supplied_epoch_failure(4096, {**supplied, "source": "X"}))
+        self.assertIsNone(k.supplied_epoch_failure(4096, supplied))
         with self.assertRaises(k.SuppliedEpochRefused) as raised:
             k.carried_epoch(unmarked, retry_entrypoint="test")
         self.assertEqual(raised.exception.refusal["failure_code"], "HB_EPOCH_PROVENANCE_UNMARKED")
