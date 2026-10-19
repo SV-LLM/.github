@@ -127,13 +127,22 @@ def require_manifest(manifest:Any)->dict[str,Any]:
         raise Refused("MANIFEST_DESTINATION_MISSING")
     return manifest
 
+def supplied_epoch(hb_epoch:Any, entrypoint:str)->int:
+    """The caller's supplied epoch, checked by the kernel's shared rule before anything is written.
+
+    An absent or invalid one raises kernel.SuppliedEpochRefused carrying the
+    six-field FAIL_CLOSED as ``.refusal``. No clock is read.
+    """
+    return kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=entrypoint+" (hb_epoch=, or --hb-epoch)")["epoch"]
+
 def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT, genesis:bool=False,
            hb_epoch:int|None=None)->dict[str,Any]:
     """Append one transition to the repository ledger, then the organization ledger.
 
-    ``hb_epoch`` is the caller's supplied heartbeat epoch. The repository
-    emitter refuses an append without one (HB_EPOCH_NOT_SUPPLIED, six fields)
-    before its store is opened, so no receipt is stamped from a host clock.
+    ``hb_epoch`` is the caller's supplied heartbeat epoch. An absent or invalid
+    one raises kernel.SuppliedEpochRefused with the six-field refusal before
+    the emitter runs, so no receipt is stamped from a host clock; a refusal the
+    emitter prints is raised the same way, never cut into a SystemExit string.
     The organization receipt takes the repository receipt's epoch.
 
     The organization chain is opened only by an explicit genesis transition
@@ -141,15 +150,21 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
     is refused FAIL_CLOSED ORG_LEDGER_GENESIS_NOT_DECLARED.
     """
     require_ledger_locations()
+    hb_epoch=supplied_epoch(hb_epoch,"org-runtime/crossing.py::record")
     predecessor=sha(subject); successor=sha(outcome)
     transition_id=transition_class+":"+successor[7:31]
     run=subprocess.run([sys.executable,str(root/".stegverse/transition-ledger/emit.py"),
                         "--transition-id",transition_id,"--transition-class",transition_class,
                         "--predecessor-state-sha256",predecessor,"--successor-state-sha256",successor,
                         "--evidence-json",json.dumps(outcome,sort_keys=True),"--authority-effect","NONE",
-                        *(["--hb-epoch",str(hb_epoch)] if hb_epoch is not None else [])],
+                        "--hb-epoch",str(hb_epoch)],
                        capture_output=True,text=True,env=dict(os.environ))
-    if run.returncode!=0: raise SystemExit("REPO_LEDGER_APPEND_FAILED:"+(run.stderr.strip() or run.stdout.strip())[-300:])
+    if run.returncode!=0:
+        try: refusal=json.loads(run.stdout)
+        except ValueError: refusal=None
+        if isinstance(refusal,dict) and refusal.get("failed_predicate")==kernel.HB_EPOCH_PREDICATE:
+            raise kernel.SuppliedEpochRefused(refusal)
+        raise SystemExit("REPO_LEDGER_APPEND_FAILED:"+(run.stderr.strip() or run.stdout.strip())[-300:])
     repo_receipt=json.loads(run.stdout)
     org_receipt=organization_ledger.aggregate_transition(
         repo_receipt,org_transition_class=transition_class,
@@ -221,9 +236,12 @@ def destination_address(manifest:dict[str,Any], peer:dict[str,Any])->tuple[str,d
              "manifest":carried,"manifest_sha256":sha(carried)})
 
 def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, root:Path=ROOT,
-           now_ns:int|None=None, hb_epoch:int|None=None)->dict[str,Any]:
+           hb_epoch:int|None=None)->dict[str,Any]:
     subject={"intended_action":"CROSS_AN_ORGANIZATION_BOUNDARY_OUTBOUND","manifest":manifest}
     require_ledger_locations()  # before any frame is published: an unrecordable emission must not happen
+    # The frame carries the supplied epoch (derived_from_clock false), checked
+    # before anything is published; no clock is sampled for it.
+    hb_epoch=supplied_epoch(hb_epoch,"org-runtime/crossing.py::egress")
     try:
         manifest=require_manifest(manifest)
         peer=resolve_peer(manifest["destination"]["organization"],root)
@@ -234,7 +252,7 @@ def egress(manifest:Any, *, standing:dict[str,Any], mesh_root:Path|None=None, ro
                                    packet_id=SLUG+"-"+sha(manifest)[7:31])
         if mesh_root is None:
             raise FailClosed(MESH_LOCATION_REQUIRED,"the declared carrier publishes only to a mesh supplied as mesh_root")
-        published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,now_ns=now_ns)
+        published=kernel.carry_packet(packet,custody=carrier_custody(root),root=mesh_root,epoch=hb_epoch)
     except Refused as refused:
         outcome=refusal_outcome(refused,EGRESS_RETRY,manifest_sha256=sha(manifest))
         return {"transition_class":EGRESS_REFUSED,**outcome,**record(EGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
@@ -313,6 +331,7 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
     resolved against the host or the checkout. Nothing is consumed then.
     """
     require_ledger_locations()  # before any frame is consumed or marked seen
+    hb_epoch=supplied_epoch(hb_epoch,"org-runtime/crossing.py::ingress")
     for location,predicate,reason,field in (
             (mesh_root,MESH_LOCATION_REQUIRED,"frames are scanned only from a mesh supplied as mesh_root","mesh_location"),
             (node_state_root,NODE_STATE_LOCATION_REQUIRED,
@@ -348,13 +367,16 @@ def main()->int:
     refusal=kernel.writer_epoch_refusal(ns.hb_epoch,retry_entrypoint="org-runtime/crossing.py "+ns.cmd+" --hb-epoch")
     if refusal is not None: print(json.dumps(refusal,sort_keys=True)); return 1
     ns.hb_epoch=int(ns.hb_epoch)
-    if ns.cmd=="open-ledger":
-        out=open_organization_ledger(hb_epoch=ns.hb_epoch)
-    elif ns.cmd=="egress":
-        out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
-                   mesh_root=ns.mesh_root,hb_epoch=ns.hb_epoch)
-    else:
-        out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root,hb_epoch=ns.hb_epoch)
+    try:
+        if ns.cmd=="open-ledger":
+            out=open_organization_ledger(hb_epoch=ns.hb_epoch)
+        elif ns.cmd=="egress":
+            out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
+                       mesh_root=ns.mesh_root,hb_epoch=ns.hb_epoch)
+        else:
+            out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root,hb_epoch=ns.hb_epoch)
+    except kernel.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal,sort_keys=True)); return 1
     print(json.dumps(out,sort_keys=True)); return 0
 
 if __name__=="__main__": raise SystemExit(main())

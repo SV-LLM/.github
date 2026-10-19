@@ -55,11 +55,17 @@
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 16759,
+      "insertion_offset": 16833,
       "insertion_bytes": 2402,
       "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c",
-      "local_sha256": "sha256:e5bade3f7c210bbf4e4f348b14fb5103fbdd485fad4571899add5c8f301da3f4",
+      "local_sha256": "sha256:8cf4a5d676a9738c0c8f2d826b95a4d95ff46d923b7a4f779ec0bbc040a91621",
       "substitutions": [
+        {
+          "reference": "    # Ordering is a heartbeat count, not a clock reading. A supplied tick keeps\n    # the receipt reproducible; deriving one from the host clock is permitted\n    # but marks itself so the two can be told apart.\n    heartbeat = kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference()\n",
+          "local": "    # Ordering is a heartbeat count, not a clock reading. The caller supplies\n    # the tick; an absent or invalid one raises kernel.SuppliedEpochRefused\n    # (six fields) before the store is opened, and no clock is read.\n    heartbeat = kernel.supplied_hb_reference(\n        hb_epoch, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append (hb_epoch=, or --hb-epoch)\")\n",
+          "count": 1,
+          "why": "append resolves the heartbeat reference through kernel.supplied_hb_reference before open_store: an absent epoch is HB_EPOCH_NOT_SUPPLIED and an invalid one HB_EPOCH_INVALID, both the kernel's six-field FAIL_CLOSED with nothing written, and the host-clock fallback (kernel.hb_reference() with no epoch) is removed (B-P36b)"
+        },
         {
           "reference": "    parser.add_argument(\"--hb-epoch\", type=int, default=None,\n                        help=\"heartbeat epoch; derived from the host clock, and marked as derived, when absent\")\n    args = parser.parse_args()\n",
           "local": "    parser.add_argument(\"--hb-epoch\", default=None,\n                        help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\")\n    args = parser.parse_args()\n    # The raw text goes to the kernel rule; an int() here would admit '+33'.\n    refusal = kernel.writer_epoch_refusal(\n        args.hb_epoch, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py --hb-epoch\")\n    if refusal is not None:\n        print(json.dumps(refusal, sort_keys=True))\n        raise SystemExit(1)\n",
@@ -71,6 +77,12 @@
           "local": "                        hb_epoch=int(args.hb_epoch))\n    except LedgerLocationRequired",
           "count": 1,
           "why": "the CLI passes the epoch the kernel rule admitted as its integer value"
+        },
+        {
+          "reference": "        print(json.dumps(location_refusal(exc), sort_keys=True))\n        raise SystemExit(1)\n    print(",
+          "local": "        print(json.dumps(location_refusal(exc), sort_keys=True))\n        raise SystemExit(1)\n    except kernel.SuppliedEpochRefused as exc:\n        print(json.dumps(exc.refusal, sort_keys=True))\n        raise SystemExit(1)\n    print(",
+          "count": 1,
+          "why": "the CLI prints the kernel's six-field epoch refusal and exits 1 (B-P36b)"
         }
       ]
     },

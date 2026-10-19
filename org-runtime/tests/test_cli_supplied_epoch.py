@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DIGEST = "sha256:" + "0" * 64
-REFUSED = ("+33", "３３", "٣٣", " 33", "True", "abc", "33.7", None)
+REFUSED = ("+33", "３３", "٣٣", "٣３", " 33", "True", "abc", "33.7", "33.0", "31", None)
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
 

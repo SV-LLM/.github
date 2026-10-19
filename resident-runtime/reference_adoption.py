@@ -10,7 +10,8 @@ frozen reference commit and the digest of every adopted surface:
                      block inserted at a recorded offset (the temporary
                      SV_LLM_LEGACY_RECEIPT_CHAIN wrapper); removing it yields
                      the reference byte for byte. It may also carry declared
-                     substitutions after the insertion, reversed as below
+                     substitutions, reversed as below once the block (at its
+                     local offset) is removed
   declared_substitutions
                      the file is the reference file with each declared
                      (reference -> local) substitution applied exactly the
@@ -55,9 +56,10 @@ def contract_digest(document: dict, excluded: list[str]) -> str:
 def adopted_reference_bytes(path: str, data: bytes, entry: dict) -> tuple[bytes, list[str]]:
     """The reference bytes this adopted file claims to be, and any mismatch found on the way.
 
-    A declared insertion may also carry declared substitutions (none of them
-    before its offset): the insertion is removed first, then the
-    substitutions are reversed, and the local file's own digest is checked.
+    A declared insertion may also carry declared substitutions. Its offset is
+    then the block's position in the local file: the insertion is removed
+    first, then the substitutions are reversed, and the local file's own
+    digest is checked.
     """
     problems = []
     if "substitutions" in entry and digest(data) != entry.get("local_sha256"):

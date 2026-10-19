@@ -305,10 +305,11 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
         require_state_digest("predecessor_org_state_sha256", predecessor_state)
     require_state_digest("successor_org_state_sha256", successor_state)
     retained = {source_key(source["source_transition_sha256"]): source_receipt}
-    # Ordering is a heartbeat count, not a clock reading. A supplied tick keeps
-    # the receipt reproducible; deriving one from the host clock is permitted
-    # but marks itself so the two can be told apart.
-    heartbeat = kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference()
+    # Ordering is a heartbeat count, not a clock reading. The caller supplies
+    # the tick; an absent or invalid one raises kernel.SuppliedEpochRefused
+    # (six fields) before the store is opened, and no clock is read.
+    heartbeat = kernel.supplied_hb_reference(
+        hb_epoch, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_epoch=, or --hb-epoch)")
     target = store or open_store(ledger_root())
     target.initialize()
     # The storage substrate owns serialization. A lost comparison writes
@@ -449,6 +450,9 @@ def main():
                         hb_epoch=int(args.hb_epoch))
     except LedgerLocationRequired as exc:
         print(json.dumps(location_refusal(exc), sort_keys=True))
+        raise SystemExit(1)
+    except kernel.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
         raise SystemExit(1)
     print(json.dumps(result, sort_keys=True))
 

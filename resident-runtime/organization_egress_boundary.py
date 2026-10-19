@@ -386,7 +386,16 @@ def emit(destination_organization: Any, payload: Mapping[str, Any], *,
          transition_reference: str = "ecosystem.transition.interorg.v1",
          root: Path | None = None, mesh_root: Path | None = None,
          hb_epoch: int | None = None) -> dict[str, Any]:
-    """Emit one closable crossing to a derived capability address, and record it."""
+    """Emit one closable crossing to a derived capability address, and record it.
+
+    ``hb_epoch`` is checked by the kernel's shared supplied-epoch rule before
+    anything else: an absent or invalid one raises SuppliedEpochRefused (the
+    repository emitter's class, six fields) before a frame is built, so no
+    frame is published and no clock is read. The frame carries that epoch.
+    """
+    hb_epoch = repository_ledger.kernel.supplied_hb_reference(
+        hb_epoch, retry_entrypoint="resident-runtime/organization_egress_boundary.py::emit (hb_epoch=, or --hb-epoch)"
+    )["epoch"]
     origin = this_organization(root)
     try:
         if credential_authority is not None:
