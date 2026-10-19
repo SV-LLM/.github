@@ -301,6 +301,8 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
     # Admission is decided before the append lock is taken; an inadmissible
     # source receipt never contends for the organization ledger.
     source = verify_source(source_receipt)
+    if source["source_receipt_schema"] == "stegverse.repo-transition-receipt/v1":
+        kernel.require_supplied_source(source_receipt, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append")
     if predecessor_state not in (FROM_HEAD, GENESIS):
         require_state_digest("predecessor_org_state_sha256", predecessor_state)
     require_state_digest("successor_org_state_sha256", successor_state)

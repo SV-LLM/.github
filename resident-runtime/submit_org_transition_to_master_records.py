@@ -175,9 +175,9 @@ def main():
     # both ledgers its materializer supplied (STEGVERSE_REPO_LEDGER_ROOT and
     # STEGVERSE_ORG_LEDGER_ROOT) before the frame is written; without them the
     # kernel refuses and nothing is published. Stamped with the epoch of the
-    # segment's head receipt, so releasing the same segment again publishes the
-    # same frame -- a write-once no-op -- instead of a second record request
-    # stamped by the host clock. Publication is fire-and-forget evidence: no
+    # segment's head receipt, which must be the current organization ledger
+    # head: any other segment, the same one released again included, is refused
+    # rather than stamped by the host clock. Publication is fire-and-forget evidence: no
     # answer is requested and nothing waits for Master Records to record it.
     # The epoch is CARRIED from the segment's head receipt, never supplied: it is
     # admitted only when that head's heartbeat reference passes the shared rule
@@ -195,8 +195,15 @@ def main():
                   "head_receipt_sha256": head["receipt_sha256"], "epoch": epoch, "derived_from_clock": False}
     custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
                                  org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
-    published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
-                                 epoch_provenance=provenance)
+    # The kernel verifies the provenance against the current organization
+    # ledger head (CARRIED_PROVENANCE_UNVERIFIED otherwise) before anything is
+    # written, so only the current head is released and a re-release is refused.
+    try:
+        published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
+                                     epoch_provenance=provenance)
+    except K.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
+        raise SystemExit(1)
     print(json.dumps({"status": "RELEASED_ORGANIZATION_BATCH_PUBLISHED_FOR_DOWNSTREAM_RECORD",
                       "packet_id": packet["packet_id"], "receipt_count": len(receipts),
                       "frame_sha256": published["frame"]["frame_sha256"], "authority_effect": "NONE",

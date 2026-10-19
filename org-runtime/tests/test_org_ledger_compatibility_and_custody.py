@@ -30,7 +30,7 @@ record = load("svllm_organization_record", "resident-runtime/submit_org_transiti
 
 def repo_receipt(number):
     body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/sandbox",
-            "transition_id": "wrapper-" + str(number)}
+            "transition_id": "wrapper-" + str(number), "hb_reference": agg.kernel.hb_reference(epoch=32)}
     return {**body, "receipt_sha256": agg.sha(body)}
 
 

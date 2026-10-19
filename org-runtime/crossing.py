@@ -170,9 +170,7 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         repo_receipt,org_transition_class=transition_class,
         boundary_evidence={"disposition":outcome["disposition"],"credential_authority":CREDENTIAL_AUTHORITY,
                            "transition_authority":"Interlock/InTr"},
-        authority_effect="NONE",genesis=genesis,
-        # CARRIED from the repository receipt, never re-stamped from a clock reading (B-P36f).
-        hb_epoch=kernel.carried_epoch(repo_receipt["hb_reference"],retry_entrypoint="org-runtime/crossing.py::record"))
+        authority_effect="NONE",genesis=genesis,hb_epoch=hb_epoch)  # the SUPPLIED epoch, not one read back (B-P36f)
     return {"repo_receipt_sha256":repo_receipt["receipt_sha256"],"org_receipt_sha256":org_receipt["receipt_sha256"]}
 
 def open_organization_ledger(root:Path=ROOT, *, hb_epoch:int|None=None)->dict[str,Any]:

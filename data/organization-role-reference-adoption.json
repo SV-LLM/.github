@@ -55,11 +55,17 @@
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 16833,
+      "insertion_offset": 17044,
       "insertion_bytes": 2402,
       "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c",
-      "local_sha256": "sha256:8cf4a5d676a9738c0c8f2d826b95a4d95ff46d923b7a4f779ec0bbc040a91621",
+      "local_sha256": "sha256:a5039120edc401d5da5d8e8c005ed369b25377c1e3654ae81f79ba783ff44dfa",
       "substitutions": [
+        {
+          "reference": "    source = verify_source(source_receipt)\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
+          "local": "    source = verify_source(source_receipt)\n    if source[\"source_receipt_schema\"] == \"stegverse.repo-transition-receipt/v1\":\n        kernel.require_supplied_source(source_receipt, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append\")\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
+          "count": 1,
+          "why": "a repository source receipt whose epoch is CLOCK or unmarked is refused before anything is written with six-field SOURCE_RECEIPT_IS_CLOCK_PROVENANCE (kernel.require_supplied_source), so its clock epoch is never consumed as supplied (B-P36h O-1)"
+        },
         {
           "reference": "    # Ordering is a heartbeat count, not a clock reading. A supplied tick keeps\n    # the receipt reproducible; deriving one from the host clock is permitted\n    # but marks itself so the two can be told apart.\n    heartbeat = kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference()\n",
           "local": "    # Ordering is a heartbeat count, not a clock reading. The caller supplies\n    # the tick; an absent or invalid one raises kernel.SuppliedEpochRefused\n    # (six fields) before the store is opened, and no clock is read.\n    heartbeat = kernel.supplied_hb_reference(\n        hb_epoch, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append (hb_epoch=, or --hb-epoch)\")\n",
@@ -128,7 +134,7 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:80ddce127f1a806352cfe23ca7e36e193dd15fe660fec10a5152957001db1aae",
+      "local_sha256": "sha256:29bcc3d6f7b641181d219a8654725056fc36fea39f383deade34c4ec487c60a5",
       "substitutions": [
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
@@ -168,15 +174,15 @@
         },
         {
           "reference": "        \"NONE\", hb_epoch=repository_receipt[\"hb_reference\"][\"epoch\"], idempotent=True)\n    return {\"repository_receipt\": repository_receipt,\n            \"organization_receipt\": organization_receipt}\n",
-          "local": "        \"NONE\", hb_epoch=organization_ledger.kernel.carried_epoch(\n            repository_receipt[\"hb_reference\"],\n            retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::_record_refusal\"), idempotent=True)\n    return {\"repository_receipt\": repository_receipt,\n            \"organization_receipt\": organization_receipt}\n",
+          "local": "        \"NONE\", hb_epoch=hb_epoch, idempotent=True)  # the SUPPLIED epoch, not one read back (B-P36f)\n    return {\"repository_receipt\": repository_receipt,\n            \"organization_receipt\": organization_receipt}\n",
           "count": 1,
-          "why": "the organization receipt's epoch is CARRIED from the repository receipt through kernel.carried_epoch, which refuses a clock-derived or invalid heartbeat reference with the six fields, so a clock epoch is never re-stamped derived_from_clock false (B-P36f)"
+          "why": "the refusal's organization receipt takes the SUPPLIED epoch, never one read back from the repository receipt (B-P36f)"
         },
         {
-          "reference": "    hb_epoch = repository_receipt[\"hb_reference\"][\"epoch\"]\n    organization_receipt = organization_ledger.append(",
-          "local": "    hb_epoch = organization_ledger.kernel.carried_epoch(\n        repository_receipt[\"hb_reference\"], retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::receive\")\n    organization_receipt = organization_ledger.append(",
+          "reference": "    hb_epoch = repository_receipt[\"hb_reference\"][\"epoch\"]\n    organization_receipt = organization_ledger.append(\n        repository_receipt, \"REPO_STATE_PROPAGATION\",\n        predecessor_state, successor_state,\n        {\"receiving_operation\": OPERATION_ID,\n         \"resolved_service_id\": crossing[\"resolved_service_id\"],\n         \"ingress_packet_id\": crossing[\"ingress_packet_id\"],\n         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)\n",
+          "local": "    # The organization receipt takes the SUPPLIED epoch (B-P36f); the outbound\n    # frame then takes the repository receipt's epoch, CARRIED and validated.\n    carried = organization_ledger.kernel.carried_epoch(\n        repository_receipt[\"hb_reference\"], retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::receive\")\n    organization_receipt = organization_ledger.append(\n        repository_receipt, \"REPO_STATE_PROPAGATION\",\n        predecessor_state, successor_state,\n        {\"receiving_operation\": OPERATION_ID,\n         \"resolved_service_id\": crossing[\"resolved_service_id\"],\n         \"ingress_packet_id\": crossing[\"ingress_packet_id\"],\n         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)\n    hb_epoch = carried\n",
           "count": 1,
-          "why": "the organization receipt's epoch is CARRIED from the repository receipt through kernel.carried_epoch, which refuses a clock-derived or invalid heartbeat reference with the six fields, so a clock epoch is never re-stamped derived_from_clock false (B-P36f)"
+          "why": "the organization receipt takes the SUPPLIED epoch; the outbound frame keeps the repository receipt's epoch, CARRIED through kernel.carried_epoch, which refuses a clock-derived or unmarked reference with six fields (B-P36f)"
         }
       ]
     }

@@ -28,7 +28,7 @@ STATE_AFTER = "sha256:" + "b" * 64
 
 def repo_receipt(number):
     body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/sandbox",
-            "transition_id": "resolution-" + str(number)}
+            "transition_id": "resolution-" + str(number), "hb_reference": module.kernel.hb_reference(epoch=32)}
     return {**body, "receipt_sha256": module.sha(body)}
 
 

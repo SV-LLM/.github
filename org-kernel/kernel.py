@@ -115,6 +115,7 @@ def recover_packet(frame:dict[str,Any])->dict[str,Any]:
 # an absent or invalid epoch before it opens anything; no clock is read.
 HB_EPOCH_NOT_SUPPLIED="HB_EPOCH_NOT_SUPPLIED"
 HB_EPOCH_INVALID="HB_EPOCH_INVALID"
+HB_EPOCH_PROVENANCE_UNMARKED="HB_EPOCH_PROVENANCE_UNMARKED"
 HB_EPOCH_PREDICATE="SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"
 HB_EPOCH_OWNING_EXISTING_GOAL="INTERLOCK-INTR-RUNTIME-INDEPENDENT-PROTOCOL-001"
 
@@ -147,6 +148,9 @@ def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, s
         return "HB_EPOCH_INVALID", "hb_epoch " + repr(hb_epoch) + " is not ASCII [0-9]+"
     if int(text) < 32:
         return "HB_EPOCH_INVALID", "hb_epoch " + text + " is below the HB32 anchor (32)"
+    if reference is not None and "derived_from_clock" not in reference \
+            and not str(reference.get("provenance", "")).startswith("CARRIED:"):
+        return "HB_EPOCH_PROVENANCE_UNMARKED", "the carrier's heartbeat reference does not mark derived_from_clock"
     if reference is not None and "derived_from_clock" in reference \
             and reference["derived_from_clock"] is not False:
         return "HB_EPOCH_INVALID", ("the carrier's derived_from_clock is not exactly false; "
@@ -199,15 +203,16 @@ def carried_epoch(reference:Any, *, retry_entrypoint:str)->int:
     A writer may forward an epoch it was not handed directly only when that
     epoch is CARRIED: read from a frame or receipt whose heartbeat reference
     passes the shared rule and is not clock-derived. A reference is CLOCK when
-    derived_from_clock is anything but false, or is absent beside a
-    sampled_unix_ns. A CLOCK, absent or invalid reference raises
+    derived_from_clock is anything but false or it carries a sampled_unix_ns,
+    and UNMARKED when derived_from_clock is absent (HB_EPOCH_PROVENANCE_UNMARKED).
+    A CLOCK, UNMARKED, absent or invalid reference raises
     SuppliedEpochRefused (six fields) before anything is written; a carried
     clock epoch is never re-stamped derived_from_clock false. No clock is read.
     """
     epoch=reference.get("epoch") if isinstance(reference,dict) else None
     failure=supplied_epoch_failure(epoch,reference)
-    if failure is None and "derived_from_clock" not in reference and "sampled_unix_ns" in reference:
-        failure=("HB_EPOCH_INVALID","the carried heartbeat reference was sampled from a clock")
+    if failure is None and "sampled_unix_ns" in reference:
+        failure=("HB_EPOCH_INVALID","the carried heartbeat reference carries a clock sample (sampled_unix_ns)")
     if failure is None:
         return int(str(epoch))
     refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
@@ -215,6 +220,58 @@ def carried_epoch(reference:Any, *, retry_entrypoint:str)->int:
                    required_evidence_or_repair=("a carried heartbeat reference has an ASCII-digit epoch >= "
                                                 +str(HB_ANCHOR_EPOCH)+" and derived_from_clock false; a "
                                                 "clock-sampled epoch is never forwarded as supplied"))
+    raise SuppliedEpochRefused(refusal)
+
+SOURCE_RECEIPT_IS_CLOCK_PROVENANCE="SOURCE_RECEIPT_IS_CLOCK_PROVENANCE"
+CARRIED_PROVENANCE_UNVERIFIED="CARRIED_PROVENANCE_UNVERIFIED"
+
+def require_supplied_source(receipt:Any, *, retry_entrypoint:str)->None:
+    """Refuse a repository source receipt whose epoch is CLOCK or unmarked, before anything is written.
+
+    An organization receipt consuming such a receipt would re-stamp a clock
+    epoch as supplied. The refusal is six-field SOURCE_RECEIPT_IS_CLOCK_PROVENANCE;
+    a legacy receipt is rebound by a migration transition, never mutated.
+    """
+    try:
+        carried_epoch(receipt.get("hb_reference") if isinstance(receipt,dict) else None,
+                      retry_entrypoint=retry_entrypoint)
+    except SuppliedEpochRefused as exc:
+        raise SuppliedEpochRefused({**exc.refusal,"failure_code":SOURCE_RECEIPT_IS_CLOCK_PROVENANCE,
+            "detail":"source receipt: "+exc.refusal["detail"],
+            "required_evidence_or_repair":("a WU-B13 migration transition that rebinds the legacy repo receipt "
+                                           "under a supplied epoch with provenance CARRIED:LEGACY_CLOCK_RECEIPT + "
+                                           "source sha; existing receipts are never mutated")}) from None
+
+def verify_carried_provenance(provenance:Any, *, organization_store:Any, organization_ledger:Any,
+                              retry_entrypoint:str)->dict[str,Any]:
+    """A caller-supplied CARRIED provenance, verified against the organization ledger head.
+
+    Its head_receipt_sha256 must be the current head, that head must not be
+    CLOCK or unmarked, and the epoch must be the head's and pass the shared
+    rule. Otherwise six-field CARRIED_PROVENANCE_UNVERIFIED and nothing is
+    written.
+    """
+    head=organization_store.get(organization_ledger.HEAD_KEY) if organization_store is not None else None
+    sha_=provenance.get("head_receipt_sha256") if isinstance(provenance,dict) else None
+    receipt_=organization_store.get(organization_ledger.receipt_key(sha_)) if head and sha_==head.get("receipt_sha256") else None
+    detail=None
+    if receipt_ is None:
+        detail="head_receipt_sha256 is not the current organization ledger head"
+    else:
+        try:
+            epoch=carried_epoch(receipt_.get("hb_reference"),retry_entrypoint=retry_entrypoint)
+        except SuppliedEpochRefused as exc:
+            detail="the ledger head's epoch is not CARRIED: "+exc.refusal["detail"]
+        else:
+            if provenance.get("epoch")!=epoch or provenance.get("derived_from_clock") is not False:
+                detail="the provenance epoch is not the ledger head's supplied epoch"
+    if detail is None:
+        return dict(provenance)
+    refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+    refusal.update(failure_code=CARRIED_PROVENANCE_UNVERIFIED,detail=detail,
+                   required_evidence_or_repair=("a CARRIED provenance names the current organization ledger head, "
+                                                "whose heartbeat reference is derived_from_clock false and passes "
+                                                "the shared rule"))
     raise SuppliedEpochRefused(refusal)
 
 def receipt(kind:str, packet_id:str, subject:str, previous:str|None, detail:dict[str,Any])->dict[str,Any]:
@@ -408,7 +465,8 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "addressed_node_state_store","record_federation_cycle","federation_cycles","required_node_state",
          "crossing_custody","require_custody","carry_packet",
          "HB_EPOCH_NOT_SUPPLIED","HB_EPOCH_INVALID","supplied_epoch_failure",
-         "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference","carried_epoch"]
+         "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference","carried_epoch",
+         "require_supplied_source","verify_carried_provenance"]
 
 
 # --- Federation mesh v1.1 additions ---
@@ -558,6 +616,11 @@ def publish_packet(packet:dict[str,Any], *, root:Path|None=None, now_ns:int|None
             None,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)"),
             detail="a recorded emission is not stamped from a clock sample; supply epoch="))
     epoch=supplied_hb_reference(epoch,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)")["epoch"]
+    if epoch_provenance is not None:
+        epoch_provenance=verify_carried_provenance(
+            {**epoch_provenance,"epoch":epoch} if epoch_provenance.get("epoch") is None else epoch_provenance,
+            organization_store=custody["organization_store"],organization_ledger=custody["organization_ledger"],
+            retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch_provenance=)")
     frame=carrier_frame(packet,epoch=epoch)
     if root is None:  # the refusal publish_frame would make, before anything is recorded
         raise ValueError("mesh_location_required_from_materializer")
@@ -875,8 +938,7 @@ def _append_both(custody:dict[str,Any], identity:str, transition_class:str, pred
     organization_receipt=organization_ledger.append(
         repository_receipt,"REPO_STATE_PROPAGATION",predecessor,successor,
         {"operation":transition_class,**organization_evidence},
-        "NONE",hb_epoch=carried_epoch(repository_receipt["hb_reference"],
-                                      retry_entrypoint="org-kernel/kernel.py::_append_both"),
+        "NONE",hb_epoch=epoch,  # the epoch this crossing was handed, not one read back (B-P36f)
         store=custody["organization_store"],idempotent=True)
     return {"repository_receipt_sha256":repository_receipt["receipt_sha256"],
             "organization_receipt_sha256":organization_receipt["receipt_sha256"]}
@@ -1011,10 +1073,11 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
         # An answer is stamped with the epoch of the frame it answers. Consuming
         # the same frame again then builds the same answer frame, and publishing
         # it is a write-once no-op rather than a second answer stamped by
-        # whatever clock this pass read. A caller-supplied sample still wins.
+        # whatever clock this pass read. The frame's validated epoch is SUPPLIED
+        # for the answer, so a caller's sample never reaches the clock default.
         epoch=carried_epoch(item["frame"].get("heartbeat_reference"),
                             retry_entrypoint="org-kernel/kernel.py::consume_and_respond")
-        answer_epoch=None if now_ns is not None else epoch
+        answer_epoch=epoch
         # Recorded before anything leaves this node: no answer is published and
         # no consumption marker written for a crossing the organization has not
         # recorded. A failed append leaves the frame unmarked, so the next pass
@@ -1033,7 +1096,7 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
             # The answer is the return leg of the crossing just recorded, so it
             # is carried rather than recorded as a second emission.
             response=build_control_response(packet,result["execution_result"])
-            response_publication=_carry(response,root=mesh_root,now_ns=now_ns,epoch=answer_epoch)
+            response_publication=_carry(response,root=mesh_root,now_ns=None,epoch=answer_epoch)
         marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=node_state)
         out.append({"path":item["path"],"result":result,"response_publication":response_publication,
                     "organization_record":recorded,"seen_marker":str(marker)})

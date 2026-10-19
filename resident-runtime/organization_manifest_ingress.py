@@ -234,9 +234,7 @@ def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str
          "intended_action": INTENDED_ACTION,
          "disposition": "DENY",
          "failed_predicate": record["failed_predicate"]},
-        "NONE", hb_epoch=organization_ledger.kernel.carried_epoch(
-            repository_receipt["hb_reference"],
-            retry_entrypoint="resident-runtime/organization_manifest_ingress.py::_record_refusal"), idempotent=True)
+        "NONE", hb_epoch=hb_epoch, idempotent=True)  # the SUPPLIED epoch, not one read back (B-P36f)
     return {"repository_receipt": repository_receipt,
             "organization_receipt": organization_receipt}
 
@@ -816,7 +814,9 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
     # Everything after the repository receipt takes its epoch from that receipt,
     # so a replay rebuilds the same organization receipt and the same outbound
     # frame rather than ones stamped with whatever epoch this attempt carried.
-    hb_epoch = organization_ledger.kernel.carried_epoch(
+    # The organization receipt takes the SUPPLIED epoch (B-P36f); the outbound
+    # frame then takes the repository receipt's epoch, CARRIED and validated.
+    carried = organization_ledger.kernel.carried_epoch(
         repository_receipt["hb_reference"], retry_entrypoint="resident-runtime/organization_manifest_ingress.py::receive")
     organization_receipt = organization_ledger.append(
         repository_receipt, "REPO_STATE_PROPAGATION",
@@ -826,6 +826,7 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
          "ingress_packet_id": crossing["ingress_packet_id"],
          "egress_packet_id": crossing["egress_packet_id"]},
         "NONE", hb_epoch=hb_epoch, idempotent=True)
+    hb_epoch = carried
 
     # Governance is decided by the organization that owns StegCore. The ingress
     # transition above occurred here and is recorded; the request now leaves

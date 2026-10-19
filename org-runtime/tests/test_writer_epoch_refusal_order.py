@@ -232,7 +232,8 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         body = {k: v for k, v in genesis.items() if k != "receipt_sha256"}
         clock = {**body["hb_reference"], "derived_from_clock": True, "sampled_unix_ns": 1}
         unflagged = {k: v for k, v in clock.items() if k != "derived_from_clock"}
-        for name, reference in (("derived_from_clock true", clock), ("sampled, unflagged", unflagged)):
+        for name, reference, code in (("derived_from_clock true", clock, "HB_EPOCH_INVALID"),
+                                      ("sampled, unflagged", unflagged, "HB_EPOCH_PROVENANCE_UNMARKED")):
             with self.subTest(head=name):
                 receipt = {**body, "hb_reference": reference}
                 receipt["receipt_sha256"] = self.agg.sha(receipt)
@@ -240,7 +241,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 done = self.release(receipt)
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 refusal = json.loads(done.stdout)
-                self.assertEqual(refusal["failure_code"], "HB_EPOCH_INVALID")
+                self.assertEqual(refusal["failure_code"], code)
                 for field in SIX_FIELDS:
                     self.assertTrue(refusal[field], field)
                 self.assertEqual(files_under(self.base), before)
@@ -331,6 +332,130 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         self.assertEqual(self.receipts_at(clock_epoch), [])
         for receipt in self.receipts_at(4096):
             self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+
+    def test_an_unmarked_reference_is_refused(self):
+        # B-P36h (P): a heartbeat reference must mark derived_from_clock exactly
+        # false, or carry a CARRIED provenance; an unmarked one is refused.
+        k = self.crossing.kernel
+        unmarked = {k_: v for k_, v in k.hb_reference(epoch=4096).items() if k_ != "derived_from_clock"}
+        self.assertEqual(k.supplied_epoch_failure(4096, unmarked)[0], "HB_EPOCH_PROVENANCE_UNMARKED")
+        with self.assertRaises(k.SuppliedEpochRefused) as raised:
+            k.carried_epoch(unmarked, retry_entrypoint="test")
+        self.assertEqual(raised.exception.refusal["failure_code"], "HB_EPOCH_PROVENANCE_UNMARKED")
+        for field in SIX_FIELDS:
+            self.assertTrue(raised.exception.refusal[field], field)
+        self.assertIsNone(k.supplied_epoch_failure(4096, {**unmarked, "provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD"}))
+
+    def test_the_aggregate_refuses_a_clock_or_unmarked_source_receipt(self):
+        # B-P36h (O-1): a CLOCK-provenance repository receipt is never consumed.
+        k = self.agg.kernel
+        clock = {**k.hb_reference(epoch=4096), "derived_from_clock": True, "sampled_unix_ns": 1}
+        unmarked = {k_: v for k_, v in k.hb_reference(epoch=4096).items() if k_ != "derived_from_clock"}
+        self.no_clock()
+        for name, reference in (("clock", clock), ("unmarked", unmarked)):
+            with self.subTest(source=name):
+                body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/.github",
+                        "transition_id": "b-p36h-" + name, "hb_reference": reference}
+                source = {**body, "receipt_sha256": self.agg.sha(body)}
+                before = files_under(self.base)
+                with self.assertRaises(k.SuppliedEpochRefused) as raised:
+                    self.agg.append(source, "REPO_STATE_PROPAGATION", self.agg.GENESIS, "sha256:" + "2" * 64,
+                                    {}, "NONE", hb_epoch=4096)
+                refusal = raised.exception.refusal
+                self.assertEqual(refusal["failure_code"], "SOURCE_RECEIPT_IS_CLOCK_PROVENANCE")
+                self.assertIn("CARRIED:LEGACY_CLOCK_RECEIPT", refusal["required_evidence_or_repair"])
+                for field in SIX_FIELDS:
+                    self.assertTrue(refusal[field], field)
+                self.assertEqual(files_under(self.base), before)
+
+    def test_an_invented_carried_provenance_is_refused(self):
+        # 07:08Z: a caller-supplied CARRIED provenance must name the current
+        # ledger head, which must be supplied; an invented sha writes nothing.
+        self.open_ledger()
+        self.no_clock()
+        k, custody = self.kernel_custody()
+        for provenance in ({"source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha256": "sha256:" + "9" * 64,
+                            "derived_from_clock": False},
+                           {"source": "ORGANIZATION_LEDGER_HEAD", "derived_from_clock": False}):
+            with self.subTest(provenance=provenance):
+                before = files_under(self.base)
+                with self.assertRaises(k.SuppliedEpochRefused) as raised:
+                    k.publish_packet(self.packet("b-p36h-invented"), root=self.mesh, custody=custody, epoch=32,
+                                     epoch_provenance=provenance)
+                refusal = raised.exception.refusal
+                self.assertEqual(refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
+                for field in SIX_FIELDS:
+                    self.assertTrue(refusal[field], field)
+                self.assertEqual(files_under(self.base), before)
+
+    def test_an_answer_is_published_at_the_answered_frame_epoch(self):
+        # B-P36g / 07:10Z: the inbound frame's validated epoch is SUPPLIED for the
+        # answer; a caller's now_ns never reaches the kernel's clock default.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
+                                destination_service="sv-llm.org-control",
+                                payload={"message_class": "ecosystem.monitor.request", "subject": "b-p36g"},
+                                standing=STANDING, packet_id="b-p36g-monitor")
+        k._publish_frame(k.carrier_frame(packet, epoch=4096), root=self.mesh)
+        self.no_clock()
+        out = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=self.base / "node",
+                                    repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger",
+                                    now_ns=k.HB_ANCHOR_UNIX_NS + 10 ** 12)
+        answer, = [row["response_publication"]["frame"] for row in out if row["response_publication"]]
+        self.assertEqual(answer["heartbeat_reference"]["epoch"], 4096)
+        self.assertIs(answer["heartbeat_reference"]["derived_from_clock"], False)
+        self.assertNotIn("sampled_unix_ns", answer["heartbeat_reference"])
+        for receipt in self.receipts_at(4096):
+            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+
+    def test_marker_vocabulary(self):
+        # 07:16Z: SUPPLIED is derived_from_clock false with no sampled_unix_ns,
+        # and a clock value is always marked (derived_from_clock true and sampled_unix_ns).
+        k = self.crossing.kernel
+        self.no_clock()
+        supplied = k.hb_reference(epoch=4096)
+        self.assertIs(supplied["derived_from_clock"], False)
+        self.assertNotIn("sampled_unix_ns", supplied)
+        frame = k.carrier_frame(self.packet("b-p36g-marker"), epoch=4096)
+        self.assertIs(frame["heartbeat_reference"]["derived_from_clock"], False)
+        self.assertNotIn("sampled_unix_ns", frame["heartbeat_reference"])
+        sampled = k.hb_reference(k.HB_ANCHOR_UNIX_NS + 10 ** 12)
+        self.assertIs(sampled["derived_from_clock"], True)
+        self.assertIn("sampled_unix_ns", sampled)
+
+    def test_every_route_at_a_fixed_clock_writes_only_supplied_epochs(self):
+        # B-P36g row 6: with the clock fixed, every receipt and every frame the
+        # writer routes produce is SUPPLIED (false, no sample) at the epoch given.
+        class FixedClock:
+            @staticmethod
+            def now(*args, **kwargs):
+                import datetime as real
+                return real.datetime(2030, 1, 1, tzinfo=real.timezone.utc)
+        kernels = {id(k): k for k in (self.crossing.kernel, self.agg.kernel, self.egress.kernel,
+                                      self.egress.repository_ledger.kernel, self.egress.organization_ledger.kernel)}
+        for k in kernels.values():
+            patcher = mock.patch.object(k, "datetime", FixedClock)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.crossing.open_organization_ledger(root=self.root, hb_epoch="4096")
+        self.crossing.egress({"manifest_id": "b-p36g-fixed", "destination": {"organization": PEER},
+                              "payload": {"probe": 1}}, standing=STANDING, mesh_root=self.mesh, root=self.root,
+                             hb_epoch="4096")
+        self.egress.emit(PEER, {"message_class": "ecosystem.communication", "communication_id": "b-p36g-fixed",
+                                "subject": "purpose-neutral mesh diagnostic",
+                                "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "b"}},
+                         standing=STANDING, capability="intr-destination", mesh_root=self.mesh, hb_epoch=4096)
+        k, custody = self.kernel_custody()
+        k.publish_packet(self.packet("b-p36g-fixed-publish"), root=self.mesh, custody=custody, epoch=4096)
+        references = [d["hb_reference"] for d in [*self.documents(self.base / "repo-ledger"),
+                                                   *self.documents(self.base / "org-ledger")] if "hb_reference" in d]
+        references += [d["heartbeat_reference"] for d in self.documents(self.mesh) if "heartbeat_reference" in d]
+        self.assertTrue(references)
+        for reference in references:
+            self.assertEqual(reference["epoch"], 4096)
+            self.assertIs(reference["derived_from_clock"], False)
+            self.assertNotIn("sampled_unix_ns", reference)
 
     @staticmethod
     def documents(root):
