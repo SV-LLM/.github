@@ -14,7 +14,7 @@ With STEGVERSE_FAULT_MATCH set, only writes whose destination path contains
 it are counted (HEAD.json, frames.d, seen ...).
 
 `directory()` returns a sitecustomize directory to put first on PYTHONPATH,
-so a CLI subprocess (the emitter, the Master Records release) is injected the
+so a CLI subprocess (the emitter, the release CLI) is injected the
 same way. With STEGVERSE_FAULT_AT unset nothing fails and the count is a
 census of the writes a clean run makes. Test support only.
 """
