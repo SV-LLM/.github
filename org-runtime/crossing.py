@@ -322,12 +322,6 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
     return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":path,
             **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
 
-def clock_flagged(reference:Any, refusal:dict[str,Any])->bool:
-    """A reference the shared rule refused as CLOCK: derived_from_clock not false, or a clock sample."""
-    return refusal.get("failure_code")=="HB_EPOCH_INVALID" and isinstance(reference,dict) and (
-        ("derived_from_clock" in reference and reference["derived_from_clock"] is not False)
-        or "sampled_unix_ns" in reference)
-
 def epoch_conflict(frame:dict[str,Any], supplied:int, carried:int)->dict[str,Any]:
     """The six-field HB_EPOCH_CONFLICT of an ingress handed an epoch its frame contradicts."""
     refusal=kernel.writer_epoch_refusal(None,retry_entrypoint="org-runtime/crossing.py::ingress (--hb-epoch)")
@@ -369,11 +363,21 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
         # or an unverified CARRIED claim is quarantined: a six-field seen-marker,
         # no receipt, never retried (B-P36j/k). A clock-flagged frame is consumed
         # but lends no epoch: it is recorded at the supplied one (S1).
-        frame_epoch=None
-        try: frame_epoch=kernel.frame_epoch(item["frame"],custody=custody,retry_entrypoint="org-runtime/crossing.py::ingress")
+        # A verified CARRIED frame is quarantined here: this route's receipts
+        # (the emitter CLI) take no provenance, and stripping it is laundering (B-P36m).
+        try:
+            frame_epoch,provenance=kernel.ingest_epoch(item["frame"],custody=custody,
+                                                       retry_entrypoint="org-runtime/crossing.py::ingress")
+            refusal=None
+            if provenance is not None:
+                refusal=kernel.writer_epoch_refusal(None,retry_entrypoint="org-runtime/crossing.py::ingress")
+                refusal.update(failure_code=kernel.CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM,
+                               detail="crossing.ingress records through the emitter CLI, which takes no CARRIED provenance",
+                               required_evidence_or_repair="crossing.record carries hb_provenance to both writers (WU-B13 slice c)")
         except kernel.SuppliedEpochRefused as exc:
-            if not clock_flagged(item["frame"].get("heartbeat_reference"),exc.refusal):
-                results.append(kernel.quarantine_frame(root,item,exc.refusal,store=node_state)["result"]); continue
+            refusal=exc.refusal
+        if refusal is not None:
+            results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
         if frame_epoch is not None and frame_epoch!=hb_epoch:
             # B-P36l: the supplied epoch and the frame's disagree. Nothing is
             # written and the frame is not marked, so a pass at its epoch takes it.

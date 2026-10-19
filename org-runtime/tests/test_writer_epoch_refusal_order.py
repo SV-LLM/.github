@@ -411,6 +411,97 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         taken = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root, hb_epoch="4096")
         self.assertEqual([r["disposition"] for r in taken], ["ALLOW"], taken)
 
+    def reframed(self, k, packet_id, reference_edit, service="sv-llm.org-control", payload=None):
+        """A frame to SV-LLM whose heartbeat reference is edited, re-digested and published."""
+        packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
+                                destination_service=service,
+                                payload=payload or {"message_class": "ecosystem.monitor.request", "subject": packet_id},
+                                standing=STANDING, packet_id=packet_id)
+        frame = k.carrier_frame(packet, epoch=32)
+        body = {key: value for key, value in frame.items() if key != "frame_sha256"}
+        body["heartbeat_reference"] = reference_edit(dict(body["heartbeat_reference"]))
+        frame = {**body, "frame_sha256": k.sha(body)}
+        k._publish_frame(frame, root=self.mesh)
+        return frame
+
+    def test_a_verified_carried_frame_keeps_its_provenance_in_every_receipt(self):
+        # B-P36m: a frame whose CARRIED claim verifies against this organization's
+        # head produces receipts that read CARRIED (source, head_receipt_sha,
+        # derived false); routes whose writers take no provenance quarantine it
+        # (CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM) rather than strip it.
+        self.open_ledger()
+        k, custody = self.kernel_custody()
+        head = self.org_genesis()["receipt_sha256"]
+        carried = lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head}
+        frame = self.reframed(k, "b-p36m-carried", carried)
+        self.no_clock()
+        ledgers = {"repo_ledger_root": self.base / "repo-ledger", "org_ledger_root": self.base / "org-ledger"}
+        rows = k.consume_addressed_frames(self.root, mesh_root=self.mesh, **ledgers)
+        self.assertEqual([r["result"].get("status") for r in rows], ["CONSUMED"], rows)
+        written = [d for d in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]
+                   if frame["frame_sha256"] in json.dumps(d)]
+        self.assertTrue(written)
+        for receipt in {d["receipt_sha256"]: d for d in written}.values():
+            self.assertEqual(receipt["hb_reference"]["source"], "ORGANIZATION_LEDGER_HEAD")
+            self.assertEqual(receipt["hb_reference"]["head_receipt_sha"], head)
+            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+
+    def test_a_carried_frame_is_quarantined_where_its_provenance_cannot_be_carried(self):
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        head = self.org_genesis()["receipt_sha256"]
+        carried = lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head}
+        self.reframed(k, "b-p36m-crossing", carried)
+        ledgers = lambda: files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger")
+        before = ledgers()
+        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root,
+                                    hb_epoch="32")
+        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
+        self.assertIn("CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM", out[0]["detail"])
+        self.assertEqual(ledgers(), before)
+        capability = self.reframed(k, "b-p36m-capability", carried, service="sv-llm.intr-destination",
+                      payload={"message_class": "ecosystem.communication", "communication_id": "b-p36m",
+                               "subject": "purpose-neutral mesh diagnostic",
+                               "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "m"}})
+        rows = k.consume_addressed_frames(self.root, mesh_root=self.mesh, repo_ledger_root=self.base / "repo-ledger",
+                                          org_ledger_root=self.base / "org-ledger")
+        refused = [r for r in rows if r["result"].get("failure_code") == "CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM"]
+        self.assertEqual(len(refused), 1, rows)
+        # The capability frame produced no receipt (the earlier org-control frame, consumed
+        # here without seen-state, is recorded with its provenance: see the B-P36m probe above).
+        self.assertEqual([d for d in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]
+                          if capability["frame_sha256"] in json.dumps(d)], [])
+
+    def test_clock_frames_lend_no_epoch_and_unmarked_frames_are_refused(self):
+        # 08:10Z: flagged-true and bare-sampled frames are CLOCK: consumed, lending
+        # no epoch (an epoch-needing route refuses NOT_SUPPLIED); only an UNMARKED
+        # frame (no flag, no sample) and an unverified CARRIED claim are refused.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        bare = self.reframed(k, "b-p36-bare-sampled",
+                             lambda ref: {**{a: b for a, b in ref.items() if a != "derived_from_clock"},
+                                          "sampled_unix_ns": k.HB_ANCHOR_UNIX_NS})
+        node = self.base / "node"
+        rows = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node,
+                                     repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")
+        self.assertEqual([r["result"]["detail"].split(":")[0] for r in rows], ["HB_EPOCH_NOT_SUPPLIED"], rows)
+        crossing_node = self.base / "crossing-node"
+        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=crossing_node, root=self.root, hb_epoch="4096")
+        self.assertEqual([r["disposition"] for r in out], ["ALLOW"], out)
+        for_frame = [d for d in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]
+                     if "hb_reference" in d and bare["packet_id"] in json.dumps(d)]
+        self.assertTrue(for_frame)
+        for receipt in for_frame:
+            self.assertEqual(receipt["hb_reference"]["epoch"], 4096)
+            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+            self.assertNotIn("sampled_unix_ns", receipt["hb_reference"])
+        unmarked = self.reframed(k, "b-p36-unmarked",
+                                 lambda ref: {a: b for a, b in ref.items() if a != "derived_from_clock"})
+        out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=crossing_node, root=self.root, hb_epoch="4096")
+        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
+        self.assertIn("HB_EPOCH_PROVENANCE_UNMARKED", out[0]["detail"])
+        self.assertEqual([d for d in self.documents(self.base / "repo-ledger") if unmarked["packet_id"] in json.dumps(d)], [])
+
     def test_a_forged_carried_frame_is_refused_on_every_route(self):
         # B-P36k: a self-asserted CARRIED claim is verified against this
         # organization's ledger head; a forged sha is refused, never stripped
