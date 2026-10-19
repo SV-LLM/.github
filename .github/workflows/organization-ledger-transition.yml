@@ -96,7 +96,7 @@ jobs:
       # put on PYTHONPATH and nothing is downloaded from a package index.
       - name: Checkout exact merged SDK manifest state-transition runtime
         if: env.MODE == 'request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           repository: StegVerse-org/StegVerse-SDK
           ref: 74d9b473aa415b06a9d550c28b2779a691b4ba32
