@@ -239,22 +239,27 @@ class WriterEpochRefusalOrder(unittest.TestCase):
     def test_4096_emit_frame_and_receipts_carry_the_supplied_epoch(self):
         self.open_ledger()
         self.no_clock()
-        payload = {"message_class": "ecosystem.communication", "communication_id": "b-p36b-emit-4096",
-                   "subject": "purpose-neutral mesh diagnostic",
-                   "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "b-p36b"}}
-        emitted = self.egress.emit(PEER, payload, standing=STANDING, capability="intr-destination",
-                                   mesh_root=self.mesh, hb_epoch="4096")
-        self.assertEqual(emitted["disposition"], "ALLOW", emitted.get("detail"))
-        frames = [json.loads(Path(p).read_text()) for p in files_under(self.mesh) if p.endswith(".json")]
-        references = [f["heartbeat_reference"] for f in frames if isinstance(f, dict) and "heartbeat_reference" in f]
-        self.assertTrue(references)
-        for reference in references:
-            self.assertEqual(reference["epoch"], 4096)
-            self.assertIs(reference["derived_from_clock"], False)
-        receipts = self.receipts_at(4096)
-        self.assertEqual(len(receipts), 2, receipts)
-        for receipt in receipts:
-            self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+        # V-P11 N1: the text "4096" used to commit a DENY; the text and the int both emit.
+        for count, epoch in enumerate(("4096", 4096), start=1):
+            with self.subTest(epoch=epoch):
+                payload = {"message_class": "ecosystem.communication",
+                           "communication_id": "b-p36b-emit-4096-" + type(epoch).__name__,
+                           "subject": "purpose-neutral mesh diagnostic",
+                           "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "b-p36b"}}
+                emitted = self.egress.emit(PEER, payload, standing=STANDING, capability="intr-destination",
+                                           mesh_root=self.mesh, hb_epoch=epoch)
+                self.assertEqual(emitted["disposition"], "ALLOW", emitted.get("detail"))
+                frames = [json.loads(Path(p).read_text()) for p in files_under(self.mesh) if p.endswith(".json")]
+                references = [f["heartbeat_reference"] for f in frames
+                              if isinstance(f, dict) and "heartbeat_reference" in f]
+                self.assertEqual(len(references), count)
+                for reference in references:
+                    self.assertEqual(reference["epoch"], 4096)
+                    self.assertIs(reference["derived_from_clock"], False)
+                receipts = self.receipts_at(4096)
+                self.assertEqual(len(receipts), 2 * count, receipts)
+                for receipt in receipts:
+                    self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
 
 
 if __name__ == "__main__":
