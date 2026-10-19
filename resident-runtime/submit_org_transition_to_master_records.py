@@ -184,8 +184,7 @@ def main():
     # six fields and nothing is published, never stamped from the clock (B-P36e).
     epoch = (receipts[-1].get("hb_reference") or {}).get("epoch")
     refusal = K.writer_epoch_refusal(
-        epoch, retry_entrypoint="resident-runtime/submit_org_transition_to_master_records.py "
-                                "(a head --org-receipt carrying hb_reference.epoch)")
+        epoch, retry_entrypoint=RETRY_ENTRYPOINT + " (a head --org-receipt carrying hb_reference.epoch)")
     if refusal is not None:
         print(json.dumps(refusal, sort_keys=True))
         raise SystemExit(1)
