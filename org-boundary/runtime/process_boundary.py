@@ -33,7 +33,7 @@ def load_input(path,argument):
   value=load(path)
   if not isinstance(value,dict): raise TypeError("expected a JSON object")
   return value
- except (OSError,UnicodeDecodeError,ValueError,TypeError) as exc:
+ except (OSError,UnicodeDecodeError,ValueError,TypeError,RecursionError,MemoryError) as exc:  # a deeply nested document too (F-SCAN-RECURSION)
   raise BoundaryFault(INPUT_FAULT_EXIT,"PROCESS_BOUNDARY_INPUT_FAULT","PROCESS_BOUNDARY_INPUT_IS_A_JSON_OBJECT",argument+": "+type(exc).__name__+": "+str(exc)[-200:],"pass "+argument+" a readable JSON object","none for this input; nothing was written",True) from None
 def write_fault(exc):
  return BoundaryFault(WRITE_FAULT_EXIT,"PROCESS_BOUNDARY_WRITE_FAULT","PROCESS_BOUNDARY_OUTPUT_IS_WRITABLE",type(exc).__name__+": "+str(exc)[-200:],"the --out location is writable","run the same crossing again; nothing durable was written",False)
@@ -85,9 +85,9 @@ def endpoint_result(env,svc,envelope_path,node_state_root=None):
                 detail=(completed.stderr or completed.stdout or "").strip().splitlines()
                 raise SystemExit("endpoint-adapter-execution-failed"
                                  + (": "+detail[-1] if detail else ""))
-            result=load(out)
-            if not isinstance(result,dict):
-                raise SystemExit("endpoint-adapter-result-invalid")
+            # SV-LLM declared substitution (F-SCAN-RECURSION): an unparsable or deeply
+            # nested adapter result is a terminal input fault (exit 65), never a traceback.
+            result=load_input(out,"endpoint adapter result")
             return result
     if role=="BOUNDARY_LOCAL_DIAGNOSTIC":
         return {"echo":env["payload"]}

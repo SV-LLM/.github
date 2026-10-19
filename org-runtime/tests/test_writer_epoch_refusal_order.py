@@ -1741,6 +1741,70 @@ class WriterEpochRefusalOrder(unittest.TestCase):
             return {}  # the refusal this operation records, written once
         self.sweep(self.open_ledger, run, settle=2)
 
+    DEEP = '{"a":' + "[" * 100000  # ~100 KB: under the frame cap and one argv string; json.loads raises RecursionError
+
+    def test_a_deeply_nested_frames_file_is_quarantined_and_the_cycle_goes_on(self):
+        # F-SCAN-RECURSION: a peer-writable frames.d file that json.loads cannot
+        # parse without RecursionError is quarantined by name (FRAME_INGEST_FAILED);
+        # the valid frame beside it is consumed exactly once, on both routes.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                frames = self.mesh / "frames.d"
+                frames.mkdir(parents=True, exist_ok=True)
+                (frames / "000-deep.json").write_text(self.DEEP)
+                valid = self.inbound(k, "f-scan-recursion-valid", epoch=4096)
+                run = self.consume_route(k, route, self.base / "node")
+                results = run()
+                bad = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual([r["failure_code"] for r in bad], ["FRAME_INGEST_FAILED"], results)
+                for field in SIX_FIELDS:
+                    self.assertTrue(bad[0][field], field)
+                consumed = [d for d in self.documents(self.base / "repo-ledger")
+                            if d.get("transition_class") in ("ORGANIZATION_FEDERATION_CROSSING_CONSUMED",
+                                                             "ORGANIZATION_INGRESS_CONSUMED")
+                            and valid["packet_id"] in json.dumps(d)]
+                self.assertEqual(len(consumed), 1, results)
+                self.assertEqual(run(), [])
+
+    def test_a_frame_carrying_a_deeply_nested_packet_is_quarantined(self):
+        # The packet inside a well-formed frame is peer data too: a deeply nested one
+        # is FRAME_INGEST_FAILED, quarantined; responses are still collected.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        packet = self.packet("f-scan-recursion-packet")
+        frame = k.carrier_frame(packet, epoch=4096)
+        import base64
+        body = {key: value for key, value in frame.items() if key != "frame_sha256"}
+        raw = self.DEEP.encode()
+        body.update(destination_org="SV-LLM", packet_base64=base64.b64encode(raw).decode(), packet_sha256=k.sha(raw))
+        k._publish_frame({**body, "frame_sha256": k.sha(body)}, root=self.mesh)
+        valid = self.inbound(k, "f-scan-recursion-packet-valid", epoch=4096)
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                results = self.consume_route(k, route, self.base / ("node-" + route))()
+                bad = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual([r["failure_code"] for r in bad], ["FRAME_INGEST_FAILED"], results)
+        self.assertIn(valid["packet_id"], json.dumps(list(self.documents(self.base / "repo-ledger"))))
+        self.assertEqual(k.collect_ecosystem_responses("SV-LLM", "none", mesh_root=self.mesh)["response_count"], 0)
+
+    def test_a_deeply_nested_cli_input_is_refused_terminally(self):
+        # F-SCAN-RECURSION on F-INPUT-TRACE: a deep input file and a deep inline JSON
+        # argument are terminal CLI_INPUT_INVALID, nothing written, no traceback.
+        self.open_ledger()
+        bad, rows = self.cli_inputs()
+        (bad / "deep.json").write_text(self.DEEP)
+        for name, argv, argument, kind in rows:
+            value = self.DEEP if kind == "inline" else str(bad / "deep.json")
+            with self.subTest(cli=name, argument=argument):
+                before = files_under(self.base)
+                code, refusal, done = self.cli(argv + [argument, value])
+                self.assertEqual(code, 1, done.stdout + done.stderr)
+                self.assertEqual((refusal["failure_code"], refusal["terminal"]), ("CLI_INPUT_INVALID", True), refusal)
+                self.assertEqual(files_under(self.base), before)
+
     @staticmethod
     def documents(root):
         for path in files_under(root):

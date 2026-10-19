@@ -465,12 +465,15 @@ class Receive(unittest.TestCase):
     def test_the_processor_prints_six_fields_for_each_exit_class(self):
         processor = ROOT / "org-boundary/runtime/process_boundary.py"
         (self.work / "not.json").write_text("{not json")
+        (self.work / "deep.json").write_text('{"a":' + "[" * 100000)  # F-SCAN-RECURSION
         (self.work / "registry.json").write_text(json.dumps(REGISTRY))
         for name, argv, code, failure, terminal in (
                 ("missing envelope", ["--envelope", str(self.work / "missing.json"), "--registry",
                                       str(self.work / "registry.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True),
                 ("non-JSON registry", ["--envelope", str(self.work / "registry.json"), "--registry",
-                                       str(self.work / "not.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True)):
+                                       str(self.work / "not.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True),
+                ("deeply nested envelope", ["--envelope", str(self.work / "deep.json"), "--registry",
+                                            str(self.work / "registry.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True)):
             with self.subTest(case=name):
                 done = subprocess.run([sys.executable, "-B", str(processor), *argv, "--out", str(self.work / "out.json")],
                                       capture_output=True, text=True, cwd=ROOT, timeout=60)

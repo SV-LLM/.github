@@ -598,7 +598,7 @@ def parse_cli_json(text:Any, *, argument:str, retry_entrypoint:str, expect:type=
         if not isinstance(value,expect):
             raise TypeError("expected a JSON "+expect.__name__+", got "+type(value).__name__)
         return value
-    except (ValueError,TypeError) as exc:
+    except (ValueError,TypeError,RecursionError,MemoryError) as exc:  # a deeply nested document too (F-SCAN-RECURSION)
         raise CliInputInvalid(cli_input_refusal(argument,exc,retry_entrypoint=retry_entrypoint)) from None
 
 def read_cli_json(path:Any, *, argument:str, retry_entrypoint:str, expect:type=dict)->Any:
@@ -609,7 +609,7 @@ def read_cli_json(path:Any, *, argument:str, retry_entrypoint:str, expect:type=d
     """
     try:
         text=Path(path).read_text(encoding="utf-8")
-    except (OSError,UnicodeDecodeError) as exc:
+    except (OSError,UnicodeDecodeError,MemoryError) as exc:
         raise CliInputInvalid(cli_input_refusal(argument,exc,retry_entrypoint=retry_entrypoint)) from None
     return parse_cli_json(text,argument=argument,retry_entrypoint=retry_entrypoint,expect=expect)
 
@@ -1080,8 +1080,8 @@ def _carry_response(response:dict[str,Any], *, root:Path|None, epoch:int|None)->
     for key in target.list_prefix(node_store_module.MESH_FRAME_PREFIX):
         try:
             existing=target.get(key)
-        except (ValueError,OSError):
-            continue  # another file's defect, quarantined on its own
+        except (ValueError,OSError,RecursionError,MemoryError):
+            continue  # another file's defect (a deeply nested one included), quarantined on its own
         if (isinstance(existing,dict) and existing.get("packet_id")==frame["packet_id"]
                 and existing.get("frame_sha256")!=frame["frame_sha256"]):
             raise ResponseIdCollision("response packet id "+frame["packet_id"]+" already answers another request "
@@ -1613,7 +1613,7 @@ def ingest_recorded(repo_root:Path, item:dict[str,Any], custody:dict[str,Any], r
     """
     try:
         destination=recover_packet(item["frame"])["destination"]["service"]
-    except (ValueError,KeyError,TypeError):
+    except (ValueError,KeyError,TypeError,RecursionError,MemoryError):
         destination=None
     service=next((svc for svc in registry["services"] if svc.get("service_id")==destination),None)
     try:
@@ -1712,7 +1712,10 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
 def collect_ecosystem_responses(origin_org:str, communication_id:str, *, mesh_root:Path|None=None)->dict[str,Any]:
     responses=[]
     for item in scan_addressed_frames(origin_org,root=mesh_root):
-        packet=recover_packet(item["frame"])
+        try:
+            packet=recover_packet(item["frame"])
+        except (ValueError,KeyError,TypeError,RecursionError,MemoryError):
+            continue  # a peer's unrecoverable (or deeply nested) frame is not a response
         payload=packet.get("payload") or {}
         if payload.get("communication_id")!=communication_id:
             continue
