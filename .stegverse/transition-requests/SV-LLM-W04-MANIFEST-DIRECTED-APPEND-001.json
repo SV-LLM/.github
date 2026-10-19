@@ -1,0 +1,51 @@
+{
+  "schema": "stegverse.organization-transition-request/v1",
+  "request_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001",
+  "owning_existing_goal": "SVORG-LLM-ORG-FOUNDATION-001",
+  "registered_task": "SVORG-LLM-ORG-FOUNDATION-001-W04-CANONICAL-RUNTIME-SUBSTRATE",
+  "purpose": "Record the adoption of this organization's manifest-directed organization ledger append path (SV-LLM/.github#30 W4; SV-LLM-EXEMPTION-004) as an organization transition by manifest: the adopted reference coordinates are disclosed to this organization's boundary diagnostic; read-only disclosure, no provider execution or Sandbox activation.",
+  "build_manifest": {
+    "created_at": "2026-10-17T00:00:00Z",
+    "data": {
+      "external_side_effect": false,
+      "purpose": "manifest-directed organization ledger append path adopted from StegVerse-org/.github@10d141041fd0fa3b8bd696f6c6236bef199845b8 with StegVerse-SDK@74d9b473aa415b06a9d550c28b2779a691b4ba32: disclose the adoption record; admit nothing",
+      "request_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001",
+      "adoption_record": "data/organization-role-reference-adoption.json"
+    },
+    "data_class": "sv.organization.reference-adoption-disclosure.v1",
+    "declared_intent": "Disclose this organization's adopted manifest-directed append path to its boundary diagnostic",
+    "egress_surface": "BOUNDARY_DIAGNOSTIC",
+    "process": "ecosystem_diagnostic",
+    "processor_request": {
+      "diagnostic_request_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001",
+      "expected_evidence_fields": [
+        "reference",
+        "files",
+        "contracts"
+      ],
+      "mutation_permitted": false,
+      "schema": "stegverse.ecosystem-diagnostic-request.v1",
+      "scope": "repository",
+      "tests": [
+        {
+          "authority_owner": "SV-LLM/.github",
+          "component_id": "SV-LLM/.github:data/organization-role-reference-adoption.json",
+          "observation": null,
+          "predicate_id": "ADOPTED_FILES_MATCH_THE_RECORDED_REFERENCE_DIGESTS",
+          "test_id": "MANIFEST_DIRECTED_APPEND_PATH_IS_ADOPTED"
+        }
+      ]
+    },
+    "publisher_required": false,
+    "requested_consequence": "Record the received manifest on this organization's ledger; admit nothing",
+    "return_depth": "full-trace",
+    "source_framework": "SV-LLM/.github",
+    "source_output_id": "SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001"
+  },
+  "standing": {
+    "mode": "ESTABLISH_GENESIS",
+    "node_ref": "SV-LLM/.github",
+    "predecessor": null,
+    "_declared_not_authenticated": "A declared standing is not authenticated standing; the ingress decides the disposition and the organization ledger records it either way."
+  }
+}
