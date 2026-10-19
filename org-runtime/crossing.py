@@ -172,6 +172,12 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         except ValueError: refusal=None
         if isinstance(refusal,dict) and refusal.get("failed_predicate")==kernel.HB_EPOCH_PREDICATE:
             raise kernel.SuppliedEpochRefused(refusal)
+        # The emitter prints its own six fields (F-WRITER-TRACE): a fault in its write is
+        # resumable, a content collision is terminal; neither is cut into a string.
+        if isinstance(refusal,dict) and refusal.get("failure_code")==kernel.LEDGER_WRITE_FAULT_RESUMABLE:
+            raise kernel.WriterFaultRefused(refusal)
+        if isinstance(refusal,dict) and refusal.get("failure_code")==kernel.TRANSITION_CONTENT_COLLISION:
+            raise kernel.TransitionContentCollision(refusal=refusal)
         raise SystemExit("REPO_LEDGER_APPEND_FAILED:"+(run.stderr.strip() or run.stdout.strip())[-300:])
     repo_receipt=json.loads(run.stdout)
     org_receipt=organization_ledger.aggregate_transition(
@@ -462,12 +468,15 @@ def main()->int:
         if ns.cmd=="open-ledger":
             out=open_organization_ledger(hb_epoch=ns.hb_epoch)
         elif ns.cmd=="egress":
-            out=egress(json.loads(Path(ns.manifest).read_text()),standing=json.loads(Path(ns.standing).read_text()),
-                       mesh_root=ns.mesh_root,hb_epoch=ns.hb_epoch)
+            # Inputs are read before any write and outside the fault classifier (F-INPUT-TRACE).
+            entry="org-runtime/crossing.py egress"
+            manifest=kernel.read_cli_json(ns.manifest,argument="--manifest",retry_entrypoint=entry+" --manifest")
+            standing=kernel.read_cli_json(ns.standing,argument="--standing",retry_entrypoint=entry+" --standing")
+            out=egress(manifest,standing=standing,mesh_root=ns.mesh_root,hb_epoch=ns.hb_epoch)
         else:
             out=ingress(mesh_root=ns.mesh_root,node_state_root=ns.node_state_root,hb_epoch=ns.hb_epoch)
     except (kernel.SuppliedEpochRefused,kernel.WriterFaultRefused) as exc:
         print(json.dumps(exc.refusal,sort_keys=True)); return 1
     print(json.dumps(out,sort_keys=True)); return 0
 
-if __name__=="__main__": raise SystemExit(main())
+if __name__=="__main__": raise SystemExit(kernel.run_cli(main,retry_entrypoint="org-runtime/crossing.py (the same command again)"))

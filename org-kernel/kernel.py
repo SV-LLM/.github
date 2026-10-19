@@ -458,7 +458,13 @@ _WRITER_FAULT_MARKERS=("ledger_append_lost_comparison","CONTENTION_EXHAUSTED","l
                        "git update-ref failed")
 
 def writer_fault(exc:BaseException)->bool:
-    """OSError, a CAS race, contention or a store collision while writing this organization's state."""
+    """OSError, a CAS race, contention or a store collision while writing this organization's state.
+
+    A content collision (the same id over different content) is the caller's
+    conflict and terminal, never a writer fault; neither is bad CLI input.
+    """
+    if content_collision(exc) or type(exc).__name__=="CliInputInvalid":
+        return False
     if isinstance(exc,(OSError,LedgerWriteFailed)):
         return True
     return any(marker in str(exc) for marker in _WRITER_FAULT_MARKERS)
@@ -505,8 +511,15 @@ def io_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
     refusal.update(failure_code=FRAME_DISPATCH_IO_FAILED,failed_predicate=type(exc).__name__,terminal=False,
                    detail=type(exc).__name__+": "+str(exc),
                    required_evidence_or_repair="this organization's own dispatch or ledger storage is writable",
-                   next_attempt="the frame is still pending; the next cycle consumes it, once")
+                   next_attempt="the frame is still pending; the next cycle consumes it, once",
+                   **_PARTIAL_WRITE)
     return refusal
+
+# A writer fault may land after a step committed (a HEAD replaced before its
+# directory sync): the record never claims nothing was written (F-POST-HEAD).
+_PARTIAL_WRITE={"consequence_committed":None,"partial_write_possible":True,
+                "partial_write":"a step (a receipt, HEAD, a frame or a marker) may have committed before the "
+                                "fault; the retry finishes it and returns what was recorded, never a second copy"}
 
 LEDGER_WRITE_FAULT_RESUMABLE="LEDGER_WRITE_FAULT_RESUMABLE"
 
@@ -523,8 +536,116 @@ def writer_fault_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,A
                    detail=type(exc).__name__+": "+str(exc)[-300:],
                    required_evidence_or_repair="this organization's own ledger and node storage is writable",
                    next_attempt="run the same entrypoint again; the steps already written are completed, not "
-                                "repeated, and a torn ledger append is finished first")
+                                "repeated, and a torn ledger append is finished first",
+                   **_PARTIAL_WRITE)
     return refusal
+
+TRANSITION_CONTENT_COLLISION="TRANSITION_CONTENT_COLLISION"
+RESPONSE_ID_COLLISION="RESPONSE_ID_COLLISION"
+CLI_INPUT_INVALID="CLI_INPUT_INVALID"
+
+class TransitionContentCollision(ValueError):
+    """The same transition id over different content: the caller's conflict, terminal, never a writer fault.
+
+    Its message stays `ledger_receipt_collision`, which callers match. A
+    collision the store meets on a content-addressed key (its own state) is a
+    plain ValueError and stays a non-terminal writer fault.
+    """
+    def __init__(self, message:str="ledger_receipt_collision", *, refusal:dict[str,Any]|None=None):
+        super().__init__(message)
+        self.refusal=refusal
+
+class ResponseIdCollision(ValueError):
+    """A different answer under a response packet id already published: terminal (F-REPUB keying)."""
+
+class CliInputInvalid(ValueError):
+    """A CLI input that is missing or not what the CLI reads: terminal, the caller's to repair."""
+    def __init__(self, refusal:dict[str,Any]):
+        super().__init__(refusal["detail"])
+        self.refusal=refusal
+
+def _terminal_refusal(code:str, predicate:str, detail:str, repair:str, *, retry_entrypoint:str,
+                      next_attempt:str)->dict[str,Any]:
+    return {"disposition":"FAIL_CLOSED","failure_code":code,"failed_predicate":predicate,"detail":detail,
+            "required_evidence_or_repair":repair,"retry_entrypoint":retry_entrypoint,
+            "owning_existing_goal":HB_EPOCH_OWNING_EXISTING_GOAL,"next_attempt":next_attempt,
+            "terminal":True,"derived_from_clock":False,"consequence_committed":False}
+
+def content_collision_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
+    refusal=getattr(exc,"refusal",None)
+    if isinstance(refusal,dict):
+        return refusal
+    code=RESPONSE_ID_COLLISION if type(exc).__name__=="ResponseIdCollision" else TRANSITION_CONTENT_COLLISION
+    return _terminal_refusal(code,"ONE_ID_BINDS_ONE_CONTENT",str(exc),
+                             "use a new id for different content; an exact retry of the recorded content is "
+                             "returned as recorded",retry_entrypoint=retry_entrypoint,
+                             next_attempt="none for this content under this id; nothing further was written")
+
+def content_collision(exc:BaseException)->bool:
+    return type(exc).__name__ in ("TransitionContentCollision","ResponseIdCollision")
+
+def cli_input_refusal(argument:str, exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
+    """F-INPUT-TRACE: a terminal six-field CLI_INPUT_INVALID; nothing was read past it or written."""
+    return _terminal_refusal(CLI_INPUT_INVALID,"CLI_INPUT_IS_A_READABLE_JSON_DOCUMENT",
+                             argument+": "+type(exc).__name__+": "+str(exc)[-200:],
+                             "pass "+argument+" a readable UTF-8 JSON document of the expected type",
+                             retry_entrypoint=retry_entrypoint,
+                             next_attempt="call again with a valid "+argument+"; nothing was written")
+
+def parse_cli_json(text:Any, *, argument:str, retry_entrypoint:str, expect:type=dict)->Any:
+    try:
+        value=json.loads(text)
+        if not isinstance(value,expect):
+            raise TypeError("expected a JSON "+expect.__name__+", got "+type(value).__name__)
+        return value
+    except (ValueError,TypeError) as exc:
+        raise CliInputInvalid(cli_input_refusal(argument,exc,retry_entrypoint=retry_entrypoint)) from None
+
+def read_cli_json(path:Any, *, argument:str, retry_entrypoint:str, expect:type=dict)->Any:
+    """Read one CLI input document before, and outside, the own-state fault classifier.
+
+    A missing path, a directory, non-UTF-8, non-JSON or a wrong top-level type
+    is the caller's input, never this organization's write fault (F-INPUT-TRACE).
+    """
+    try:
+        text=Path(path).read_text(encoding="utf-8")
+    except (OSError,UnicodeDecodeError) as exc:
+        raise CliInputInvalid(cli_input_refusal(argument,exc,retry_entrypoint=retry_entrypoint)) from None
+    return parse_cli_json(text,argument=argument,retry_entrypoint=retry_entrypoint,expect=expect)
+
+def run_cli(main:Any, *, retry_entrypoint:str)->int:
+    """Run a CLI that writes this organization's state; every refusal or fault prints six fields.
+
+    F-WRITER-TRACE / F-INPUT-TRACE. A refusal carrying its six fields (an
+    epoch, an input, a resumable fault) prints them. A fault in this
+    organization's own write prints non-terminal LEDGER_WRITE_FAULT_RESUMABLE;
+    a content collision prints terminal TRANSITION_CONTENT_COLLISION. Either
+    exits 1 with no traceback. Anything else is a defect and raises.
+    """
+    try:
+        code=main()
+        return 0 if code is None else code
+    except SystemExit as exc:
+        if isinstance(getattr(exc,"failed_predicate",None),str) and getattr(exc,"disposition",None):
+            # A ledger's own refusal (DENY/FAIL_CLOSED, nothing written), printed with its six fields.
+            refusal=_terminal_refusal(exc.failed_predicate,exc.failed_predicate,str(exc.code),
+                                      "satisfy "+exc.failed_predicate,retry_entrypoint=retry_entrypoint,
+                                      next_attempt="none until the predicate holds; nothing was written")
+            refusal["disposition"]=exc.disposition
+        elif isinstance(exc.code,int) or exc.code is None or not writer_fault(exc):
+            raise
+        else:
+            refusal=writer_fault_refusal(exc,retry_entrypoint=retry_entrypoint)
+    except Exception as exc:
+        refusal=getattr(exc,"refusal",None)
+        if content_collision(exc):
+            refusal=content_collision_refusal(exc,retry_entrypoint=retry_entrypoint)
+        elif not isinstance(refusal,dict):
+            if not writer_fault(exc):
+                raise
+            refusal=writer_fault_refusal(exc,retry_entrypoint=retry_entrypoint)
+    print(json.dumps(refusal,sort_keys=True))
+    return 1
 
 class WriterFaultRefused(LedgerWriteFailed):
     """A writer fault reported as its six-field resumable refusal (`refusal`)."""
@@ -813,7 +934,9 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "quarantine_frame","ingest_epoch","ingest_refusal",
          "admit_frame","frame_failure_refusal","io_refusal","recover_admissible",
          "LedgerWriteFailed","writer_fault","WriterFaultRefused","writer_fault_refusal","resumable",
-         "LEDGER_WRITE_FAULT_RESUMABLE",
+         "LEDGER_WRITE_FAULT_RESUMABLE","TRANSITION_CONTENT_COLLISION","RESPONSE_ID_COLLISION","CLI_INPUT_INVALID",
+         "TransitionContentCollision","ResponseIdCollision","CliInputInvalid","content_collision",
+         "content_collision_refusal","cli_input_refusal","parse_cli_json","read_cli_json","run_cli",
          "MAX_FRAME_FILE_BYTES"]
 
 
@@ -943,6 +1066,27 @@ def build_packet(*, origin_org:str, origin_service:str, destination_org:str, des
       "standing":standing,
       "evidence":{"ingress_receipt":None,"dispatch_receipt":None,"consumption_receipt":None,"egress_receipt":None,"reconstruction_reference":None}
     }
+
+def _carry_response(response:dict[str,Any], *, root:Path|None, epoch:int|None)->dict[str,Any]:
+    """Publish an answer once per request (F-REPUB keying).
+
+    The answer to the same request rebuilds byte-identically, so publishing
+    it again is a write-once no-op. A different answer under a response packet
+    id already in the mesh (another request reusing the communication id) is
+    ResponseIdCollision: terminal, never silently handed the first answer.
+    """
+    frame=carrier_frame(response,epoch=epoch)
+    target=mesh_store(root)
+    for key in target.list_prefix(node_store_module.MESH_FRAME_PREFIX):
+        try:
+            existing=target.get(key)
+        except (ValueError,OSError):
+            continue  # another file's defect, quarantined on its own
+        if (isinstance(existing,dict) and existing.get("packet_id")==frame["packet_id"]
+                and existing.get("frame_sha256")!=frame["frame_sha256"]):
+            raise ResponseIdCollision("response packet id "+frame["packet_id"]+" already answers another request "
+                                      "(frame "+str(existing.get("frame_sha256"))+")")
+    return _carry(response,root=root,now_ns=None,epoch=epoch)
 
 def _carry(packet:dict[str,Any], *, root:Path|None, now_ns:int|None, epoch:int|None)->dict[str,Any]:
     # A supplied epoch makes the frame reproducible: the same packet at the same
@@ -1248,7 +1392,10 @@ def build_control_response(request_packet:dict[str,Any], execution_result:dict[s
       standing=carried_standing(request_packet),
       transition_reference=str((request_packet.get("transition") or {}).get("reference") or "ecosystem.communication.v1")+".response",
       authority_effect="NONE",
-      packet_id=str(req_payload.get("communication_id"))+":response:"+organization_slug(local_org)
+      # One response id per request: a request with no communication id is answered
+      # under its own packet id, so two such requests never share one (F-REPUB keying).
+      packet_id=(str(req_payload["communication_id"]) if req_payload.get("communication_id") is not None
+                 else "request:"+str(request_packet["packet_id"]))+":response:"+organization_slug(local_org)
     )
 
 # --- Organization receipts for every crossing this node consumes or emits ---
@@ -1542,9 +1689,15 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
                 # The answer is the return leg of the crossing just recorded, so it
                 # is carried rather than recorded as a second emission.
                 response=build_control_response(packet,result["execution_result"])
-                response_publication=_carry(response,root=mesh_root,now_ns=None,epoch=answer_epoch)
+                response_publication=_carry_response(response,root=mesh_root,epoch=answer_epoch)
             marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=node_state)
         except Exception as exc:
+            if content_collision(exc):
+                # The crossing is recorded; its answer would collide with another
+                # request's under the same response id: six fields, quarantined.
+                out.append(quarantine_frame(repo_root,item,content_collision_refusal(exc,retry_entrypoint=entry),
+                                            store=node_state))
+                continue
             if not writer_fault(exc):
                 raise
             # The crossing is recorded; the answer is write-once and the record idempotent,

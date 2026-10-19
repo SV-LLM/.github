@@ -12,9 +12,9 @@
       "substitutions": [
         {
           "reference": "            for key in missing:\n                self.put(key, documents[key])\n            self.put(HEAD_KEY, new_head)\n            return True\n",
-          "local": "            # SV-LLM declared substitution (B-P36q): the transaction is journaled\n            # before its first write and the journal removed after HEAD, so a fault\n            # at any step leaves a store the next append finishes, never one that\n            # refuses itself as holding orphan receipts.\n            self.put(PENDING_APPEND_KEY, {\"expected_head\": expected_head, \"new_head\": new_head,\n                                          \"documents\": {key: documents[key] for key in missing}})\n            for key in missing:\n                self.put(key, documents[key])\n            self.put(HEAD_KEY, new_head)\n            self._discard_pending_append()\n            return True\n\n    def complete_pending_append(self):\n        \"\"\"Finish a journaled transaction a fault interrupted; None when there is none.\n\n        Content-addressed documents are written byte-identically (a different\n        document already at a key is `ledger_receipt_collision`), then HEAD,\n        then the journal is removed. A journal whose HEAD already moved on to\n        its new HEAD is only removed. One whose expected HEAD is no longer\n        HEAD was not written by this store's transaction and is refused.\n        \"\"\"\n        with self.exclusive():\n            pending = self.get(PENDING_APPEND_KEY)\n            if pending is None:\n                return None\n            head = self.get(HEAD_KEY)\n            if head == pending[\"new_head\"]:\n                self._discard_pending_append()\n                return \"COMPLETED\"\n            if head != pending[\"expected_head\"]:\n                raise ValueError(\"ledger_pending_append_inconsistent\")\n            for key, value in pending[\"documents\"].items():\n                existing = self.get(key)\n                if existing is not None and existing != value:\n                    raise ValueError(\"ledger_receipt_collision\")\n                if existing is None:\n                    self.put(key, value)\n            self.put(HEAD_KEY, pending[\"new_head\"])\n            self._discard_pending_append()\n            return \"ROLLED_FORWARD\"\n\n    def _discard_pending_append(self):\n        path = self._path(PENDING_APPEND_KEY)\n        if path.exists():\n            path.unlink()\n            self._sync_directory(path.parent)\n",
+          "local": "            # SV-LLM declared substitution (B-P36q): the transaction is journaled\n            # before its first write and the journal removed after HEAD, so a fault\n            # at any step leaves a store the next append finishes, never one that\n            # refuses itself as holding orphan receipts.\n            self.put(PENDING_APPEND_KEY, {\"expected_head\": expected_head, \"new_head\": new_head,\n                                          \"documents\": {key: documents[key] for key in missing}})\n            for key in missing:\n                self.put(key, documents[key])\n            self.put(HEAD_KEY, new_head)\n            self._discard_pending_append()\n            return True\n\n    def complete_pending_append(self):\n        \"\"\"Finish a journaled transaction a fault interrupted; None when there is none.\n\n        Content-addressed documents are written byte-identically (a different\n        document already at a key is `ledger_receipt_collision`), then HEAD,\n        then the journal is removed. A journal whose HEAD already moved on to\n        its new HEAD is only removed. One whose expected HEAD is no longer\n        HEAD was not written by this store's transaction and is refused.\n        \"\"\"\n        with self.exclusive():\n            # The receipt of a transaction finished here, for a retry of that same\n            # transition to return rather than append again (F-POST-HEAD).\n            self.recovered_receipt = None\n            pending = self.get(PENDING_APPEND_KEY)\n            if pending is None:\n                return None\n            head = self.get(HEAD_KEY)\n            if head == pending[\"new_head\"]:\n                self.recovered_receipt = self.get(receipt_key(pending[\"new_head\"][\"receipt_sha256\"]))\n                self._discard_pending_append()\n                return \"COMPLETED\"\n            if head != pending[\"expected_head\"]:\n                raise ValueError(\"ledger_pending_append_inconsistent\")\n            for key, value in pending[\"documents\"].items():\n                existing = self.get(key)\n                if existing is not None and existing != value:\n                    raise ValueError(\"ledger_receipt_collision\")\n                if existing is None:\n                    self.put(key, value)\n            self.put(HEAD_KEY, pending[\"new_head\"])\n            self._discard_pending_append()\n            self.recovered_receipt = self.get(receipt_key(pending[\"new_head\"][\"receipt_sha256\"]))\n            return \"ROLLED_FORWARD\"\n\n    def _discard_pending_append(self):\n        path = self._path(PENDING_APPEND_KEY)\n        if path.exists():\n            path.unlink()\n            self._sync_directory(path.parent)\n",
           "count": 1,
-          "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49)"
+          "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49); a retry of the finished transition returns its receipt (F-POST-HEAD)"
         },
         {
           "reference": "    def initialize(self):\n        (self.root / RECEIPT_PREFIX.rstrip(\"/\")).mkdir(parents=True, exist_ok=True)\n\n    def locator(self, key):",
@@ -29,13 +29,37 @@
           "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49)"
         }
       ],
-      "local_sha256": "sha256:7872fc8e0b280ad282e78df165b5d20953c84fd18d24958dc40ea5ed37403b02"
+      "local_sha256": "sha256:574d51ec928945894b9b16551a2336839c070f1ad2cfd9cc9de4a083417e47f4"
     },
     ".stegverse/transition-ledger/emit.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e",
-      "local_sha256": "sha256:0954ba3a1201a1ff60d3bb256b66c7d1a0c219ddd1c9bc6960b86d29ac5c1bbc",
+      "local_sha256": "sha256:6abf026d5ab298f58775771cf0948a15e92f23def7d71959de5a2b651a62ceca",
       "substitutions": [
+        {
+          "reference": "if __name__==\"__main__\":main()",
+          "local": "if __name__==\"__main__\":raise SystemExit(kernel.run_cli(main,retry_entrypoint=\".stegverse/transition-ledger/emit.py (the same command again)\"))",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "json.loads(a.evidence_json),a.authority_effect,a.hb_epoch,idempotent_on=",
+          "local": "kernel.parse_cli_json(a.evidence_json,argument=\"--evidence-json\",retry_entrypoint=\".stegverse/transition-ledger/emit.py --evidence-json\"),a.authority_effect,a.hb_epoch,idempotent_on=",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "       or any(theirs.get(k,_ABSENT)!=mine.get(k,_ABSENT) for k in idempotent_on)):\n    raise ValueError(\"ledger_receipt_collision\")",
+          "local": "       or any(theirs.get(k,_ABSENT)!=mine.get(k,_ABSENT) for k in idempotent_on)):\n    raise kernel.TransitionContentCollision(\"ledger_receipt_collision\")",
+          "count": 1,
+          "why": "F-POST-HEAD and the content-collision split: a retry of a transition the store just finished returns its receipt; the same id over different content is terminal kernel.TransitionContentCollision, not a writer fault (SV-LLM/.github#49)"
+        },
+        {
+          "reference": " target=store or ledger_store.open_store(lr());target.initialize()\n for _attempt in range(128):",
+          "local": " target=store or ledger_store.open_store(lr());target.initialize()\n recovered=getattr(target,\"recovered_receipt\",None)\n if (isinstance(recovered,dict) and recovered.get(\"transition_id\")==transition_id and recovered.get(\"transition_class\")==transition_class\n     and recovered.get(\"predecessor_state_sha256\")==predecessor_state_sha256 and recovered.get(\"successor_state_sha256\")==successor_state_sha256):\n  return recovered  # the store finished this very transaction after a fault: returned, never appended twice\n for _attempt in range(128):",
+          "count": 1,
+          "why": "F-POST-HEAD and the content-collision split: a retry of a transition the store just finished returns its receipt; the same id over different content is terminal kernel.TransitionContentCollision, not a writer fault (SV-LLM/.github#49)"
+        },
         {
           "reference": "a.hb_epoch,idempotent_on=() if a.idempotent else None)",
           "local": "a.hb_epoch,idempotent_on=() if a.idempotent else None,**carried)",
@@ -100,11 +124,41 @@
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main()); aggregate_transition passes idempotent (F-TRANSIENT-RT) and hb_provenance (B-P36m ruling) through",
-      "insertion_offset": 17905,
+      "insertion_offset": 18387,
       "insertion_bytes": 2492,
       "insertion_sha256": "sha256:187a719512c9050a4b5d2e6e7c6497e1a36ed6ed4ddea1b1411196093e8c9ab0",
-      "local_sha256": "sha256:479b634cfbbc4bf4e502a5c1de1205118c15cfc7297061fdbf727bec7654d4c0",
+      "local_sha256": "sha256:34d4a8a8874f26f07136ccb0bad14ea607144d76f40783c70ad871555c8ecf82",
       "substitutions": [
+        {
+          "reference": "if __name__ == \"__main__\":\n    main()",
+          "local": "if __name__ == \"__main__\":\n    raise SystemExit(kernel.run_cli(main, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py \"\n                                                            \"(the same command again)\"))",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                        json.loads(args.boundary_evidence_json), args.authority_effect,",
+          "local": "                        kernel.parse_cli_json(args.boundary_evidence_json, argument=\"--boundary-evidence-json\",\n                                              retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py \"\n                                                               \"--boundary-evidence-json\"), args.authority_effect,",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "    receipt = load(source_path)\n    default_class",
+          "local": "    receipt = kernel.read_cli_json(source_path, argument=\"--repo-receipt/--transition-receipt\",\n                                   retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py --repo-receipt\")\n    default_class",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                    if prior.get(\"org_transition_class\") != org_transition_class:\n                        raise ValueError(\"ledger_receipt_collision\")",
+          "local": "                    if prior.get(\"org_transition_class\") != org_transition_class:\n                        raise kernel.TransitionContentCollision(\"ledger_receipt_collision\")",
+          "count": 1,
+          "why": "F-POST-HEAD and the content-collision split: a retry of a transition the store just finished returns its receipt; the same id over different content is terminal kernel.TransitionContentCollision, not a writer fault (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "    target.initialize()\n    # The storage substrate owns serialization. A lost comparison writes\n    # nothing, so a retry cannot strand an orphan receipt.\n    for _attempt in range(128):",
+          "local": "    target.initialize()\n    # SV-LLM declared substitution (F-POST-HEAD): a retry of the consumption the\n    # store just finished after a fault returns that receipt, never a second one.\n    recovered = getattr(target, \"recovered_receipt\", None)\n    if (isinstance(recovered, dict)\n            and recovered.get(\"source_transition_sha256\") == source[\"source_transition_sha256\"]\n            and recovered.get(\"org_transition_class\") == org_transition_class):\n        return recovered\n    # The storage substrate owns serialization. A lost comparison writes\n    # nothing, so a retry cannot strand an orphan receipt.\n    for _attempt in range(128):",
+          "count": 1,
+          "why": "F-POST-HEAD and the content-collision split: a retry of a transition the store just finished returns its receipt; the same id over different content is terminal kernel.TransitionContentCollision, not a writer fault (SV-LLM/.github#49)"
+        },
         {
           "reference": "    source = verify_source(source_receipt)\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
           "local": "    source = verify_source(source_receipt)\n    if source[\"source_receipt_schema\"] == \"stegverse.repo-transition-receipt/v1\":\n        kernel.require_supplied_source(source_receipt, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append\")\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
@@ -209,8 +263,20 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:7db9d44c17ab65e477a1a981487353a17ad60e1cc1016473cd811d265e2394b6",
+      "local_sha256": "sha256:f86034325385417e373cdd7b9efc941d6cdfb3427316d5018de0b2a5e66819a1",
       "substitutions": [
+        {
+          "reference": "if __name__ == \"__main__\":\n    sys.exit(main())",
+          "local": "if __name__ == \"__main__\":\n    sys.exit(organization_ledger.kernel.run_cli(\n        main, retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py (the same command again)\"))",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "    result = receive(\n        json.loads(args.manifest.read_text(encoding=\"utf-8\")),\n        registry=json.loads(args.registry.read_text(encoding=\"utf-8\")),\n        standing=(json.loads(args.standing.read_text(encoding=\"utf-8\"))\n                  if args.standing else None),\n        packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)",
+          "local": "    entry = \"resident-runtime/organization_manifest_ingress.py\"\n    read = organization_ledger.kernel.read_cli_json\n    manifest = read(args.manifest, argument=\"--manifest\", retry_entrypoint=entry + \" --manifest\")\n    registry = read(args.registry, argument=\"--registry\", retry_entrypoint=entry + \" --registry\")\n    standing = read(args.standing, argument=\"--standing\", retry_entrypoint=entry + \" --standing\") if args.standing else None\n    result = receive(manifest, registry=registry, standing=standing,\n                     packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)",
+          "count": 1,
+          "why": "F-WRITER-TRACE / F-INPUT-TRACE: the CLI reads its inputs through the kernel's terminal CLI_INPUT_INVALID reader and runs under kernel.run_cli, so a bad input or an own-write fault prints six fields and never a traceback (SV-LLM/.github#49)"
+        },
         {
           "reference": "            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed)",
           "local": "            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed, hb_provenance=hb_provenance)",

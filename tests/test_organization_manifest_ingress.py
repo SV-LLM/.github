@@ -181,7 +181,7 @@ class ContractBinding(unittest.TestCase):
         self.assertEqual(record["sdk"]["commit"], SDK_PIN)
         entry = record["files"]["resident-runtime/organization_manifest_ingress.py"]
         self.assertEqual(entry["rule"], "declared_substitutions")
-        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 26)
+        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 28)
         boundary_ci = (ROOT / ".github/workflows/org-runtime-boundary.yml").read_text()
         self.assertIn("ref: " + REFERENCE_COMMIT, boundary_ci)
 

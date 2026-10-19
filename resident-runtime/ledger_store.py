@@ -325,11 +325,15 @@ class PosixLedgerStore:
         HEAD was not written by this store's transaction and is refused.
         """
         with self.exclusive():
+            # The receipt of a transaction finished here, for a retry of that same
+            # transition to return rather than append again (F-POST-HEAD).
+            self.recovered_receipt = None
             pending = self.get(PENDING_APPEND_KEY)
             if pending is None:
                 return None
             head = self.get(HEAD_KEY)
             if head == pending["new_head"]:
+                self.recovered_receipt = self.get(receipt_key(pending["new_head"]["receipt_sha256"]))
                 self._discard_pending_append()
                 return "COMPLETED"
             if head != pending["expected_head"]:
@@ -342,6 +346,7 @@ class PosixLedgerStore:
                     self.put(key, value)
             self.put(HEAD_KEY, pending["new_head"])
             self._discard_pending_append()
+            self.recovered_receipt = self.get(receipt_key(pending["new_head"]["receipt_sha256"]))
             return "ROLLED_FORWARD"
 
     def _discard_pending_append(self):

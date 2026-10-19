@@ -33,6 +33,7 @@ REFUSED = (None, "33.0", True, 31, "+33", " 33", "３３", "٣３", "abc", "33.7
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
 LEDGER_VARIABLES = ("STEGVERSE_REPO_LEDGER_ROOT", "STEGVERSE_ORG_LEDGER_ROOT", "STEGVERSE_ORG_FEDERATION_ROOT")
+RELEASE_CLI = "resident-runtime/submit_org_transition_to_master_records.py"
 
 
 def load(name, path):
@@ -214,7 +215,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         (self.base / "standing.json").write_text(json.dumps(STANDING))
         try:
             return subprocess.run(
-                [sys.executable, "-B", str(self.root / "resident-runtime/submit_org_transition_to_master_records.py"),
+                [sys.executable, "-B", str(self.root / RELEASE_CLI),
                  "--org-receipt", str(path), "--predecessor-ecosystem-state-sha256", "sha256:" + "0" * 64,
                  "--successor-ecosystem-state-sha256", "sha256:" + "1" * 64,
                  "--standing", str(self.base / "standing.json"), "--mesh-root", str(self.mesh)],
@@ -1315,6 +1316,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
 
         def run():
             done = self.release(state["genesis"])
+            self.assertNotIn("Traceback", done.stderr, done.stderr)  # F-WRITER-TRACE
             if done.returncode == 0:
                 return json.loads(done.stdout)
             refusal = json.loads(done.stdout)
@@ -1377,7 +1379,8 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 self.assertEqual([(r["failure_code"], r["terminal"]) for r in first],
                                  [("FRAME_DISPATCH_IO_FAILED", False)], first)
                 self.assertTrue((self.base / ledger / "PENDING_APPEND.json").is_file(), "the torn append is journaled")
-                self.assertEqual([r.get("status") for r in run()], ["CONSUMED"])
+                second = run()
+                self.assertEqual([r.get("status") for r in second], ["CONSUMED"], second)
                 self.assertFalse((self.base / ledger / "PENDING_APPEND.json").exists())
                 state = self.ledger_state()  # one receipt per class, HEAD consistent, no orphans
                 consumed = [n for n, c in state["receipts"].items() if "CONSUMED" in n or "None" in n]
@@ -1441,6 +1444,302 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                         exc, retry_entrypoint="resident-runtime/organization_egress_boundary.py::emit"))
                 raise
         self.sweep(self.open_ledger, run)
+
+    def test_a_fault_after_head_returns_the_recorded_receipt(self):
+        # F-POST-HEAD: HEAD lands, then its durability step fails. The retry of the
+        # same transition returns the receipt HEAD names; there is exactly one.
+        emit = self.egress.repository_ledger
+        args = ("F-POST-HEAD:emit", "F_POST_HEAD", "sha256:" + "0" * 64, "sha256:" + "1" * 64, {}, "NONE")
+        with self.assertRaises(OSError):
+            self.faulted_once("repo-ledger/HEAD.json", "after", lambda: emit.append(*args, hb_epoch=32))
+        again = emit.append(*args, hb_epoch=32)
+        receipts = [d for d in self.documents(self.base / "repo-ledger" / "receipts")]
+        self.assertEqual([r["receipt_sha256"] for r in receipts], [again["receipt_sha256"]])
+        head = json.loads((self.base / "repo-ledger" / "HEAD.json").read_text())
+        self.assertEqual(head["receipt_sha256"], again["receipt_sha256"])
+        self.assertFalse((self.base / "repo-ledger" / "PENDING_APPEND.json").exists())
+        # A later, different transition is appended as usual.
+        later = emit.append("F-POST-HEAD:later", "F_POST_HEAD", "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},
+                            "NONE", hb_epoch=32)
+        self.assertEqual(later["previous_receipt_sha256"], again["receipt_sha256"])
+        # The organization append likewise.
+        self.open_ledger()
+        source = self.repo_receipt()
+        aggregate = lambda: self.agg.append(source, "REPO_STATE_PROPAGATION", self.agg.FROM_HEAD,
+                                            "sha256:" + "3" * 64, {}, "NONE", hb_epoch=32)
+        with self.assertRaises(OSError):
+            self.faulted_once("org-ledger/HEAD.json", "after", aggregate)
+        recorded = aggregate()
+        consuming = [d for d in self.documents(self.base / "org-ledger" / "receipts")
+                     if d.get("source_transition_sha256") == source["receipt_sha256"]]
+        self.assertEqual([r["receipt_sha256"] for r in consuming], [recorded["receipt_sha256"]])
+
+    def test_a_content_collision_is_terminal_and_a_store_collision_is_not(self):
+        # VALIDATOR: the same transition id over different content is the caller's
+        # conflict (terminal); a collision the store meets is its own state (non-terminal).
+        k = self.crossing.kernel
+        emit = self.egress.repository_ledger
+        emit.append("COLLIDE:1", "COLLIDE", "sha256:" + "0" * 64, "sha256:" + "1" * 64, {}, "NONE", hb_epoch=32,
+                    idempotent_on=())
+        with self.assertRaises(ValueError) as raised:
+            emit.append("COLLIDE:1", "COLLIDE", "sha256:" + "0" * 64, "sha256:" + "9" * 64, {}, "NONE", hb_epoch=32,
+                        idempotent_on=())
+        self.assertEqual(str(raised.exception), "ledger_receipt_collision")
+        self.assertFalse(k.writer_fault(raised.exception))
+        refusal = k.content_collision_refusal(raised.exception, retry_entrypoint="test")
+        self.assertEqual((refusal["failure_code"], refusal["terminal"]), ("TRANSITION_CONTENT_COLLISION", True))
+        for field in SIX_FIELDS:
+            self.assertTrue(refusal[field], field)
+        self.assertTrue(k.writer_fault(ValueError("ledger_receipt_collision")))  # raised by the store itself
+
+    def test_a_different_request_never_receives_another_requests_response(self):
+        # F-REPUB keying: the same request reuses its response; a different request
+        # under the same communication id is RESPONSE_ID_COLLISION, terminal, and the
+        # first response is not handed to it.
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        def request(packet_id, subject):
+            packet = k.build_packet(origin_org=PEER, origin_service="stegverse-org.org-control", destination_org="SV-LLM",
+                                    destination_service="sv-llm.org-control",
+                                    payload={"message_class": "ecosystem.monitor.request", "subject": subject,
+                                             "communication_id": "f-repub-shared"},
+                                    standing=STANDING, packet_id=packet_id)
+            frame = k.carrier_frame(packet, epoch=4096)
+            k._publish_frame(frame, root=self.mesh)
+            return frame
+        node = self.base / "node"
+        run = lambda node: k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node,
+                                                 repo_ledger_root=self.base / "repo-ledger",
+                                                 org_ledger_root=self.base / "org-ledger")
+        first = request("f-repub-first", "one")
+        answered, = run(node)
+        self.assertEqual(answered["result"]["status"], "CONSUMED")
+        again, = run(self.base / "fresh-node")  # the same request again: the same response, published once
+        self.assertEqual(again["response_publication"]["frame"], answered["response_publication"]["frame"])
+        request("f-repub-second", "two")
+        refused, = run(node)
+        self.assertEqual((refused["result"]["failure_code"], refused["result"]["quarantine"]),
+                         ("RESPONSE_ID_COLLISION", "FRAME_REFUSED_QUARANTINED"))
+        for field in SIX_FIELDS:
+            self.assertTrue(refused["result"][field], field)
+        responses = [d for d in self.documents(self.mesh / "frames.d")
+                     if d.get("packet_id") not in (first["packet_id"], "f-repub-second")]
+        self.assertEqual(len(responses), 1, responses)
+        self.assertEqual(run(node), [])
+
+    def cli(self, argv):
+        done = subprocess.run([sys.executable, "-B", *argv], cwd=self.root, capture_output=True, text=True,
+                              env=dict(os.environ), timeout=120)
+        self.assertNotIn("Traceback", done.stderr, done.stderr)
+        try:
+            out = json.loads(done.stdout)
+        except ValueError:
+            lines = [line for line in done.stdout.splitlines() if line.strip().startswith("{")]
+            out = json.loads(lines[-1]) if lines else None
+        if isinstance(out, list):  # crossing ingress prints one row per frame
+            failed = [r for r in out if isinstance(r, dict) and r.get("failure_code")]
+            out = failed[0] if failed else {"disposition": "ALLOW", "rows": out}
+        return done.returncode, out, done
+
+    def cli_inputs(self):
+        """Each epoch-taking CLI with each JSON input argument it reads, and what else it needs."""
+        bad = self.base.parent / (self.base.name + "-inputs")
+        bad.mkdir(exist_ok=True)
+        (bad / "not.json").write_text("{not json")
+        (bad / "list.json").write_text("[1]")
+        (bad / "ok.json").write_text(json.dumps(STANDING))
+        self.addCleanup(shutil.rmtree, bad, True)
+        mesh, node, registry = str(self.mesh), str(self.base / "node"), "org-boundary/registry/services.json"
+        rows = [
+            ("emit", [".stegverse/transition-ledger/emit.py", "--transition-id", "i", "--transition-class", "I",
+                      "--predecessor-state-sha256", "sha256:" + "0" * 64, "--successor-state-sha256",
+                      "sha256:" + "1" * 64, "--hb-epoch", "32"], "--evidence-json", "inline"),
+            ("aggregate", ["resident-runtime/aggregate_repo_transition.py", "--predecessor-org-state-sha256",
+                           "FROM_HEAD", "--successor-org-state-sha256", "sha256:" + "1" * 64, "--hb-epoch", "32"],
+             "--repo-receipt", "file"),
+            ("aggregate", ["resident-runtime/aggregate_repo_transition.py", "--repo-receipt", str(bad / "ok.json"),
+                           "--predecessor-org-state-sha256", "FROM_HEAD", "--successor-org-state-sha256",
+                           "sha256:" + "1" * 64, "--hb-epoch", "32"], "--boundary-evidence-json", "inline"),
+            ("crossing egress", ["org-runtime/crossing.py", "egress", "--standing", str(bad / "ok.json"),
+                                 "--mesh-root", mesh, "--hb-epoch", "32"], "--manifest", "file"),
+            ("crossing egress", ["org-runtime/crossing.py", "egress", "--manifest", str(bad / "ok.json"),
+                                 "--mesh-root", mesh, "--hb-epoch", "32"], "--standing", "file"),
+            ("authentic lane", ["org-runtime/authentic_live_lane.py", "prepare", "--out", str(bad / "out.json"),
+                                "--hb-epoch", "32"], "--target", "file"),
+            ("intr receive", ["resident-runtime/intr_destination_ingress.py", "--registry", registry,
+                              "--hb-epoch", "32"], "--payload", "file-any"),
+            ("intr receive", ["resident-runtime/intr_destination_ingress.py", "--payload", str(bad / "ok.json"),
+                              "--hb-epoch", "32"], "--registry", "file"),
+            ("intr self-close", ["resident-runtime/intr_destination_ingress.py", "--self-close",
+                                 "--communication-id", "i", "--packet-id", "i", "--hb-epoch", "32"], "--registry", "file"),
+            ("egress boundary", ["resident-runtime/organization_egress_boundary.py", "--destination-organization", PEER,
+                                 "--standing", str(bad / "ok.json"), "--mesh-root", mesh, "--hb-epoch", "32"],
+             "--payload", "file"),
+            ("egress boundary", ["resident-runtime/organization_egress_boundary.py", "--destination-organization", PEER,
+                                 "--payload", str(bad / "ok.json"), "--mesh-root", mesh, "--hb-epoch", "32"],
+             "--standing", "file"),
+            ("release", [RELEASE_CLI,
+                         "--predecessor-ecosystem-state-sha256", "sha256:" + "0" * 64,
+                         "--successor-ecosystem-state-sha256", "sha256:" + "1" * 64,
+                         "--standing", str(bad / "ok.json"), "--mesh-root", mesh], "--org-receipt", "file"),
+            ("release", [RELEASE_CLI, "--org-receipt",
+                         str(bad / "ok.json"), "--predecessor-ecosystem-state-sha256", "sha256:" + "0" * 64,
+                         "--successor-ecosystem-state-sha256", "sha256:" + "1" * 64, "--mesh-root", mesh],
+             "--standing", "file"),
+            ("release", [RELEASE_CLI, "--org-receipt",
+                         str(bad / "ok.json"), "--standing", str(bad / "ok.json"),
+                         "--predecessor-ecosystem-state-sha256", "sha256:" + "0" * 64,
+                         "--successor-ecosystem-state-sha256", "sha256:" + "1" * 64, "--mesh-root", mesh],
+             "--relation-evidence-json", "inline"),
+        ]
+        return bad, rows
+
+    def test_every_cli_input_is_refused_terminally_before_anything_is_written(self):
+        # F-INPUT-TRACE: a missing path, a directory, non-JSON or the wrong top-level
+        # type is a TERMINAL six-field CLI_INPUT_INVALID, exit 1, nothing written,
+        # no traceback; never a non-terminal write fault.
+        self.open_ledger()
+        bad, rows = self.cli_inputs()
+        for name, argv, argument, kind in rows:
+            if kind == "inline":
+                values = {"non-JSON": "{not json", "wrong type": "[1]"}
+            else:
+                values = {"missing": str(bad / "missing.json"), "directory": str(bad), "non-JSON": str(bad / "not.json")}
+                if kind == "file":
+                    values["wrong type"] = str(bad / "list.json")
+            for label, value in values.items():
+                with self.subTest(cli=name, argument=argument, input=label):
+                    before = files_under(self.base)
+                    code, refusal, done = self.cli(argv + [argument, value])
+                    self.assertEqual(code, 1, done.stdout + done.stderr)
+                    self.assertEqual((refusal["failure_code"], refusal["terminal"]), ("CLI_INPUT_INVALID", True), refusal)
+                    for field in SIX_FIELDS:
+                        self.assertTrue(refusal[field], field)
+                    self.assertIn(argument, refusal["detail"])
+                    self.assertEqual(files_under(self.base), before)
+
+    def cli_sweep(self, prepare, argv, settle=1):
+        """F-WRITER-TRACE: every write of a CLI faulted; six fields, no traceback, the next run completes once."""
+        def run():
+            code, out, done = self.cli(argv() if callable(argv) else argv)
+            self.assertIsNotNone(out, done.stdout + done.stderr)
+            if code != 0 and out.get("failure_code") == "LEDGER_WRITE_FAULT_RESUMABLE":
+                return out
+            if code != 0 and out.get("disposition") not in ("ALLOW", "PENDING"):
+                if out.get("failure_code") == "ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER":
+                    for field in SIX_FIELDS:
+                        self.assertTrue(out[field], field)
+                    return {}  # opened: a second genesis is refused, with its six fields
+                raise AssertionError(json.dumps(out))
+            return out
+        self.sweep(prepare, run, settle=settle)
+
+    def test_every_write_of_the_emitter_cli_prints_six_fields_and_resumes(self):
+        self.cli_sweep(lambda: None, [".stegverse/transition-ledger/emit.py", "--transition-id", "w", "--transition-class",
+                                      "W", "--predecessor-state-sha256", "sha256:" + "0" * 64,
+                                      "--successor-state-sha256", "sha256:" + "1" * 64, "--hb-epoch", "32"])
+
+    def test_every_write_of_the_aggregate_cli_prints_six_fields_and_resumes(self):
+        source = self.base.parent / (self.base.name + "-source.json")
+        self.addCleanup(lambda: source.unlink(missing_ok=True))
+
+        def prepare():
+            self.open_ledger()
+            source.write_text(json.dumps(self.repo_receipt()))
+        self.cli_sweep(prepare, lambda: ["resident-runtime/aggregate_repo_transition.py", "--repo-receipt", str(source),
+                                         "--predecessor-org-state-sha256", "FROM_HEAD",
+                                         "--successor-org-state-sha256", "sha256:" + "4" * 64, "--hb-epoch", "32"])
+
+    def test_every_write_of_the_crossing_clis_prints_six_fields_and_resumes(self):
+        files = self.base.parent / (self.base.name + "-crossing")
+        files.mkdir(exist_ok=True)
+        self.addCleanup(shutil.rmtree, files, True)
+        (files / "manifest.json").write_text(json.dumps({"manifest_id": "f-writer-trace",
+                                                         "destination": {"organization": PEER}, "payload": {"probe": 1}}))
+        (files / "standing.json").write_text(json.dumps(STANDING))
+        with self.subTest(cli="open-ledger"):
+            self.cli_sweep(lambda: None, ["org-runtime/crossing.py", "open-ledger", "--hb-epoch", "32"], settle=2)
+        with self.subTest(cli="egress"):
+            self.cli_sweep(self.open_ledger, lambda: ["org-runtime/crossing.py", "egress", "--manifest",
+                                                      str(files / "manifest.json"), "--standing",
+                                                      str(files / "standing.json"), "--mesh-root", str(self.mesh),
+                                                      "--hb-epoch", "4096"], settle=2)
+        with self.subTest(cli="ingress"):
+            self.cli_sweep(self.consume_inbound, lambda: ["org-runtime/crossing.py", "ingress", "--mesh-root",
+                                                          str(self.mesh), "--node-state-root", str(self.base / "node"),
+                                                          "--hb-epoch", "4096"], settle=2)
+
+    def test_every_write_of_the_intr_destination_cli_prints_six_fields_and_resumes(self):
+        self.cli_sweep(self.open_ledger, ["resident-runtime/intr_destination_ingress.py", "--self-close",
+                                          "--registry", "org-boundary/registry/services.json",
+                                          "--communication-id", "f-writer-trace", "--packet-id", "f-writer-trace",
+                                          "--hb-epoch", "32"], settle=2)
+
+    def test_every_write_of_the_egress_boundary_cli_prints_six_fields_and_resumes(self):
+        files = self.base.parent / (self.base.name + "-egress")
+        files.mkdir(exist_ok=True)
+        self.addCleanup(shutil.rmtree, files, True)
+        (files / "payload.json").write_text(json.dumps({
+            "message_class": "ecosystem.communication", "communication_id": "f-writer-trace",
+            "subject": "purpose-neutral mesh diagnostic",
+            "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "f-writer-trace"}}))
+        (files / "standing.json").write_text(json.dumps(STANDING))
+        self.cli_sweep(self.open_ledger, lambda: ["resident-runtime/organization_egress_boundary.py",
+                                                  "--destination-organization", PEER, "--capability", "intr-destination",
+                                                  "--payload", str(files / "payload.json"), "--standing",
+                                                  str(files / "standing.json"), "--mesh-root", str(self.mesh),
+                                                  "--hb-epoch", "4096"], settle=2)
+
+    def manifest_sdk(self):
+        root = os.environ.get("STEGVERSE_SDK_ROOT")
+        if not root or not (Path(root) / "stegverse/manifest_builder.py").is_file():
+            if os.environ.get("STEGVERSE_SDK_REQUIRED") == "1":
+                self.fail("STEGVERSE_SDK_REQUIRED=1 but no SDK checkout was found")
+            self.skipTest("the manifest ingress imports the StegVerse SDK (STEGVERSE_SDK_ROOT)")
+        os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, [str(Path(root).resolve()),
+                                                                 os.environ.get("PYTHONPATH")]))
+
+    def test_the_manifest_ingress_cli_inputs_are_refused_terminally(self):
+        # F-INPUT-TRACE on the manifest ingress CLI: each input argument.
+        self.manifest_sdk()
+        self.open_ledger()
+        bad, _ = self.cli_inputs()
+        (bad / "empty.json").write_text("{}")
+        base = ["resident-runtime/organization_manifest_ingress.py", "--hb-epoch", "32"]
+        inputs = {"--manifest": str(bad / "empty.json"), "--registry": "org-boundary/registry/services.json",
+                  "--standing": str(bad / "ok.json")}
+        for argument in inputs:
+            others = [part for name, value in inputs.items() if name != argument for part in (name, value)]
+            for label, value in (("missing", str(bad / "missing.json")), ("directory", str(bad)),
+                                 ("non-JSON", str(bad / "not.json")), ("wrong type", str(bad / "list.json"))):
+                with self.subTest(argument=argument, input=label):
+                    before = files_under(self.base)
+                    code, refusal, done = self.cli(base + others + [argument, value])
+                    self.assertEqual(code, 1, done.stdout + done.stderr)
+                    self.assertEqual((refusal["failure_code"], refusal["terminal"]), ("CLI_INPUT_INVALID", True))
+                    for field in SIX_FIELDS:
+                        self.assertTrue(refusal[field], field)
+                    self.assertEqual(files_under(self.base), before)
+
+    def test_every_write_of_the_manifest_ingress_cli_prints_six_fields_and_resumes(self):
+        # F-WRITER-TRACE on the manifest ingress CLI: an unresolvable manifest is a
+        # recorded refusal (both ledgers); every write of it is faulted.
+        self.manifest_sdk()
+        files = self.base.parent / (self.base.name + "-manifest")
+        files.mkdir(exist_ok=True)
+        self.addCleanup(shutil.rmtree, files, True)
+        (files / "manifest.json").write_text("{}")
+
+        def run():
+            code, out, done = self.cli(["resident-runtime/organization_manifest_ingress.py", "--manifest",
+                                        str(files / "manifest.json"), "--registry",
+                                        "org-boundary/registry/services.json", "--hb-epoch", "32"])
+            self.assertIsNotNone(out, done.stdout + done.stderr)
+            if out.get("failure_code") in ("LEDGER_WRITE_FAULT_RESUMABLE", "TRANSITION_CONTENT_COLLISION"):
+                return out
+            self.assertEqual(out.get("receiving_operation"), "ORGANIZATION_SDK_MANIFEST_INGRESS", out)
+            return {}  # the refusal this operation records, written once
+        self.sweep(self.open_ledger, run, settle=2)
 
     @staticmethod
     def documents(root):

@@ -167,10 +167,14 @@ def main():
     # The mesh this node was materialized with; the kernel refuses without one.
     p.add_argument("--mesh-root", type=Path, required=True)
     a = p.parse_args()
-    receipts = [load(path) for path in a.org_receipt]
+    # Inputs are read before any write and outside the fault classifier (F-INPUT-TRACE).
+    receipts = [K.read_cli_json(path, argument="--org-receipt", retry_entrypoint=RETRY_ENTRYPOINT + " --org-receipt")
+                for path in a.org_receipt]
+    relation = K.parse_cli_json(a.relation_evidence_json, argument="--relation-evidence-json",
+                                retry_entrypoint=RETRY_ENTRYPOINT + " --relation-evidence-json")
+    standing = K.read_cli_json(a.standing, argument="--standing", retry_entrypoint=RETRY_ENTRYPOINT + " --standing")
     packet = build_released_batch_packet(receipts, a.predecessor_ecosystem_state_sha256,
-                                         a.successor_ecosystem_state_sha256, json.loads(a.relation_evidence_json),
-                                         load(a.standing))
+                                         a.successor_ecosystem_state_sha256, relation, standing)
     # The release is an emission of this organization, so it is recorded on
     # both ledgers its materializer supplied (STEGVERSE_REPO_LEDGER_ROOT and
     # STEGVERSE_ORG_LEDGER_ROOT) before the frame is written; without them the
@@ -215,4 +219,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(K.run_cli(main, retry_entrypoint=RETRY_ENTRYPOINT + " (the same command again)"))

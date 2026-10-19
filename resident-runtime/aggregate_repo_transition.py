@@ -325,6 +325,13 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
             hb_epoch, hb_provenance, store=target, head_key=HEAD_KEY, receipt_key=receipt_key,
             retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)")
     target.initialize()
+    # SV-LLM declared substitution (F-POST-HEAD): a retry of the consumption the
+    # store just finished after a fault returns that receipt, never a second one.
+    recovered = getattr(target, "recovered_receipt", None)
+    if (isinstance(recovered, dict)
+            and recovered.get("source_transition_sha256") == source["source_transition_sha256"]
+            and recovered.get("org_transition_class") == org_transition_class):
+        return recovered
     # The storage substrate owns serialization. A lost comparison writes
     # nothing, so a retry cannot strand an orphan receipt.
     for _attempt in range(128):
@@ -341,7 +348,7 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
                 prior = recorded(target, expected_head, source["source_transition_sha256"])
                 if prior is not None:
                     if prior.get("org_transition_class") != org_transition_class:
-                        raise ValueError("ledger_receipt_collision")
+                        raise kernel.TransitionContentCollision("ledger_receipt_collision")
                     return prior
             # Resolved against the HEAD this attempt will compare against, so a
             # retry after a lost comparison re-resolves rather than reusing it.
@@ -452,14 +459,17 @@ def main():
     source_path = args.transition_receipt or args.repo_receipt
     if not source_path:
         raise SystemExit("transition receipt required")
-    receipt = load(source_path)
+    receipt = kernel.read_cli_json(source_path, argument="--repo-receipt/--transition-receipt",
+                                   retry_entrypoint="resident-runtime/aggregate_repo_transition.py --repo-receipt")
     default_class = ("REPO_STATE_PROPAGATION"
                      if receipt.get("schema") == "stegverse.repo-transition-receipt/v1"
                      else "ORGANIZATION_STATE_TRANSITION")
     try:
         result = append(receipt, args.org_transition_class or default_class,
                         args.predecessor_org_state_sha256, args.successor_org_state_sha256,
-                        json.loads(args.boundary_evidence_json), args.authority_effect,
+                        kernel.parse_cli_json(args.boundary_evidence_json, argument="--boundary-evidence-json",
+                                              retry_entrypoint="resident-runtime/aggregate_repo_transition.py "
+                                                               "--boundary-evidence-json"), args.authority_effect,
                         hb_epoch=int(args.hb_epoch))
     except LedgerLocationRequired as exc:
         print(json.dumps(location_refusal(exc), sort_keys=True))
@@ -471,4 +481,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(kernel.run_cli(main, retry_entrypoint="resident-runtime/aggregate_repo_transition.py "
+                                                            "(the same command again)"))

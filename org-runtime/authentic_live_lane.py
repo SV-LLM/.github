@@ -79,7 +79,9 @@ def main() -> int:
     if refusal is not None:
         print(json.dumps(refusal, sort_keys=True))
         return 1
-    result = prepare(json.loads(args.target.read_text()), hb_epoch=int(args.hb_epoch))
+    target = crossing.kernel.read_cli_json(args.target, argument="--target",
+                                           retry_entrypoint="org-runtime/authentic_live_lane.py prepare --target")
+    result = prepare(target, hb_epoch=int(args.hb_epoch))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, indent=2, sort_keys=True))
@@ -87,4 +89,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(crossing.kernel.run_cli(main, retry_entrypoint="org-runtime/authentic_live_lane.py prepare (the same command again)"))

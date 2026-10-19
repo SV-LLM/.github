@@ -512,6 +512,9 @@ def main() -> int:
             print(json.dumps(refusal, sort_keys=True))
             return 1
         args.hb_epoch = int(args.hb_epoch)
+    # Inputs are read before any write and outside the fault classifier (F-INPUT-TRACE).
+    read = repository_ledger.kernel.read_cli_json
+    entry = "resident-runtime/intr_destination_ingress.py"
     try:
         if args.verify_self_closure:
             if not args.location or not args.repository_namespace or args.closure is None:
@@ -520,7 +523,7 @@ def main() -> int:
                     "--location, --repository-namespace, and --closure are required")
             result = verify_closure(
                 args.location,
-                json.loads(args.closure.read_text(encoding="utf-8")),
+                read(args.closure, argument="--closure", retry_entrypoint=entry + " --closure"),
                 repository_namespace=args.repository_namespace)
             code = 0
         elif args.self_close:
@@ -528,16 +531,19 @@ def main() -> int:
                 raise SelfClosureRefused("REGISTRY_REQUIRED", "--registry is required")
             result = closure(
                 args.communication_id,
-                registry=json.loads(args.registry.read_text(encoding="utf-8")),
+                registry=read(args.registry, argument="--registry", retry_entrypoint=entry + " --registry"),
                 packet_id=args.packet_id, hb_epoch=args.hb_epoch)
             code = 0 if result.get("disposition") == ALLOW else 1
         else:
             if args.payload is None or args.registry is None:
                 raise SelfClosureRefused(
                     "PAYLOAD_AND_REGISTRY_REQUIRED", "--payload and --registry are required")
+            # The payload may be any JSON: a misshapen diagnostic is this operation's own recorded DENY.
+            payload = read(args.payload, argument="--payload", retry_entrypoint=entry + " --payload", expect=object)
+            registry = read(args.registry, argument="--registry", retry_entrypoint=entry + " --registry")
             result = receive(
-                json.loads(args.payload.read_text(encoding="utf-8")),
-                registry=json.loads(args.registry.read_text(encoding="utf-8")),
+                payload,
+                registry=registry,
                 packet_id=args.packet_id or "organization-intr-destination",
                 hb_epoch=args.hb_epoch)
             code = 0 if result.get("disposition") == ALLOW else 1
@@ -549,4 +555,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(repository_ledger.kernel.run_cli(
+        main, retry_entrypoint="resident-runtime/intr_destination_ingress.py (the same command again)"))

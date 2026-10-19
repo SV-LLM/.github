@@ -611,8 +611,10 @@ def main() -> int:
     else:
         if args.payload is None or args.standing is None:
             raise SystemExit("emit requires --payload and --standing")
-        standing = json.loads(args.standing.read_text(encoding="utf-8"))
-        payload = json.loads(args.payload.read_text(encoding="utf-8"))
+        # Read before any write and outside the fault classifier (F-INPUT-TRACE).
+        entry = "resident-runtime/organization_egress_boundary.py"
+        standing = kernel.read_cli_json(args.standing, argument="--standing", retry_entrypoint=entry + " --standing")
+        payload = kernel.read_cli_json(args.payload, argument="--payload", retry_entrypoint=entry + " --payload")
         result = emit(args.destination_organization, payload, standing=standing,
                       capability=args.capability, transition_reference=args.transition_reference,
                       mesh_root=args.mesh_root, hb_epoch=args.hb_epoch)
@@ -625,4 +627,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(kernel.run_cli(main, retry_entrypoint="resident-runtime/organization_egress_boundary.py (the same command again)"))

@@ -944,12 +944,13 @@ def main() -> int:
         print(json.dumps(refusal, sort_keys=True))
         return 1
 
-    result = receive(
-        json.loads(args.manifest.read_text(encoding="utf-8")),
-        registry=json.loads(args.registry.read_text(encoding="utf-8")),
-        standing=(json.loads(args.standing.read_text(encoding="utf-8"))
-                  if args.standing else None),
-        packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)
+    entry = "resident-runtime/organization_manifest_ingress.py"
+    read = organization_ledger.kernel.read_cli_json
+    manifest = read(args.manifest, argument="--manifest", retry_entrypoint=entry + " --manifest")
+    registry = read(args.registry, argument="--registry", retry_entrypoint=entry + " --registry")
+    standing = read(args.standing, argument="--standing", retry_entrypoint=entry + " --standing") if args.standing else None
+    result = receive(manifest, registry=registry, standing=standing,
+                     packet_id=args.packet_id, hb_epoch=int(args.hb_epoch), mesh_root=args.mesh_root)
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -961,4 +962,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(organization_ledger.kernel.run_cli(
+        main, retry_entrypoint="resident-runtime/organization_manifest_ingress.py (the same command again)"))
