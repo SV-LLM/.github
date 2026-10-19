@@ -353,7 +353,7 @@ class Receive(unittest.TestCase):
         result = capability.receive(ROOT, row(ADDRESS), {"payload": {"manifest": built()},
                                                          "standing": committed_request()["standing"],
                                                          "packet_id": "w04-address"},
-                                    registry=REGISTRY)
+                                    registry=REGISTRY, hb_epoch=32)
         self.assertEqual(result["receiving_operation_id"], OPERATION_ID)
         self.assertEqual(result["receiving_operation_result"]["disposition"], "ALLOW")
         with self.assertRaisesRegex(SystemExit, "SUBMISSION_CARRIES_A_MANIFEST"):
@@ -530,8 +530,8 @@ class EndToEndDryRun(unittest.TestCase):
     is in a temporary directory.
     """
 
-    def run_request(self, space, event, **step_env):
-        env = space.job("request", GITHUB_EVENT_NAME=event)
+    def run_request(self, space, event, hb_epoch="41", **step_env):
+        env = space.job("request", GITHUB_EVENT_NAME=event, HB_EPOCH=hb_epoch)
         for name in (SDK_PATH, VALIDATE, BIND):
             done = space.step(name, env)
             self.assertEqual(done.returncode, 0, name + "\n" + done.stdout + done.stderr)
@@ -586,7 +586,10 @@ class EndToEndDryRun(unittest.TestCase):
         self.assertEqual(readback["disposition"], "ALLOW", readback)
         self.assertEqual(space.published(), tip_after)
 
-    def test_the_push_that_commits_a_request_opens_the_ledger_and_reads_it_back(self):
+    def test_a_push_without_a_supplied_epoch_fails_closed_and_publishes_nothing(self):
+        # A push carries no hb_epoch. The request used to be received anyway,
+        # its receipts stamped from the runner's clock; it now fails closed
+        # before it is received and nothing is appended or published.
         space = Workspace(self, with_request=False)
         before = space.git("rev-parse", "HEAD")
         target = space.ws / REQUEST
@@ -595,13 +598,22 @@ class EndToEndDryRun(unittest.TestCase):
         space.git("add", REQUEST)
         space.git("commit", "-q", "-m", "commit the W04 request")
         space.git("push", "-q", "origin", "HEAD:refs/heads/main")
-        self.assertIsNone(space.published())
-        ingress_result, readback, _ = self.run_request(space, "push", INPUT_REQUEST="", BEFORE=before)
+        env = space.job("request", GITHUB_EVENT_NAME="push")
+        for name in (SDK_PATH, VALIDATE, BIND):
+            done = space.step(name, env)
+            self.assertEqual(done.returncode, 0, name + "\n" + done.stdout + done.stderr)
+        done = space.step(SELECT, env, INPUT_REQUEST="", BEFORE=before)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual((space.temp / "requests.txt").read_text(), REQUEST + "\n")
-        self.assertEqual(ingress_result["disposition"], "ALLOW", ingress_result)
-        self.assertEqual(readback["disposition"], "ALLOW", readback)
-        self.assertEqual(readback["chain_length"], 1)
-        self.assertTrue(space.published())
+        received = space.step(RECEIVE, env)
+        self.assertNotEqual(received.returncode, 0)
+        refusal = json.loads(received.stdout.strip().splitlines()[-1])
+        self.assertEqual(refusal["failure_code"], "HB_EPOCH_NOT_SUPPLIED_PATH_LIVE")
+        for field in ("failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                      "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
+        self.assertFalse((space.temp / "results" / Path(REQUEST).stem / "ingress.json").exists())
+        self.assertIsNone(space.published())
 
 
 class ExemptionStaysUntilAReceiptIsReadBack(unittest.TestCase):

@@ -173,7 +173,8 @@
         "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
-        "identity checks name SV-LLM/.github"
+        "identity checks name SV-LLM/.github",
+        "a request is received only at a supplied hb_epoch: one that would append without one fails closed HB_EPOCH_NOT_SUPPLIED_PATH_LIVE before it is received (B-P31), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
       ]
     }
   }
