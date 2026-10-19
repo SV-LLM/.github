@@ -123,7 +123,7 @@ class WorkflowEpochGate(unittest.TestCase):
                 self.assertEqual(done.stdout, "")
 
     def test_no_code_reads_stegverse_hb_epoch(self):
-        listed = subprocess.run(["git", "grep", "-l", "STEGVERSE_HB_EPOCH", "--", ".", ":!" + Path(__file__).name],
+        listed = subprocess.run(["git", "grep", "-l", "STEGVERSE_HB_EPOCH", "--", ".", ":(exclude)" + str(Path(__file__).resolve().relative_to(ROOT))],
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(listed.stdout.strip(), "")
 
