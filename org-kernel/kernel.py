@@ -259,6 +259,9 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
     else is six-field CARRIED_PROVENANCE_UNVERIFIED. No clock is read.
     """
     epoch=supplied_hb_reference(hb_epoch,retry_entrypoint=retry_entrypoint)["epoch"]
+    if isinstance(provenance,dict) and "admission_key" in provenance:
+        return _admitted_hb_reference(epoch,provenance,store=store,head_key=head_key,receipt_key=receipt_key,
+                                      retry_entrypoint=retry_entrypoint)
     head=store.get(head_key) if store is not None else None
     head_sha=provenance.get("head_receipt_sha") if isinstance(provenance,dict) else None
     head_receipt=store.get(receipt_key(head_sha)) if head and isinstance(head_sha,str) and head_sha==head.get("receipt_sha256") else None
@@ -280,12 +283,95 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
             detail="the carried epoch is not the ledger head's epoch"
     if detail is None:
         return {**hb_reference(epoch=epoch),"source":provenance["source"],"head_receipt_sha":head_sha}
+    _carried_unverified(detail,retry_entrypoint)
+
+def _carried_unverified(detail:str, retry_entrypoint:str):
     refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
     refusal.update(failure_code=CARRIED_PROVENANCE_UNVERIFIED,detail=detail,
                    required_evidence_or_repair=("a CARRIED provenance names source ORGANIZATION_LEDGER_HEAD and the "
                                                 "current ledger head, whose heartbeat reference is derived_from_clock "
-                                                "false and passes the shared rule, at that head's epoch"))
+                                                "false and passes the shared rule, at that head's epoch; a writer "
+                                                "downstream of its admission names that admission's head"))
     raise SuppliedEpochRefused(refusal)
+
+# B-P36m propagation (lead ruling, 09:00Z). The current-head check is the
+# admission check, made once at ingest; the admission is a durable record in
+# the organization store, written before any downstream write of the crossing.
+# Each downstream writer then verifies the carried head_receipt_sha against
+# that record rather than against the current head, which the crossing's own
+# receipts move: (a) it is a member of the writer's ledger chain, (b) its
+# receipt recomputes to it, (c) that receipt's epoch is SUPPLIED and equals
+# the carried epoch, and (d) it is the head the admission record names.
+ADMISSION_PREFIX="carried-admissions/"
+ADMISSION_SCHEMA="stegverse.carried-epoch-admission/v1"
+
+def admission_key(crossing_id:str)->str:
+    return ADMISSION_PREFIX+hashlib.sha256(crossing_id.encode()).hexdigest()+".json"
+
+def _admitted_hb_reference(epoch:int, provenance:dict[str,Any], *, store:Any, head_key:str, receipt_key:Any,
+                           retry_entrypoint:str)->dict[str,Any]:
+    key=provenance.get("admission_key"); head_sha=provenance.get("head_receipt_sha")
+    admission=store.get(key) if store is not None and isinstance(key,str) and key.startswith(ADMISSION_PREFIX) else None
+    detail=None
+    if provenance.get("source")!=CARRIED_SOURCE_ORGANIZATION_LEDGER_HEAD:
+        detail="the provenance source is not "+CARRIED_SOURCE_ORGANIZATION_LEDGER_HEAD
+    elif not isinstance(admission,dict) or admission.get("schema")!=ADMISSION_SCHEMA:
+        detail="no admission record names this crossing's carried head"
+    elif (admission.get("head_receipt_sha")!=head_sha or admission.get("source")!=provenance["source"]
+          or admission.get("epoch")!=epoch):
+        detail="head_receipt_sha is not the head recorded at this crossing's admission"
+    else:
+        cursor=(store.get(head_key) or {}).get("receipt_sha256"); member=None; seen=set()
+        while isinstance(cursor,str) and cursor not in seen:
+            seen.add(cursor)
+            receipt=store.get(receipt_key(cursor))
+            if not isinstance(receipt,dict):
+                break
+            if cursor==head_sha:
+                member=receipt
+                break
+            cursor=receipt.get("previous_receipt_sha256")
+        if member is None:
+            detail="head_receipt_sha is not a member of this ledger's chain"
+        elif (member.get("receipt_sha256")!=head_sha
+              or sha({k:v for k,v in member.items() if k!="receipt_sha256"})!=head_sha):
+            detail="the admitted head receipt does not recompute to head_receipt_sha"
+        else:
+            reference=member.get("hb_reference")
+            failure=supplied_epoch_failure((reference or {}).get("epoch") if isinstance(reference,dict) else None,
+                                           reference)
+            if failure is not None:
+                detail="the admitted head's epoch is not SUPPLIED: "+failure[1]
+            elif reference["epoch"]!=epoch:
+                detail="the carried epoch is not the admitted head's epoch"
+    if detail is None:
+        return {**hb_reference(epoch=epoch),"source":provenance["source"],"head_receipt_sha":head_sha}
+    _carried_unverified(detail,retry_entrypoint)
+
+def admit_carried(epoch:Any, provenance:dict[str,Any], *, custody:dict[str,Any], crossing_id:str,
+                  retry_entrypoint:str, resume:bool=True)->dict[str,Any]:
+    """Admit a CARRIED epoch for one crossing: the provenance its downstream writers are handed.
+
+    The first admission verifies the claim against the current organization
+    ledger head and writes the admission record before anything else of the
+    crossing is written. A crossing resumed after a fault (`resume`) finds its
+    record and is verified against it, so its own receipts moving the head
+    never refuse it. The provenance returned carries `admission_key`; receipts
+    record only source and head_receipt_sha.
+    """
+    store=custody["organization_store"]; ledger=custody["organization_ledger"]
+    claim={"source":provenance.get("source"),"head_receipt_sha":provenance.get("head_receipt_sha")}
+    key=admission_key(crossing_id)
+    if not resume or store.get(key) is None:
+        carried_hb_reference(epoch,claim,store=store,head_key=ledger.HEAD_KEY,receipt_key=ledger.receipt_key,
+                             retry_entrypoint=retry_entrypoint)
+        store.put(key,{"schema":ADMISSION_SCHEMA,"crossing_id":crossing_id,**claim,
+                       "epoch":supplied_hb_reference(epoch,retry_entrypoint=retry_entrypoint)["epoch"],
+                       "derived_from_clock":False})
+    admitted={**claim,"admission_key":key}
+    carried_hb_reference(epoch,admitted,store=store,head_key=ledger.HEAD_KEY,receipt_key=ledger.receipt_key,
+                         retry_entrypoint=retry_entrypoint)
+    return admitted
 
 FRAME_REFUSED_QUARANTINED="FRAME_REFUSED_QUARANTINED"
 
@@ -299,16 +385,23 @@ def frame_epoch(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->int:
     CARRIED_PROVENANCE_UNVERIFIED otherwise; the claim is never stripped to
     accept the frame as SUPPLIED (B-P36k). No clock is read.
     """
+    return frame_admission(frame,custody=custody,retry_entrypoint=retry_entrypoint)[0]
+
+def frame_admission(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->tuple[int,dict[str,Any]|None]:
+    """(epoch, admitted CARRIED provenance or None) for a consumed frame; see frame_epoch.
+
+    A CARRIED claim is admitted once per frame (admit_carried, keyed by the
+    content-addressed frame), so a frame resumed after a fault, whose earlier
+    receipts moved the head, is verified against its admission (B-P36m ruling).
+    """
     reference=frame.get("heartbeat_reference") if isinstance(frame,dict) else None
     epoch=carried_epoch(reference,retry_entrypoint=retry_entrypoint)
     if "source" in reference or "head_receipt_sha" in reference:
-        ledger=custody["organization_ledger"]
-        carried_hb_reference(epoch,{"source":reference.get("source"),"head_receipt_sha":reference.get("head_receipt_sha")},
-                             store=custody["organization_store"],head_key=ledger.HEAD_KEY,
-                             receipt_key=ledger.receipt_key,retry_entrypoint=retry_entrypoint)
-    return epoch
-
-CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM="CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM"
+        return epoch,admit_carried(epoch,{"source":reference.get("source"),
+                                          "head_receipt_sha":reference.get("head_receipt_sha")},
+                                   custody=custody,crossing_id="frame:"+str(frame.get("frame_sha256")),
+                                   retry_entrypoint=retry_entrypoint)
+    return epoch,None
 
 def clock_reference(reference:Any)->bool:
     """CLOCK at ingest: derived_from_clock present and not false, or a sampled_unix_ns (08:10Z)."""
@@ -326,7 +419,7 @@ def ingest_epoch(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->tup
     """
     reference=frame.get("heartbeat_reference") if isinstance(frame,dict) else None
     try:
-        epoch=frame_epoch(frame,custody=custody,retry_entrypoint=retry_entrypoint)
+        epoch,admitted=frame_admission(frame,custody=custody,retry_entrypoint=retry_entrypoint)
     except SuppliedEpochRefused as exc:
         epoch_value=reference.get("epoch") if isinstance(reference,dict) else None
         if isinstance(reference,dict) and ("source" in reference or "head_receipt_sha" in reference):
@@ -339,37 +432,20 @@ def ingest_epoch(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->tup
                 and supplied_epoch_failure(epoch_value) is None):
             return None,None  # a well-formed CLOCK frame; a malformed one stays refused (F-S1a)
         raise
-    if "source" in reference or "head_receipt_sha" in reference:
-        return epoch,{"source":reference["source"],"head_receipt_sha":reference["head_receipt_sha"]}
-    return epoch,None
+    return epoch,admitted
 
 def ingest_refusal(frame:Any, epoch:int|None, provenance:dict[str,Any]|None, registry:dict[str,Any], *,
                    retry_entrypoint:str)->dict[str,Any]|None:
     """The six-field refusal of a consumed frame this route cannot record, or None.
 
     A frame lending no epoch on a route that holds none is HB_EPOCH_NOT_SUPPLIED.
-    A CARRIED frame addressed to a capability operation, whose receipts take no
-    provenance, is CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM rather than being
-    recorded as SUPPLIED.
     """
     if epoch is None:
         refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
         refusal["detail"]="the frame is clock-flagged, so it lends no epoch, and this route was supplied none"
         return refusal
-    if provenance is not None:
-        try:
-            destination=recover_packet(frame)["destination"]["service"]
-        except (ValueError,KeyError,TypeError):
-            destination=None
-        service=next((s for s in registry["services"] if s.get("service_id")==destination),None)
-        if (service or {}).get("boundary_role")==CAPABILITY_INGRESS_ROLE:
-            refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
-            refusal.update(failure_code=CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM,
-                           detail="the capability operation's receipts take no CARRIED provenance; recording "
-                                  "them at the carried epoch would strip it",
-                           required_evidence_or_repair="the capability operations carry hb_provenance to their "
-                                                       "writers (WU-B13 slice c)")
-            return refusal
+    # A verified CARRIED frame is recorded with its provenance on every route,
+    # the capability operations included (B-P36m ruling, 09:00Z).
     return None
 
 FRAME_DISPATCH_IO_FAILED="FRAME_DISPATCH_IO_FAILED"
@@ -432,6 +508,41 @@ def io_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
                    next_attempt="the frame is still pending; the next cycle consumes it, once")
     return refusal
 
+LEDGER_WRITE_FAULT_RESUMABLE="LEDGER_WRITE_FAULT_RESUMABLE"
+
+def writer_fault_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
+    """A fault in one step of a multi-step write: six-field, non-terminal LEDGER_WRITE_FAULT_RESUMABLE.
+
+    B-P36q. Every multi-step write of this organization is resumable: a torn
+    ledger append is finished by the next writer (complete_pending_append),
+    each record is idempotent and each frame or marker write-once, so running
+    the same entrypoint again completes the work exactly once.
+    """
+    refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+    refusal.update(failure_code=LEDGER_WRITE_FAULT_RESUMABLE,failed_predicate=type(exc).__name__,terminal=False,
+                   detail=type(exc).__name__+": "+str(exc)[-300:],
+                   required_evidence_or_repair="this organization's own ledger and node storage is writable",
+                   next_attempt="run the same entrypoint again; the steps already written are completed, not "
+                                "repeated, and a torn ledger append is finished first")
+    return refusal
+
+class WriterFaultRefused(LedgerWriteFailed):
+    """A writer fault reported as its six-field resumable refusal (`refusal`)."""
+    def __init__(self, refusal:dict[str,Any]):
+        super().__init__(refusal["detail"])
+        self.refusal=refusal
+
+def resumable(call:Any, *, retry_entrypoint:str)->Any:
+    """Run one multi-step write; a writer fault leaves as WriterFaultRefused, anything else as raised."""
+    try:
+        return call()
+    except (SuppliedEpochRefused,WriterFaultRefused):
+        raise
+    except (Exception,SystemExit) as exc:
+        if writer_fault(exc):
+            raise WriterFaultRefused(writer_fault_refusal(exc,retry_entrypoint=retry_entrypoint)) from exc
+        raise
+
 def recover_admissible(frame:Any, *, retry_entrypoint:str)->dict[str,Any]:
     """Recover a consumed frame's packet, refusing what the frame itself gets wrong.
 
@@ -483,7 +594,15 @@ def quarantine_frame(repo_root:Path, item:dict[str,Any], refusal:dict[str,Any], 
             "next_attempt":"none for this frame: it is quarantined and never re-processed; its sender "
                            "publishes again at a supplied epoch",
             "derived_from_clock":False,"consequence_committed":False}
-    marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=store)
+    try:
+        marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=store)
+    except Exception as exc:
+        if not writer_fault(exc):
+            raise
+        # The quarantine marker itself failed to land: the frame stays pending and
+        # the next cycle quarantines it, once (B-P36q).
+        return {"path":item["path"],"result":{"status":"REFUSED",**io_refusal(exc,retry_entrypoint=refusal["retry_entrypoint"])},
+                "response_publication":None,"organization_record":None,"seen_marker":None}
     return {"path":item["path"],"result":result,"response_publication":None,"organization_record":None,
             "seen_marker":str(marker)}
 
@@ -573,7 +692,8 @@ def require_custody(custody:dict[str,Any]|None)->dict[str,Any]:
     return custody
 
 def dispatch(root:Path, packet:dict[str,Any], *, custody:dict[str,Any]|None=None,
-             node_state:Any|None=None, epoch:int|None=None, mesh_root:Path|None=None)->dict[str,Any]:
+             node_state:Any|None=None, epoch:int|None=None, mesh_root:Path|None=None,
+             hb_provenance:dict[str,Any]|None=None)->dict[str,Any]:
     require_custody(custody)
     registry=load_registry(root)
     if packet["destination"]["org"]!=registry["organization"]: raise ValueError("wrong_destination_org")
@@ -618,8 +738,10 @@ def dispatch(root:Path, packet:dict[str,Any], *, custody:dict[str,Any]|None=None
         # this boundary's refusal, not a consumed crossing with the refusal
         # buried in the application result. Loaded only for this role.
         try:
+            # An admitted CARRIED provenance goes to the operation's writers (B-P36m ruling).
             application_result=capability_ingress(root).receive(
-                root,service,packet,registry=registry,mesh_root=mesh_root,hb_epoch=epoch)
+                root,service,packet,registry=registry,mesh_root=mesh_root,hb_epoch=epoch,
+                **({"hb_provenance":hb_provenance} if hb_provenance is not None else {}))
         except SystemExit as refused:
             raise ValueError("capability_ingress_refused:"+str(refused)) from None
     else:
@@ -650,8 +772,9 @@ def _ingest(root:Path, frame:dict[str,Any], *, custody:dict[str,Any], node_state
     # The epoch of the frame being consumed, which recovery has validated. What
     # the answer embeds is then a function of the frame, not of this pass. A
     # clock-stamped frame carries no epoch a receipt may take (B-P36f).
-    epoch=frame_epoch(frame,custody=custody,retry_entrypoint="org-kernel/kernel.py::_ingest")
-    result=dispatch(root,packet,custody=custody,node_state=node_state,epoch=epoch,mesh_root=mesh_root)
+    epoch,admitted=frame_admission(frame,custody=custody,retry_entrypoint="org-kernel/kernel.py::_ingest")
+    result=dispatch(root,packet,custody=custody,node_state=node_state,epoch=epoch,mesh_root=mesh_root,
+                    hb_provenance=admitted)
     return {"status":"CONSUMED","packet":packet,"execution_result":result}
 
 def ingest_frame(root:Path, frame:dict[str,Any], *, repo_ledger_root:Path|None=None,
@@ -686,9 +809,11 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "SuppliedEpochRefused","writer_epoch_refusal","supplied_hb_reference","carried_epoch",
          "SHARED_VALIDATOR_SHA256",
          "require_supplied_source","carried_hb_reference",
-         "frame_epoch","quarantine_frame","ingest_epoch","ingest_refusal",
+         "frame_epoch","frame_admission","admit_carried","admission_key","ADMISSION_PREFIX",
+         "quarantine_frame","ingest_epoch","ingest_refusal",
          "admit_frame","frame_failure_refusal","io_refusal","recover_admissible",
-         "LedgerWriteFailed","writer_fault",
+         "LedgerWriteFailed","writer_fault","WriterFaultRefused","writer_fault_refusal","resumable",
+         "LEDGER_WRITE_FAULT_RESUMABLE",
          "MAX_FRAME_FILE_BYTES"]
 
 
@@ -863,17 +988,21 @@ def publish_packet(packet:dict[str,Any], *, root:Path|None=None, now_ns:int|None
             None,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)"),
             detail="a recorded emission is not stamped from a clock sample; supply epoch="))
     epoch=supplied_hb_reference(epoch,retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch=)")["epoch"]
-    if epoch_provenance is not None:
-        # Verified here so nothing is built for an unverified provenance; each
-        # ledger writer verifies it again before it writes.
-        organization_ledger=custody["organization_ledger"]
-        carried_hb_reference(epoch,epoch_provenance,store=custody["organization_store"],
-                             head_key=organization_ledger.HEAD_KEY,receipt_key=organization_ledger.receipt_key,
-                             retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch_provenance=)")
     frame=carrier_frame(packet,epoch=epoch)
+    admitted=None
+    if epoch_provenance is not None:
+        # Admitted here, before anything is built or written, and verified again
+        # by each ledger writer against that admission (B-P36m ruling). An
+        # emission a fault interrupted resumes from its admission; one whose frame
+        # is already published was completed, so it is admitted afresh against
+        # the current head, which its own receipts moved: a re-release is refused.
+        published=root is not None and mesh_store(root).get(node_store_module.frame_key(frame)) is not None
+        admitted=admit_carried(epoch,epoch_provenance,custody=custody,crossing_id="emission:"+packet["packet_id"],
+                               retry_entrypoint="org-kernel/kernel.py::publish_packet (epoch_provenance=)",
+                               resume=not published)
     if root is None:  # the refusal publish_frame would make, before anything is recorded
         raise ValueError("mesh_location_required_from_materializer")
-    recorded=record_emission(custody,frame,packet,epoch_provenance=epoch_provenance)
+    recorded=record_emission(custody,frame,packet,epoch_provenance=epoch_provenance,admitted=admitted)
     path=_publish_frame(frame,root=root)
     return {"packet":packet,"frame":frame,"path":str(path),"organization_record":recorded}
 
@@ -1235,7 +1364,8 @@ def _crossing_identity(name:str)->str:
     return "ORGANIZATION-FEDERATION-CROSSING-"+hashlib.sha256(name.encode()).hexdigest()[:16]
 
 def record_emission(custody:dict[str,Any], frame:dict[str,Any], packet:dict[str,Any], *,
-                    epoch_provenance:dict[str,Any]|None=None)->dict[str,Any]:
+                    epoch_provenance:dict[str,Any]|None=None,
+                    admitted:dict[str,Any]|None=None)->dict[str,Any]:
     """Append the repository and organization receipts for one frame this kernel publishes.
 
     Identified by the content-addressed frame, so publishing the same frame
@@ -1257,7 +1387,9 @@ def record_emission(custody:dict[str,Any], frame:dict[str,Any], packet:dict[str,
                            "disposition":"ALLOW"}
     hb_provenance=None
     if epoch_provenance is not None:
-        hb_provenance={"source":epoch_provenance["source"],"head_receipt_sha":epoch_provenance["head_receipt_sha"]}
+        # The writers verify against the admission when there is one (admit_carried).
+        hb_provenance=dict(admitted) if admitted is not None else {
+            "source":epoch_provenance["source"],"head_receipt_sha":epoch_provenance["head_receipt_sha"]}
         evidence["hb_epoch_provenance"]=dict(epoch_provenance)
         organization_evidence["hb_epoch_provenance"]=dict(epoch_provenance)
     return _append_both(custody,"ORGANIZATION-FEDERATION-EMISSION-"+hashlib.sha256(name.encode()).hexdigest()[:16],

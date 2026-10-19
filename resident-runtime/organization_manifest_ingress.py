@@ -212,7 +212,18 @@ def refusal_record(failed_predicate: str, detail: str,
     }
 
 
-def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str, Any]:
+def _carried(hb_provenance: Mapping[str, Any] | None, *, repository: bool = False) -> dict[str, Any]:
+    """The writer arguments that carry an admitted CARRIED provenance (B-P36m ruling); {} for none."""
+    if hb_provenance is None:
+        return {}
+    carried = {"hb_provenance": dict(hb_provenance)}
+    if repository:
+        carried["provenance_store"] = organization_ledger.open_store(organization_ledger.ledger_root())
+    return carried
+
+
+def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None,
+                    hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Append a refusal at both levels, in the order the replay rule requires.
 
     The repository ledger records it first and the organization ledger consumes
@@ -225,7 +236,7 @@ def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str
     repository_receipt = repository_ledger.append(
         "ORGANIZATION-SDK-MANIFEST-INGRESS-REFUSED-" + sha(dict(record))[:16],
         REFUSED_CLASS, predecessor, successor, dict(record), "NONE", hb_epoch=hb_epoch,
-        idempotent_on=("failed_predicate", "detail"))
+        idempotent_on=("failed_predicate", "detail"), **_carried(hb_provenance, repository=True))
     # A refusal is identified by its own record, so the same refusal delivered
     # again returns the receipts already recorded rather than a second pair.
     organization_receipt = organization_ledger.append(
@@ -234,15 +245,17 @@ def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str
          "intended_action": INTENDED_ACTION,
          "disposition": "DENY",
          "failed_predicate": record["failed_predicate"]},
-        "NONE", hb_epoch=hb_epoch, idempotent=True)  # the SUPPLIED epoch, not one read back (B-P36f)
+        "NONE", hb_epoch=hb_epoch, idempotent=True,  # the SUPPLIED epoch, not one read back (B-P36f)
+        **_carried(hb_provenance))
     return {"repository_receipt": repository_receipt,
             "organization_receipt": organization_receipt}
 
 
 def _refused(failed_predicate: str, detail: str, *, manifest: Any,
-             hb_epoch: int | None = None, **extra: Any) -> dict[str, Any]:
+             hb_epoch: int | None = None, hb_provenance: Mapping[str, Any] | None = None,
+             **extra: Any) -> dict[str, Any]:
     record = refusal_record(failed_predicate, detail, manifest)
-    appended = _record_refusal(record, hb_epoch)
+    appended = _record_refusal(record, hb_epoch, hb_provenance)
     return {
         "schema": RESULT_SCHEMA_ORG,
         "organization": ORGANIZATION,
@@ -476,7 +489,8 @@ def request_governance_decision(request: Mapping[str, Any], crossing: Mapping[st
                                 repository_receipt: Mapping[str, Any],
                                 organization_receipt: Mapping[str, Any],
                                 standing: Mapping[str, Any], mesh_root: Path | None,
-                                hb_epoch: int | None, replayed: bool = False) -> dict[str, Any]:
+                                hb_epoch: int | None, replayed: bool = False,
+                                hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Emit the governance request to the organization that decides it, and record the emission.
 
     Nothing waits. The emission is a transition here, recorded at both levels by
@@ -530,7 +544,7 @@ def request_governance_decision(request: Mapping[str, Any], crossing: Mapping[st
                           governance_request_payload(request, decision_request, transition_id),
                           standing=dict(standing), capability="governance",
                           transition_reference="ecosystem.transition.governance.v1",
-                          mesh_root=mesh_root, hb_epoch=hb_epoch)
+                          mesh_root=mesh_root, hb_epoch=hb_epoch, **_carried(hb_provenance))
     emission = {key: emitted.get(key) for key in (
         "emission_transition_class", "emission_repository_receipt_sha256",
         "emission_organization_receipt_sha256")}
@@ -581,7 +595,7 @@ def _disposition_binding() -> dict[str, Any]:
 def _deliver_non_allow_disposition(result: Mapping[str, Any], request: Mapping[str, Any], *,
                                    manifest: Any, standing: Mapping[str, Any] | None,
                                    mesh_root: Path | None, hb_epoch: int | None,
-                                   packet_id: str) -> dict[str, Any]:
+                                   packet_id: str, hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Deliver a route-related NON-ALLOW on the route the manifest calculates.
 
     `remediation_route` is that calculation: the recognition location, the
@@ -688,7 +702,7 @@ def _deliver_non_allow_disposition(result: Mapping[str, Any], request: Mapping[s
                           standing=dict(standing) if isinstance(standing, Mapping) else standing,
                           capability=binding.get("profile_id"),
                           transition_reference="ecosystem.transition.non-allow-disposition.v1",
-                          mesh_root=mesh_root, hb_epoch=hb_epoch)
+                          mesh_root=mesh_root, hb_epoch=hb_epoch, **_carried(hb_provenance))
     emission = {key: emitted.get(key) for key in (
         "emission_transition_class", "emission_repository_receipt_sha256",
         "emission_organization_receipt_sha256")}
@@ -704,7 +718,8 @@ def _deliver_non_allow_disposition(result: Mapping[str, Any], request: Mapping[s
 
 def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standing: Mapping[str, Any] | None = None,
             packet_id: str = "organization-sdk-manifest-ingress",
-            hb_epoch: int | None = None, mesh_root: Path | None = None) -> dict[str, Any]:
+            hb_epoch: int | None = None, mesh_root: Path | None = None,
+            hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Receive a submitted manifest on this organization's ingress operation.
 
     `mesh_root` is the federation mesh the node was materialized with. A
@@ -721,12 +736,12 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
         # route that request calculates. No request means no route, and the
         # receipt is the whole record.
         recorded = _refused(failed_predicate, detail, manifest=manifest,
-                            hb_epoch=submitted_epoch, **extra)
+                            hb_epoch=submitted_epoch, hb_provenance=hb_provenance, **extra)
         if request is None:
             return recorded
         return _deliver_non_allow_disposition(
             recorded, request, manifest=manifest, standing=standing,
-            mesh_root=mesh_root, hb_epoch=submitted_epoch, packet_id=packet_id)
+            mesh_root=mesh_root, hb_epoch=submitted_epoch, packet_id=packet_id, hb_provenance=hb_provenance)
 
     try:
         request = derive_execution_request(manifest, boundary())
@@ -803,7 +818,8 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
             repository_receipt = repository_ledger.append(
                 transition_id, OPERATION_ID,
                 predecessor_state, successor_state, evidence,
-                "NONE", hb_epoch=hb_epoch, idempotent_on=("request_sha256",))
+                "NONE", hb_epoch=hb_epoch, idempotent_on=("request_sha256",),
+                **_carried(hb_provenance, repository=True))
             break
         except ValueError as exc:
             if str(exc) != "ledger_receipt_collision":
@@ -821,7 +837,7 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
          "resolved_service_id": crossing["resolved_service_id"],
          "ingress_packet_id": crossing["ingress_packet_id"],
          "egress_packet_id": crossing["egress_packet_id"]},
-        "NONE", hb_epoch=hb_epoch, idempotent=True)
+        "NONE", hb_epoch=hb_epoch, idempotent=True, **_carried(hb_provenance))
 
     # Governance is decided by the organization that owns StegCore. The ingress
     # transition above occurred here and is recorded; the request now leaves
@@ -832,7 +848,7 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
             request, crossing, receiving, transition_id=transition_id,
             repository_receipt=repository_receipt, organization_receipt=organization_receipt,
             standing=crossing_module.manifest_standing(manifest, standing),
-            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed)
+            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed, hb_provenance=hb_provenance)
 
     # The SDK decides whether this closes the transition. Its refusal is the
     # answer, returned as it was given. A NON-ALLOW stays the receipt already

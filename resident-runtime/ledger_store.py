@@ -42,6 +42,8 @@ from pathlib import Path, PurePath
 HEAD_KEY = "HEAD.json"
 RECEIPT_PREFIX = "receipts/"
 SOURCE_PREFIX = "source-receipts/"
+# SV-LLM declared substitution (B-P36q): a POSIX append's write-ahead journal.
+PENDING_APPEND_KEY = "PENDING_APPEND.json"
 
 
 def receipt_key(digest):
@@ -196,6 +198,9 @@ class PosixLedgerStore:
 
     def initialize(self):
         (self.root / RECEIPT_PREFIX.rstrip("/")).mkdir(parents=True, exist_ok=True)
+        # SV-LLM declared substitution (B-P36q): every writer initializes before
+        # it reads HEAD, so a transaction torn by a fault is finished first.
+        self.complete_pending_append()
 
     def locator(self, key):
         """How this substrate names the key, for a reader outside the ledger."""
@@ -298,10 +303,52 @@ class PosixLedgerStore:
                     raise ValueError("ledger_receipt_collision")
                 if existing is None:
                     missing.append(key)
+            # SV-LLM declared substitution (B-P36q): the transaction is journaled
+            # before its first write and the journal removed after HEAD, so a fault
+            # at any step leaves a store the next append finishes, never one that
+            # refuses itself as holding orphan receipts.
+            self.put(PENDING_APPEND_KEY, {"expected_head": expected_head, "new_head": new_head,
+                                          "documents": {key: documents[key] for key in missing}})
             for key in missing:
                 self.put(key, documents[key])
             self.put(HEAD_KEY, new_head)
+            self._discard_pending_append()
             return True
+
+    def complete_pending_append(self):
+        """Finish a journaled transaction a fault interrupted; None when there is none.
+
+        Content-addressed documents are written byte-identically (a different
+        document already at a key is `ledger_receipt_collision`), then HEAD,
+        then the journal is removed. A journal whose HEAD already moved on to
+        its new HEAD is only removed. One whose expected HEAD is no longer
+        HEAD was not written by this store's transaction and is refused.
+        """
+        with self.exclusive():
+            pending = self.get(PENDING_APPEND_KEY)
+            if pending is None:
+                return None
+            head = self.get(HEAD_KEY)
+            if head == pending["new_head"]:
+                self._discard_pending_append()
+                return "COMPLETED"
+            if head != pending["expected_head"]:
+                raise ValueError("ledger_pending_append_inconsistent")
+            for key, value in pending["documents"].items():
+                existing = self.get(key)
+                if existing is not None and existing != value:
+                    raise ValueError("ledger_receipt_collision")
+                if existing is None:
+                    self.put(key, value)
+            self.put(HEAD_KEY, pending["new_head"])
+            self._discard_pending_append()
+            return "ROLLED_FORWARD"
+
+    def _discard_pending_append(self):
+        path = self._path(PENDING_APPEND_KEY)
+        if path.exists():
+            path.unlink()
+            self._sync_directory(path.parent)
 
     @staticmethod
     def _sync_directory(directory):

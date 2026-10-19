@@ -256,13 +256,16 @@ def declared_manifest(payload: Any) -> dict[str, Any]:
 
 
 def receive(root: Path, service: Mapping[str, Any], packet: Mapping[str, Any], *, registry: Mapping[str, Any],
-            mesh_root: Path | None = None, hb_epoch: int | None = None) -> dict[str, Any]:
+            mesh_root: Path | None = None, hb_epoch: int | None = None,
+            hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Hand an addressed submission to the receiving operation the overlay binds.
 
     SV-LLM declared substitution (data/organization-role-reference-adoption.json):
     ``hb_epoch`` is the epoch of the frame being consumed, forwarded so the
     operation's ledger receipts carry a supplied epoch. Without one the
     repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.
+    ``hb_provenance``, the admitted CARRIED provenance of that frame, is
+    forwarded so those receipts carry it rather than having it stripped (B-P36m).
 
     The operation records its own dispositions at both ledger levels; this
     returns what it reported. A refusal is returned as the operation stated it,
@@ -278,7 +281,8 @@ def receive(root: Path, service: Mapping[str, Any], packet: Mapping[str, Any], *
     module = load_operation(resolved)
     result = module.receive(submission, registry=registry, standing=packet.get("standing"),
                             packet_id=str(packet.get("packet_id") or resolved["receiving_operation_id"]),
-                            mesh_root=mesh_root, hb_epoch=hb_epoch)
+                            mesh_root=mesh_root, hb_epoch=hb_epoch,
+                            **({"hb_provenance": hb_provenance} if hb_provenance is not None else {}))
     return {
         "capability_received": True,
         "capability_profile_id": resolved["capability_profile_id"],

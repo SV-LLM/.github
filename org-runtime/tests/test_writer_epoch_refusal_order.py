@@ -428,8 +428,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
     def test_a_verified_carried_frame_keeps_its_provenance_in_every_receipt(self):
         # B-P36m: a frame whose CARRIED claim verifies against this organization's
         # head produces receipts that read CARRIED (source, head_receipt_sha,
-        # derived false); routes whose writers take no provenance quarantine it
-        # (CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM) rather than strip it.
+        # derived false); the capability routes carry it too (see below).
         self.open_ledger()
         k, custody = self.kernel_custody()
         head = self.org_genesis()["receipt_sha256"]
@@ -440,38 +439,94 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         rows = k.consume_addressed_frames(self.root, mesh_root=self.mesh, **ledgers)
         self.assertEqual([r["result"].get("status") for r in rows], ["CONSUMED"], rows)
         written = [d for d in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]
-                   if frame["frame_sha256"] in json.dumps(d)]
+                   if frame["frame_sha256"] in json.dumps(d) and "receipt_sha256" in d]
         self.assertTrue(written)
         for receipt in {d["receipt_sha256"]: d for d in written}.values():
             self.assertEqual(receipt["hb_reference"]["source"], "ORGANIZATION_LEDGER_HEAD")
             self.assertEqual(receipt["hb_reference"]["head_receipt_sha"], head)
             self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
 
-    def test_a_carried_frame_is_quarantined_where_its_provenance_cannot_be_carried(self):
+    def carried_receipts(self, frame):
+        """Every ledger receipt written for `frame`, by digest: its repository receipts and the
+        organization receipts consuming them."""
+        repository = {d["receipt_sha256"]: d for d in self.documents(self.base / "repo-ledger")
+                      if "receipt_sha256" in d and (frame["frame_sha256"] in json.dumps(d)
+                                                    or frame["packet_id"] in json.dumps(d))}
+        organization = {d["receipt_sha256"]: d for d in self.documents(self.base / "org-ledger")
+                        if d.get("source_transition_sha256") in repository}
+        return {**repository, **organization}
+
+    def test_a_verified_carried_crossing_carries_its_provenance_through_every_writer(self):
+        # B-P36m ruling (lead, 09:00Z): the current-head check is the admission,
+        # made once at ingest and recorded; each downstream writer of the crossing
+        # verifies chain membership, digest, a SUPPLIED equal epoch and the
+        # admission's head. A capability crossing on crossing.ingress writes 2+
+        # organization receipts, every one CARRIED, none UNVERIFIED.
+        diagnostic = {"message_class": "ecosystem.communication", "communication_id": "b-p36m",
+                      "subject": "purpose-neutral mesh diagnostic",
+                      "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "m"}}
+        for route in ("crossing.ingress", "consume_addressed_frames"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                head = self.org_genesis()["receipt_sha256"]
+                carried = lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head}
+                frame = self.reframed(k, "b-p36m-capability-" + route, carried, service="sv-llm.intr-destination",
+                                      payload=diagnostic)
+                self.no_clock()
+                if route == "crossing.ingress":
+                    out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node",
+                                                root=self.root, hb_epoch="32")
+                    self.assertEqual([r["disposition"] for r in out], ["ALLOW"], out)
+                else:
+                    out = k.consume_addressed_frames(self.root, mesh_root=self.mesh,
+                                                     repo_ledger_root=self.base / "repo-ledger",
+                                                     org_ledger_root=self.base / "org-ledger")
+                    self.assertEqual([r["result"].get("status") for r in out], ["CONSUMED"], out)
+                self.assertNotIn("CARRIED_PROVENANCE_UNVERIFIED", json.dumps(out))
+                receipts = self.carried_receipts(frame)
+                organization = [r for r in receipts.values()
+                                if r.get("schema") == "stegverse.organization-transition-receipt/v1"]
+                self.assertGreaterEqual(len(organization), 2 if route == "crossing.ingress" else 1, receipts)
+                for receipt in receipts.values():
+                    self.assertEqual(receipt["hb_reference"]["source"], "ORGANIZATION_LEDGER_HEAD")
+                    self.assertEqual(receipt["hb_reference"]["head_receipt_sha"], head)
+                    self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+                    self.assertNotIn("admission_key", receipt["hb_reference"])
+
+    def test_a_forged_head_is_unverified_at_admission_and_downstream(self):
+        # The negative of the ruling: a sha that is not the head at admission is
+        # refused there; a downstream writer handed a sha other than its
+        # admission's, one outside the chain, or no admission record refuses.
         self.open_ledger()
-        k, _ = self.kernel_custody()
+        k, custody = self.kernel_custody()
         head = self.org_genesis()["receipt_sha256"]
-        carried = lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head}
-        self.reframed(k, "b-p36m-crossing", carried)
-        ledgers = lambda: files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger")
-        before = ledgers()
+        forged = "sha256:" + "e" * 64
+        frame = self.reframed(k, "b-p36m-forged-capability",
+                              lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": forged},
+                              service="sv-llm.intr-destination")
+        before = files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger")
         out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root,
                                     hb_epoch="32")
         self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in out],
-                         [("FRAME_REFUSED_QUARANTINED", "CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM")], out)
-        self.assertEqual(ledgers(), before)
-        capability = self.reframed(k, "b-p36m-capability", carried, service="sv-llm.intr-destination",
-                      payload={"message_class": "ecosystem.communication", "communication_id": "b-p36m",
-                               "subject": "purpose-neutral mesh diagnostic",
-                               "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "m"}})
-        rows = k.consume_addressed_frames(self.root, mesh_root=self.mesh, repo_ledger_root=self.base / "repo-ledger",
-                                          org_ledger_root=self.base / "org-ledger")
-        refused = [r for r in rows if r["result"].get("failure_code") == "CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM"]
-        self.assertEqual(len(refused), 1, rows)
-        # The capability frame produced no receipt (the earlier org-control frame, consumed
-        # here without seen-state, is recorded with its provenance: see the B-P36m probe above).
-        self.assertEqual([d for d in [*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")]
-                          if capability["frame_sha256"] in json.dumps(d)], [])
+                         [("FRAME_REFUSED_QUARANTINED", "CARRIED_PROVENANCE_UNVERIFIED")], out)
+        self.assertEqual(files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger"), before)
+        admitted = k.admit_carried(32, {"source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head},
+                                   custody=custody, crossing_id="b-p36m-negative", retry_entrypoint="test")
+        for name, provenance in (("another sha", {**admitted, "head_receipt_sha": forged}),
+                                 ("no admission", {**admitted, "admission_key": k.admission_key("never-admitted")}),
+                                 ("outside the store", {**admitted, "admission_key": "receipts/x.json"})):
+            with self.subTest(provenance=name):
+                written = files_under(self.base)
+                with self.assertRaises(ValueError) as raised:
+                    self.egress.repository_ledger.append(
+                        "B:forged-" + name, "B", "sha256:" + "0" * 64, "sha256:" + "1" * 64, {}, "NONE", hb_epoch=32,
+                        hb_provenance=provenance, provenance_store=custody["organization_store"])
+                self.assertEqual(raised.exception.refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
+                for field in SIX_FIELDS:
+                    self.assertTrue(raised.exception.refusal[field], field)
+                self.assertEqual(files_under(self.base), written)
 
     def test_clock_frames_lend_no_epoch_and_unmarked_frames_are_refused(self):
         # 08:10Z: flagged-true and bare-sampled frames are CLOCK: consumed, lending
@@ -1112,6 +1167,280 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                         after = {name: n - genesis.get(name, 0) for name, n in self.ledger_classes().items()}
                         self.assertEqual({n: c for n, c in after.items() if c}, {n: c for n, c in clean.items() if c})
                         self.assertEqual(self.ingest_results(k, route, node), [])
+
+    def ledger_state(self):
+        """What a run leaves durable: receipts per class, response frames, markers, and a sound chain."""
+        for root in ("repo-ledger", "org-ledger"):
+            head_path = self.base / root / "HEAD.json"
+            receipts = {Path(p).name: json.loads(Path(p).read_text())
+                        for p in files_under(self.base / root / "receipts")} if (self.base / root / "receipts").exists() else {}
+            if not receipts:
+                continue
+            self.assertTrue(head_path.is_file(), root + ": receipts without HEAD")
+            cursor, reachable = json.loads(head_path.read_text())["receipt_sha256"], set()
+            while cursor:
+                receipt = receipts.get(cursor.split(":", 1)[1] + ".json")
+                self.assertIsNotNone(receipt, root + ": chain names a missing receipt")
+                body = {k: v for k, v in receipt.items() if k != "receipt_sha256"}
+                self.assertEqual(self.crossing.kernel.sha(body), cursor, root + ": receipt does not recompute")
+                reachable.add(cursor.split(":", 1)[1] + ".json")
+                cursor = receipt.get("previous_receipt_sha256")
+            self.assertEqual(set(receipts), reachable, root + ": orphan receipts")
+            self.assertFalse((self.base / root / "PENDING_APPEND.json").exists(), root + ": an unfinished append")
+        frames = [d for d in self.documents(self.mesh) if "frame_sha256" in d]
+        markers = [d for d in self.documents(self.base / "node") if d.get("frame_name")] if (self.base / "node").exists() else []
+        return {"receipts": self.ledger_classes(), "frames": sorted(f["packet_id"] for f in frames),
+                "markers": sorted((m["frame_name"], m.get("status"), m.get("failure_code")) for m in markers)}
+
+    def sweep(self, prepare, run, settle=3):
+        """B-P36q: an OSError before and after every durable write of `run`; the next runs finish it once.
+
+        `prepare()` builds the state the path starts from (unfaulted); `run()`
+        is the multi-step path. Each faulted run must raise or return a
+        non-terminal six-field record, and up to `settle` further runs must
+        leave exactly the state one clean run leaves, with a sound chain.
+        """
+        import fault_injection
+        fault_injection.install()
+        self.addCleanup(fault_injection.uninstall)
+        hook = fault_injection.directory()
+        self.addCleanup(shutil.rmtree, hook, True)
+        counter = Path(tempfile.mkdtemp(prefix="stegverse-fault-count-")) / "count"
+        self.addCleanup(shutil.rmtree, counter.parent, True)
+
+        def environment(at, mode):
+            os.environ.update(STEGVERSE_FAULT_ROOT=str(self.base.resolve()), STEGVERSE_FAULT_COUNTER=str(counter),
+                              PYTHONPATH=os.pathsep.join(filter(None, [str(hook), os.environ.get("PYTHONPATH")])),
+                              STEGVERSE_FAULT_MODE=mode)
+            os.environ.pop("STEGVERSE_FAULT_AT", None)
+            if at is not None:
+                os.environ["STEGVERSE_FAULT_AT"] = str(at)
+            counter.unlink(missing_ok=True)
+
+        self.setUp()
+        environment(None, "before")
+        prepare()
+        counter.unlink(missing_ok=True)
+        run()
+        writes = fault_injection.census(counter)
+        clean = self.ledger_state()
+        self.assertGreater(writes, 0)
+        outcomes = []
+        for mode in ("before", "after"):
+            for at in range(writes):
+                with self.subTest(mode=mode, write=at):
+                    self.setUp()
+                    environment(None, mode)
+                    prepare()
+                    environment(at, mode)
+                    try:
+                        faulted = run()
+                    except (Exception, SystemExit) as exc:
+                        faulted = exc
+                    outcomes.append((mode, at, faulted))
+                    self.assertResumable(faulted)
+                    environment(None, mode)
+                    for _ in range(settle):
+                        try:
+                            run()
+                        except (Exception, SystemExit) as exc:
+                            self.fail("the run after a fault at write %d (%s) did not complete: %r" % (at, mode, exc))
+                    self.assertEqual(self.ledger_state(), clean)
+        return outcomes
+
+    def assertResumable(self, faulted):
+        """A faulted run reports a six-field, non-terminal record, or completed anyway."""
+        if isinstance(faulted, BaseException):
+            refusal = getattr(faulted, "refusal", None)
+            self.assertIsInstance(refusal, dict, "a writer fault left without its six fields: %r" % (faulted,))
+            rows = [refusal]
+        elif isinstance(faulted, list):
+            rows = [r for r in faulted if isinstance(r, dict) and r.get("failure_code")]
+        else:
+            rows = [faulted] if isinstance(faulted, dict) and faulted.get("failure_code") else []
+        for row in rows:
+            if row.get("quarantine") == "FRAME_REFUSED_QUARANTINED":
+                continue  # a frame's own content refusal, not the injected fault
+            if row["failure_code"] in ("CARRIED_PROVENANCE_UNVERIFIED",) and isinstance(faulted, dict):
+                continue  # the release's re-release refusal, once its frame landed
+            self.assertIn(row["failure_code"], ("FRAME_DISPATCH_IO_FAILED", "LEDGER_WRITE_FAULT_RESUMABLE"), row)
+            self.assertIs(row["terminal"], False, row)
+            for field in SIX_FIELDS:
+                self.assertTrue(row[field], field)
+
+    def consume_inbound(self):
+        self.open_ledger()
+        k, _ = self.kernel_custody()
+        self.inbound(k, "b-p36q-request", epoch=4096)
+
+    def test_every_write_of_consume_and_respond_is_resumable(self):
+        k = self.crossing.kernel
+        self.sweep(self.consume_inbound, lambda: [row["result"] for row in k.consume_and_respond(
+            self.root, mesh_root=self.mesh, node_state_root=self.base / "node",
+            repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")])
+
+    def test_every_write_of_crossing_ingress_is_resumable(self):
+        self.sweep(self.consume_inbound, lambda: self.crossing.ingress(
+            mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root, hb_epoch="4096"))
+
+    def test_every_write_of_a_carried_capability_crossing_is_resumable(self):
+        # B-P36m ruling with B-P36q: a CARRIED crossing resumed after a fault, whose
+        # earlier receipts moved the head, is verified against its admission record.
+        def prepare():
+            self.open_ledger()
+            k, _ = self.kernel_custody()
+            head = self.org_genesis()["receipt_sha256"]
+            self.reframed(k, "b-p36q-carried", lambda ref: {**ref, "source": "ORGANIZATION_LEDGER_HEAD",
+                                                            "head_receipt_sha": head},
+                          service="sv-llm.intr-destination",
+                          payload={"message_class": "ecosystem.communication", "communication_id": "b-p36q",
+                                   "subject": "purpose-neutral mesh diagnostic",
+                                   "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "q"}})
+        def run():
+            out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root,
+                                        hb_epoch="32")
+            self.assertNotIn("CARRIED_PROVENANCE_UNVERIFIED", json.dumps(out))
+            return out
+        self.sweep(prepare, run)
+
+    def test_every_write_of_the_master_records_release_is_resumable(self):
+        # The release records its emission on both ledgers and then publishes the
+        # frame. A fault at any step resumes from its admission; once the frame is
+        # published the segment is released, and releasing it again is refused.
+        state = {}
+
+        def prepare():
+            self.open_ledger()
+            state["genesis"] = self.org_genesis()
+
+        def run():
+            done = self.release(state["genesis"])
+            if done.returncode == 0:
+                return json.loads(done.stdout)
+            refusal = json.loads(done.stdout)
+            frames = list((self.mesh / "frames.d").glob("*.json")) if (self.mesh / "frames.d").exists() else []
+            if refusal.get("failure_code") == "CARRIED_PROVENANCE_UNVERIFIED" and frames:
+                return refusal  # already released: the re-release refusal
+            if refusal.get("failure_code") == "LEDGER_WRITE_FAULT_RESUMABLE":
+                return refusal
+            raise AssertionError(done.stdout + done.stderr)
+        self.sweep(prepare, run)
+
+    def test_every_write_of_crossing_egress_is_resumable(self):
+        manifest = {"manifest_id": "b-p36q-egress", "destination": {"organization": PEER}, "payload": {"probe": 1}}
+        self.sweep(self.open_ledger, lambda: self.crossing.egress(
+            manifest, standing=STANDING, mesh_root=self.mesh, root=self.root, hb_epoch="4096"))
+
+    def test_every_write_of_opening_the_ledger_is_resumable(self):
+        def run():
+            try:
+                return self.crossing.open_organization_ledger(root=self.root, hb_epoch=32)
+            except (Exception, SystemExit) as exc:
+                if "ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER" in str(exc):
+                    return exc  # opened: a second genesis is refused
+                raise
+        self.sweep(lambda: None, run)
+
+    def faulted_once(self, match, mode, run):
+        """Run `run` with an OSError at the first write whose path contains `match`."""
+        import fault_injection
+        fault_injection.install()
+        self.addCleanup(fault_injection.uninstall)
+        counter = Path(tempfile.mkdtemp(prefix="stegverse-fault-count-")) / "count"
+        self.addCleanup(shutil.rmtree, counter.parent, True)
+        os.environ.update(STEGVERSE_FAULT_ROOT=str(self.base.resolve()), STEGVERSE_FAULT_COUNTER=str(counter),
+                          STEGVERSE_FAULT_MATCH=match, STEGVERSE_FAULT_MODE=mode, STEGVERSE_FAULT_AT="0")
+        try:
+            return run()
+        finally:
+            for name in ("STEGVERSE_FAULT_ROOT", "STEGVERSE_FAULT_COUNTER", "STEGVERSE_FAULT_MATCH",
+                         "STEGVERSE_FAULT_MODE", "STEGVERSE_FAULT_AT"):
+                os.environ.pop(name, None)
+
+    def test_a_torn_receipt_and_head_append_is_finished_by_the_next_cycle(self):
+        # Lane B 09:29Z / 09:31Z torn write: an OSError on the HEAD write after the
+        # receipt landed, on the repository append and on the organization append.
+        # The next cycle leaves exactly one receipt, a consistent HEAD, and a later
+        # frame is consumed as if nothing had happened.
+        k = self.crossing.kernel
+        for ledger in ("repo-ledger", "org-ledger"):
+            with self.subTest(ledger=ledger):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                self.inbound(k, "torn-first", epoch=4096)
+                node = self.base / "node"
+                run = lambda: [row["result"] for row in k.consume_and_respond(
+                    self.root, mesh_root=self.mesh, node_state_root=node,
+                    repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")]
+                first = self.faulted_once(ledger + "/HEAD.json", "before", run)
+                self.assertEqual([(r["failure_code"], r["terminal"]) for r in first],
+                                 [("FRAME_DISPATCH_IO_FAILED", False)], first)
+                self.assertTrue((self.base / ledger / "PENDING_APPEND.json").is_file(), "the torn append is journaled")
+                self.assertEqual([r.get("status") for r in run()], ["CONSUMED"])
+                self.assertFalse((self.base / ledger / "PENDING_APPEND.json").exists())
+                state = self.ledger_state()  # one receipt per class, HEAD consistent, no orphans
+                consumed = [n for n, c in state["receipts"].items() if "CONSUMED" in n or "None" in n]
+                self.assertTrue(consumed)
+                self.assertEqual(state["receipts"]["repo-ledger:ORGANIZATION_FEDERATION_CROSSING_CONSUMED"], 1)
+                self.inbound(k, "torn-later", epoch=4096)
+                self.assertEqual([r.get("status") for r in run()], ["CONSUMED"])
+                self.assertEqual(self.ledger_state()["receipts"]["repo-ledger:ORGANIZATION_FEDERATION_CROSSING_CONSUMED"], 2)
+                self.assertEqual(run(), [])
+
+    def test_a_published_answer_is_never_published_twice(self):
+        # F-REPUB (Lane B 09:25Z): a fault after the response is published -- the
+        # seen-marker write, or the publication's own acknowledgement -- leaves the
+        # request pending; the next cycle rebuilds the answer byte-identically and
+        # the write-once frame is a no-op, so exactly one response exists.
+        for name, match, mode in (("marker OSError", "/seen", "before"),
+                                  ("ack OSError", "frames.d", "after")):
+            with self.subTest(fault=name):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                request = self.inbound(k, "f-repub-" + name.split()[0], epoch=4096)
+                node = self.base / "node"
+                run = lambda: k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node,
+                                                    repo_ledger_root=self.base / "repo-ledger",
+                                                    org_ledger_root=self.base / "org-ledger")
+                first = self.faulted_once(match, mode, run)
+                self.assertEqual([row["result"]["failure_code"] for row in first], ["FRAME_DISPATCH_IO_FAILED"], first)
+                second = run()
+                self.assertEqual([row["result"].get("status") for row in second], ["CONSUMED"])
+                self.assertEqual(run(), [])
+                responses = [d for d in self.documents(self.mesh / "frames.d")
+                             if d.get("packet_id") != request["packet_id"]]
+                self.assertEqual(len(responses), 1, responses)
+                self.assertEqual(second[0]["response_publication"]["frame"], responses[0])
+
+    def test_every_write_of_a_quarantine_is_resumable(self):
+        # A fault writing a quarantine marker leaves the bad frame pending; the
+        # next cycle quarantines it once, and the valid frame is consumed once.
+        def prepare():
+            self.open_ledger()
+            k, _ = self.kernel_custody()
+            self.reframed(k, "b-p36q-unmarked", lambda ref: {a: b for a, b in ref.items() if a != "derived_from_clock"})
+            self.inbound(k, "b-p36q-valid", epoch=4096)
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.sweep(prepare, lambda: self.consume_route(self.crossing.kernel, route, self.base / "node")())
+
+    def test_every_write_of_the_egress_boundary_emit_is_resumable(self):
+        payload = {"message_class": "ecosystem.communication", "communication_id": "b-p36q-emit",
+                   "subject": "purpose-neutral mesh diagnostic",
+                   "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "b-p36q"}}
+
+        def run():
+            try:
+                return self.egress.emit(PEER, payload, standing=STANDING, capability="intr-destination",
+                                        root=self.root, mesh_root=self.mesh, hb_epoch="4096")
+            except (Exception, SystemExit) as exc:
+                if self.egress.kernel.writer_fault(exc):
+                    raise self.egress.kernel.WriterFaultRefused(self.egress.kernel.writer_fault_refusal(
+                        exc, retry_entrypoint="resident-runtime/organization_egress_boundary.py::emit"))
+                raise
+        self.sweep(self.open_ledger, run)
 
     @staticmethod
     def documents(root):

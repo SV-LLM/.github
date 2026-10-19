@@ -198,10 +198,14 @@ def main():
     # The kernel verifies the provenance against the current organization
     # ledger head (CARRIED_PROVENANCE_UNVERIFIED otherwise) before anything is
     # written, so only the current head is released and a re-release is refused.
+    # A fault in any step (the admission, either receipt, the frame) is the
+    # six-field, non-terminal LEDGER_WRITE_FAULT_RESUMABLE: the same release run
+    # again resumes from its admission and completes once (B-P36q).
     try:
-        published = K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
-                                     epoch_provenance=provenance)
-    except K.SuppliedEpochRefused as exc:
+        published = K.resumable(lambda: K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
+                                                         epoch_provenance=provenance),
+                                retry_entrypoint=RETRY_ENTRYPOINT)
+    except (K.SuppliedEpochRefused, K.WriterFaultRefused) as exc:
         print(json.dumps(exc.refusal, sort_keys=True))
         raise SystemExit(1)
     print(json.dumps({"status": "RELEASED_ORGANIZATION_BATCH_PUBLISHED_FOR_DOWNSTREAM_RECORD",

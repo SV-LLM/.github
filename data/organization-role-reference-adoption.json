@@ -7,14 +7,47 @@
   "adopted_by": "SV-LLM-ORGANIZATION-ROLE-EXACT-STEGVERSE-ORG-DUPLICATION-001",
   "files": {
     "resident-runtime/ledger_store.py": {
-      "rule": "byte_identical",
-      "reference_sha256": "sha256:d38bdac9c50b9fb6c00e9d8ff98be36c700b8c159125261f307af91a09e075d0"
+      "rule": "declared_substitutions",
+      "reference_sha256": "sha256:d38bdac9c50b9fb6c00e9d8ff98be36c700b8c159125261f307af91a09e075d0",
+      "substitutions": [
+        {
+          "reference": "            for key in missing:\n                self.put(key, documents[key])\n            self.put(HEAD_KEY, new_head)\n            return True\n",
+          "local": "            # SV-LLM declared substitution (B-P36q): the transaction is journaled\n            # before its first write and the journal removed after HEAD, so a fault\n            # at any step leaves a store the next append finishes, never one that\n            # refuses itself as holding orphan receipts.\n            self.put(PENDING_APPEND_KEY, {\"expected_head\": expected_head, \"new_head\": new_head,\n                                          \"documents\": {key: documents[key] for key in missing}})\n            for key in missing:\n                self.put(key, documents[key])\n            self.put(HEAD_KEY, new_head)\n            self._discard_pending_append()\n            return True\n\n    def complete_pending_append(self):\n        \"\"\"Finish a journaled transaction a fault interrupted; None when there is none.\n\n        Content-addressed documents are written byte-identically (a different\n        document already at a key is `ledger_receipt_collision`), then HEAD,\n        then the journal is removed. A journal whose HEAD already moved on to\n        its new HEAD is only removed. One whose expected HEAD is no longer\n        HEAD was not written by this store's transaction and is refused.\n        \"\"\"\n        with self.exclusive():\n            pending = self.get(PENDING_APPEND_KEY)\n            if pending is None:\n                return None\n            head = self.get(HEAD_KEY)\n            if head == pending[\"new_head\"]:\n                self._discard_pending_append()\n                return \"COMPLETED\"\n            if head != pending[\"expected_head\"]:\n                raise ValueError(\"ledger_pending_append_inconsistent\")\n            for key, value in pending[\"documents\"].items():\n                existing = self.get(key)\n                if existing is not None and existing != value:\n                    raise ValueError(\"ledger_receipt_collision\")\n                if existing is None:\n                    self.put(key, value)\n            self.put(HEAD_KEY, pending[\"new_head\"])\n            self._discard_pending_append()\n            return \"ROLLED_FORWARD\"\n\n    def _discard_pending_append(self):\n        path = self._path(PENDING_APPEND_KEY)\n        if path.exists():\n            path.unlink()\n            self._sync_directory(path.parent)\n",
+          "count": 1,
+          "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "    def initialize(self):\n        (self.root / RECEIPT_PREFIX.rstrip(\"/\")).mkdir(parents=True, exist_ok=True)\n\n    def locator(self, key):",
+          "local": "    def initialize(self):\n        (self.root / RECEIPT_PREFIX.rstrip(\"/\")).mkdir(parents=True, exist_ok=True)\n        # SV-LLM declared substitution (B-P36q): every writer initializes before\n        # it reads HEAD, so a transaction torn by a fault is finished first.\n        self.complete_pending_append()\n\n    def locator(self, key):",
+          "count": 1,
+          "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "SOURCE_PREFIX = \"source-receipts/\"\n",
+          "local": "SOURCE_PREFIX = \"source-receipts/\"\n# SV-LLM declared substitution (B-P36q): a POSIX append's write-ahead journal.\nPENDING_APPEND_KEY = \"PENDING_APPEND.json\"\n",
+          "count": 1,
+          "why": "B-P36q torn write: a POSIX append is journaled before its first write and finished by the next writer, so a fault between the receipt and HEAD never leaves a store that refuses itself (SV-LLM/.github#49)"
+        }
+      ],
+      "local_sha256": "sha256:7872fc8e0b280ad282e78df165b5d20953c84fd18d24958dc40ea5ed37403b02"
     },
     ".stegverse/transition-ledger/emit.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e",
-      "local_sha256": "sha256:d9e999f2ba753e91a0fc13e18bd47d2acd0dabb778150b2bed20ac04819ef034",
+      "local_sha256": "sha256:0954ba3a1201a1ff60d3bb256b66c7d1a0c219ddd1c9bc6960b86d29ac5c1bbc",
       "substitutions": [
+        {
+          "reference": "a.hb_epoch,idempotent_on=() if a.idempotent else None)",
+          "local": "a.hb_epoch,idempotent_on=() if a.idempotent else None,**carried)",
+          "count": 1,
+          "why": "B-P36m ruling: a crossing's admitted CARRIED provenance reaches this CLI's receipt; it is verified against the organization ledger the materializer supplied (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "p.add_argument(\"--idempotent\",action=\"store_true\",help=\"return the receipt the chain already records for this transition rather than minting another\");a=p.parse_args()",
+          "local": "p.add_argument(\"--idempotent\",action=\"store_true\",help=\"return the receipt the chain already records for this transition rather than minting another\");p.add_argument(\"--hb-provenance-json\",default=None,help=\"an admitted CARRIED provenance, verified against the organization ledger at STEGVERSE_ORG_LEDGER_ROOT\");a=p.parse_args()\n carried={} if a.hb_provenance_json is None else {\"hb_provenance\":json.loads(a.hb_provenance_json),\"provenance_store\":ledger_store.open_store(os.environ[\"STEGVERSE_ORG_LEDGER_ROOT\"]) if os.environ.get(\"STEGVERSE_ORG_LEDGER_ROOT\") else None}",
+          "count": 1,
+          "why": "B-P36m ruling: a crossing's admitted CARRIED provenance reaches this CLI's receipt; it is verified against the organization ledger the materializer supplied (SV-LLM/.github#49)"
+        },
         {
           "reference": "_ABSENT=object()\ndef append(",
           "local": "# SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n# a receipt with no supplied epoch used to fall back to kernel.hb_reference(),\n# which reads the host clock, so the receipt's time base depended on that host's\n# clock discipline and a replay at another moment minted a different receipt.\n# The epoch is now required from the caller and checked by the kernel's shared\n# supplied-epoch rule: an absent or invalid one fails closed with the kernel's\n# six-field refusal before the store is opened, and no clock is read.\n_ABSENT=object()\nEPOCH_RETRY_ENTRYPOINT=\".stegverse/transition-ledger/emit.py::append (hb_epoch=, or --hb-epoch)\"\nRepoLedgerEpochRefused=kernel.SuppliedEpochRefused\ndef append(",
@@ -66,11 +99,11 @@
     "resident-runtime/aggregate_repo_transition.py": {
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
-      "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main()); aggregate_transition passes idempotent through (F-TRANSIENT-RT)",
+      "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main()); aggregate_transition passes idempotent (F-TRANSIENT-RT) and hb_provenance (B-P36m ruling) through",
       "insertion_offset": 17905,
-      "insertion_bytes": 2443,
-      "insertion_sha256": "sha256:0389531b99d8b6d8ee7edaa0c137022d3b583b82ce0812369d3682133a84425c",
-      "local_sha256": "sha256:ea5c820a732083fa2729b58209b4e993c965fa84b5e0e340321a97e1fe3cb6e8",
+      "insertion_bytes": 2492,
+      "insertion_sha256": "sha256:187a719512c9050a4b5d2e6e7c6497e1a36ed6ed4ddea1b1411196093e8c9ab0",
+      "local_sha256": "sha256:479b634cfbbc4bf4e502a5c1de1205118c15cfc7297061fdbf727bec7654d4c0",
       "substitutions": [
         {
           "reference": "    source = verify_source(source_receipt)\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
@@ -135,8 +168,26 @@
     "org-boundary/runtime/capability_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:731dab382f43ff3321f6e039cee1be338099345bf4b0e8fec89e7de1a72bca44",
-      "local_sha256": "sha256:2a25d406e1be85831380d1f9efc75f29ce4b8fdea09bbe5ab155b3dc5ddfda7a",
+      "local_sha256": "sha256:a1ec831102192d81c8e73ab4484588cda7cf94138cb331716fe34e95b1578238",
       "substitutions": [
+        {
+          "reference": "                            mesh_root=mesh_root, hb_epoch=hb_epoch)",
+          "local": "                            mesh_root=mesh_root, hb_epoch=hb_epoch,\n                            **({\"hb_provenance\": hb_provenance} if hb_provenance is not None else {}))",
+          "count": 1,
+          "why": "B-P36m ruling: the admitted CARRIED provenance of a consumed frame reaches the receiving operation's writers rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.\n\n    The operation records",
+          "local": "    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.\n    ``hb_provenance``, the admitted CARRIED provenance of that frame, is\n    forwarded so those receipts carry it rather than having it stripped (B-P36m).\n\n    The operation records",
+          "count": 1,
+          "why": "B-P36m ruling: the admitted CARRIED provenance of a consumed frame reaches the receiving operation's writers rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "            mesh_root: Path | None = None, hb_epoch: int | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n",
+          "local": "            mesh_root: Path | None = None, hb_epoch: int | None = None,\n            hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n",
+          "count": 1,
+          "why": "B-P36m ruling: the admitted CARRIED provenance of a consumed frame reaches the receiving operation's writers rather than being stripped (SV-LLM/.github#49)"
+        },
         {
           "reference": "            mesh_root: Path | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n",
           "local": "            mesh_root: Path | None = None, hb_epoch: int | None = None) -> dict[str, Any]:\n    \"\"\"Hand an addressed submission to the receiving operation the overlay binds.\n\n    SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n    ``hb_epoch`` is the epoch of the frame being consumed, forwarded so the\n    operation's ledger receipts carry a supplied epoch. Without one the\n    repository emitter refuses (HB_EPOCH_NOT_SUPPLIED, six fields); no clock is read.\n",
@@ -158,8 +209,92 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:5b2eb8b95a324cc72ca372e58251180c57b9887109dff0f876797df09b9b9f16",
+      "local_sha256": "sha256:7db9d44c17ab65e477a1a981487353a17ad60e1cc1016473cd811d265e2394b6",
       "substitutions": [
+        {
+          "reference": "            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed)",
+          "local": "            mesh_root=mesh_root, hb_epoch=hb_epoch, replayed=replayed, hb_provenance=hb_provenance)",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)",
+          "local": "         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True, **_carried(hb_provenance))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                \"NONE\", hb_epoch=hb_epoch, idempotent_on=(\"request_sha256\",))",
+          "local": "                \"NONE\", hb_epoch=hb_epoch, idempotent_on=(\"request_sha256\",),\n                **_carried(hb_provenance, repository=True))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "            mesh_root=mesh_root, hb_epoch=submitted_epoch, packet_id=packet_id)",
+          "local": "            mesh_root=mesh_root, hb_epoch=submitted_epoch, packet_id=packet_id, hb_provenance=hb_provenance)",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "        recorded = _refused(failed_predicate, detail, manifest=manifest,\n                            hb_epoch=submitted_epoch, **extra)",
+          "local": "        recorded = _refused(failed_predicate, detail, manifest=manifest,\n                            hb_epoch=submitted_epoch, hb_provenance=hb_provenance, **extra)",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "            hb_epoch: int | None = None, mesh_root: Path | None = None) -> dict[str, Any]:\n    \"\"\"Receive a submitted manifest on this organization's ingress operation.",
+          "local": "            hb_epoch: int | None = None, mesh_root: Path | None = None,\n            hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:\n    \"\"\"Receive a submitted manifest on this organization's ingress operation.",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                          transition_reference=\"ecosystem.transition.non-allow-disposition.v1\",\n                          mesh_root=mesh_root, hb_epoch=hb_epoch)",
+          "local": "                          transition_reference=\"ecosystem.transition.non-allow-disposition.v1\",\n                          mesh_root=mesh_root, hb_epoch=hb_epoch, **_carried(hb_provenance))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                                   mesh_root: Path | None, hb_epoch: int | None,\n                                   packet_id: str) -> dict[str, Any]:",
+          "local": "                                   mesh_root: Path | None, hb_epoch: int | None,\n                                   packet_id: str, hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                          transition_reference=\"ecosystem.transition.governance.v1\",\n                          mesh_root=mesh_root, hb_epoch=hb_epoch)",
+          "local": "                          transition_reference=\"ecosystem.transition.governance.v1\",\n                          mesh_root=mesh_root, hb_epoch=hb_epoch, **_carried(hb_provenance))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "                                hb_epoch: int | None, replayed: bool = False) -> dict[str, Any]:\n    \"\"\"Emit the governance request to the organization that decides it, and record the emission.",
+          "local": "                                hb_epoch: int | None, replayed: bool = False,\n                                hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:\n    \"\"\"Emit the governance request to the organization that decides it, and record the emission.",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "             hb_epoch: int | None = None, **extra: Any) -> dict[str, Any]:\n    record = refusal_record(failed_predicate, detail, manifest)\n    appended = _record_refusal(record, hb_epoch)",
+          "local": "             hb_epoch: int | None = None, hb_provenance: Mapping[str, Any] | None = None,\n             **extra: Any) -> dict[str, Any]:\n    record = refusal_record(failed_predicate, detail, manifest)\n    appended = _record_refusal(record, hb_epoch, hb_provenance)",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "         \"failed_predicate\": record[\"failed_predicate\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)  # the SUPPLIED epoch, not one read back (B-P36f)",
+          "local": "         \"failed_predicate\": record[\"failed_predicate\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True,  # the SUPPLIED epoch, not one read back (B-P36f)\n        **_carried(hb_provenance))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "        REFUSED_CLASS, predecessor, successor, dict(record), \"NONE\", hb_epoch=hb_epoch,\n        idempotent_on=(\"failed_predicate\", \"detail\"))",
+          "local": "        REFUSED_CLASS, predecessor, successor, dict(record), \"NONE\", hb_epoch=hb_epoch,\n        idempotent_on=(\"failed_predicate\", \"detail\"), **_carried(hb_provenance, repository=True))",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
+        {
+          "reference": "def _record_refusal(record: Mapping[str, Any], hb_epoch: int | None) -> dict[str, Any]:\n    \"\"\"Append a refusal at both levels, in the order the replay rule requires.\n",
+          "local": "def _carried(hb_provenance: Mapping[str, Any] | None, *, repository: bool = False) -> dict[str, Any]:\n    \"\"\"The writer arguments that carry an admitted CARRIED provenance (B-P36m ruling); {} for none.\"\"\"\n    if hb_provenance is None:\n        return {}\n    carried = {\"hb_provenance\": dict(hb_provenance)}\n    if repository:\n        carried[\"provenance_store\"] = organization_ledger.open_store(organization_ledger.ledger_root())\n    return carried\n\n\ndef _record_refusal(record: Mapping[str, Any], hb_epoch: int | None,\n                    hb_provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:\n    \"\"\"Append a refusal at both levels, in the order the replay rule requires.\n",
+          "count": 1,
+          "why": "B-P36m ruling: a verified CARRIED frame's admitted provenance reaches every receipt this operation writes for it, the egress emissions included, rather than being stripped (SV-LLM/.github#49)"
+        },
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
           "local": "# SV-LLM declared substitution (data/organization-role-reference-adoption.json):\n# the organization identity is read from this organization's own boundary\n# document instead of being written into the reference logic.\nOWNER_REPOSITORY = json.loads(BOUNDARY.read_text(encoding=\"utf-8\"))[\"owner_repository\"]\nORGANIZATION = json.loads(BOUNDARY.read_text(encoding=\"utf-8\"))[\"organization\"]",

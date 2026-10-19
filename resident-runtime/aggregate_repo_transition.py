@@ -388,7 +388,7 @@ STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"
 def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TRANSITION",
                          predecessor_org_state_sha256=None, successor_org_state_sha256=None,
                          boundary_evidence=None, authority_effect="NONE", genesis=False,
-                         hb_epoch=None, store=None, idempotent=False):
+                         hb_epoch=None, store=None, idempotent=False, hb_provenance=None):
     """SV-LLM's existing caller shape over the reference append(); temporary.
 
     It preserves SV-LLM's legacy state-digest rule until callers pass explicit
@@ -427,7 +427,7 @@ def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TR
         evidence["state_digest_rule"] = STATE_DIGEST_RULE
         evidence["state_digest_rule_fields"] = applied
     return append(receipt, org_transition_class, predecessor, successor, evidence, authority_effect,
-                  hb_epoch=hb_epoch, store=store, idempotent=idempotent)
+                  hb_epoch=hb_epoch, store=store, idempotent=idempotent, hb_provenance=hb_provenance)
 
 
 def main():

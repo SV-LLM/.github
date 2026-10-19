@@ -106,9 +106,10 @@ with tempfile.TemporaryDirectory() as td:
     # Every disposition is on both ledgers, in one unbroken chain each.
     repo_chain=chain(base/"repo-ledger"); org_chain=chain(base/"org-ledger")
     expected=len(peers)+3+5+1   # +1: the declared genesis
-    # The refused pre-genesis attempt and the refused second genesis wrote one repository receipt each
-    # (the repository ledger records the attempt) and no organization receipt.
-    assert len(repo_chain)==expected+2 and len(org_chain)==expected
+    # The refused pre-genesis attempt wrote one repository receipt (the repository ledger records
+    # the attempt) and no organization receipt. The refused second genesis writes nothing: it is
+    # refused before its repository receipt (B-P36q).
+    assert len(repo_chain)==expected+1 and len(org_chain)==expected
     assert org_chain[0]["org_transition_class"]=="ORGANIZATION_LEDGER_OPENED" and org_chain[0]["chain_genesis"] is True
     assert all(r["repository"]=="SV-LLM/.github" for r in repo_chain)
     org_sources=[o["repo_receipt_sha256"] for o in org_chain]
