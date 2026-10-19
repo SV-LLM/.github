@@ -811,13 +811,9 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
             if resolution:
                 return refused("ONE_TRANSITION_ID_BINDS_ONE_MANIFEST", str(exc),
                                request_sha256=request["request_sha256"])
-    # Everything after the repository receipt takes its epoch from that receipt,
-    # so a replay rebuilds the same organization receipt and the same outbound
-    # frame rather than ones stamped with whatever epoch this attempt carried.
-    # The organization receipt takes the SUPPLIED epoch (B-P36f); the outbound
-    # frame then takes the repository receipt's epoch, CARRIED and validated.
-    carried = organization_ledger.kernel.carried_epoch(
-        repository_receipt["hb_reference"], retry_entrypoint="resident-runtime/organization_manifest_ingress.py::receive")
+    # Everything after the repository receipt takes the SUPPLIED epoch, never
+    # one read back from that receipt (B-P36f). A request already recorded is
+    # answered from the ledger before it is received again (--recorded-for).
     organization_receipt = organization_ledger.append(
         repository_receipt, "REPO_STATE_PROPAGATION",
         predecessor_state, successor_state,
@@ -826,7 +822,6 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
          "ingress_packet_id": crossing["ingress_packet_id"],
          "egress_packet_id": crossing["egress_packet_id"]},
         "NONE", hb_epoch=hb_epoch, idempotent=True)
-    hb_epoch = carried
 
     # Governance is decided by the organization that owns StegCore. The ingress
     # transition above occurred here and is recorded; the request now leaves

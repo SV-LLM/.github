@@ -79,7 +79,7 @@ def recorded(target,head,transition_id,transition_class):
 _ABSENT=object()
 EPOCH_RETRY_ENTRYPOINT=".stegverse/transition-ledger/emit.py::append (hb_epoch=, or --hb-epoch)"
 RepoLedgerEpochRefused=kernel.SuppliedEpochRefused
-def append(transition_id,transition_class,predecessor_state_sha256,successor_state_sha256,evidence=None,authority_effect="NONE",hb_epoch=None,store=None,idempotent_on=None):
+def append(transition_id,transition_class,predecessor_state_sha256,successor_state_sha256,evidence=None,authority_effect="NONE",hb_epoch=None,store=None,idempotent_on=None,hb_provenance=None,provenance_store=None):
  """Append one repository transition receipt through the substrate transaction.
 
  With `idempotent_on` (a tuple of evidence keys, possibly empty) a transition
@@ -102,6 +102,7 @@ def append(transition_id,transition_class,predecessor_state_sha256,successor_sta
  opened; no clock is read and nothing is written.
  """
  hb=kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)
+ if hb_provenance is not None:hb=kernel.carried_hb_reference(hb_epoch,hb_provenance,store=provenance_store,head_key=ledger_store.HEAD_KEY,receipt_key=ledger_store.receipt_key,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)
  target=store or ledger_store.open_store(lr());target.initialize()
  for _attempt in range(128):
   expected_head=target.get(ledger_store.HEAD_KEY)

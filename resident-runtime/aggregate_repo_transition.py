@@ -297,7 +297,7 @@ def recorded(store, head, source_transition_sha256):
 
 
 def append(source_receipt, org_transition_class, predecessor_state, successor_state,
-           boundary_evidence, authority_effect, hb_epoch=None, store=None, idempotent=False):
+           boundary_evidence, authority_effect, hb_epoch=None, store=None, idempotent=False, hb_provenance=None):
     # Admission is decided before the append lock is taken; an inadmissible
     # source receipt never contends for the organization ledger.
     source = verify_source(source_receipt)
@@ -313,6 +313,11 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
     heartbeat = kernel.supplied_hb_reference(
         hb_epoch, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_epoch=, or --hb-epoch)")
     target = store or open_store(ledger_root())
+    if hb_provenance is not None:
+        # A CARRIED epoch is verified against this ledger's own head before anything is written.
+        heartbeat = kernel.carried_hb_reference(
+            hb_epoch, hb_provenance, store=target, head_key=HEAD_KEY, receipt_key=receipt_key,
+            retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)")
     target.initialize()
     # The storage substrate owns serialization. A lost comparison writes
     # nothing, so a retry cannot strand an orphan receipt.

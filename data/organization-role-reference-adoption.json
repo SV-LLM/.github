@@ -13,7 +13,7 @@
     ".stegverse/transition-ledger/emit.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e",
-      "local_sha256": "sha256:4b2ac6a497f6e786e889a79c3ee8b455627cdfa289d7f773d30e550d92a2f423",
+      "local_sha256": "sha256:4eafddbf305fc06c17de48c69d22fd7d8158728c4f7a1a2681c2bd0c7649b33f",
       "substitutions": [
         {
           "reference": "_ABSENT=object()\ndef append(",
@@ -23,9 +23,9 @@
         },
         {
           "reference": " so no receipt is ever minted on top of a broken chain.\n \"\"\"\n target=store",
-          "local": " so no receipt is ever minted on top of a broken chain.\n\n `hb_epoch` is required. An absent or invalid one raises\n `RepoLedgerEpochRefused` (kernel.SuppliedEpochRefused) before the store is\n opened; no clock is read and nothing is written.\n \"\"\"\n hb=kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)\n target=store",
+          "local": " so no receipt is ever minted on top of a broken chain.\n\n `hb_epoch` is required. An absent or invalid one raises\n `RepoLedgerEpochRefused` (kernel.SuppliedEpochRefused) before the store is\n opened; no clock is read and nothing is written.\n \"\"\"\n hb=kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)\n if hb_provenance is not None:hb=kernel.carried_hb_reference(hb_epoch,hb_provenance,store=provenance_store,head_key=ledger_store.HEAD_KEY,receipt_key=ledger_store.receipt_key,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)\n target=store",
           "count": 1,
-          "why": "append refuses an absent or invalid epoch through kernel.supplied_hb_reference before the store is opened"
+          "why": "append refuses an absent or invalid epoch through kernel.supplied_hb_reference before the store is opened; a CARRIED epoch's provenance (source, head_receipt_sha) is recorded in hb_reference, verified by this writer against the current organization ledger head (kernel.carried_hb_reference) before anything is written, CARRIED_PROVENANCE_UNVERIFIED otherwise; the fields are additive and absent for SUPPLIED and CLOCK references (B-P36f, coordinator ruling 07:22Z)"
         },
         {
           "reference": "\"hb_reference\":kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference(),",
@@ -44,6 +44,12 @@
           "local": "  print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)\n except RepoLedgerEpochRefused as exc:\n  print(json.dumps(exc.refusal,sort_keys=True));raise SystemExit(1)\n print(",
           "count": 1,
           "why": "the CLI prints the kernel's six-field refusal and exits 1"
+        },
+        {
+          "reference": "hb_epoch=None,store=None,idempotent_on=None):",
+          "local": "hb_epoch=None,store=None,idempotent_on=None,hb_provenance=None,provenance_store=None):",
+          "count": 1,
+          "why": "append takes an optional CARRIED provenance and the organization ledger store it is verified against (B-P36f)"
         }
       ]
     },
@@ -55,10 +61,10 @@
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
       "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 17044,
+      "insertion_offset": 17442,
       "insertion_bytes": 2402,
       "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c",
-      "local_sha256": "sha256:a5039120edc401d5da5d8e8c005ed369b25377c1e3654ae81f79ba783ff44dfa",
+      "local_sha256": "sha256:26f2a1e1a6127695eda96c818e9d96940561eff185b524a81a3d4d8b0d0db963",
       "substitutions": [
         {
           "reference": "    source = verify_source(source_receipt)\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
@@ -89,6 +95,18 @@
           "local": "        print(json.dumps(location_refusal(exc), sort_keys=True))\n        raise SystemExit(1)\n    except kernel.SuppliedEpochRefused as exc:\n        print(json.dumps(exc.refusal, sort_keys=True))\n        raise SystemExit(1)\n    print(",
           "count": 1,
           "why": "the CLI prints the kernel's six-field epoch refusal and exits 1 (B-P36b)"
+        },
+        {
+          "reference": "hb_epoch=None, store=None, idempotent=False):\n    # Admission",
+          "local": "hb_epoch=None, store=None, idempotent=False, hb_provenance=None):\n    # Admission",
+          "count": 1,
+          "why": "append takes an optional CARRIED provenance (B-P36f)"
+        },
+        {
+          "reference": "    target = store or open_store(ledger_root())\n    target.initialize()\n    # The storage substrate owns serialization.",
+          "local": "    target = store or open_store(ledger_root())\n    if hb_provenance is not None:\n        # A CARRIED epoch is verified against this ledger's own head before anything is written.\n        heartbeat = kernel.carried_hb_reference(\n            hb_epoch, hb_provenance, store=target, head_key=HEAD_KEY, receipt_key=receipt_key,\n            retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)\")\n    target.initialize()\n    # The storage substrate owns serialization.",
+          "count": 1,
+          "why": "a CARRIED epoch's provenance (source, head_receipt_sha) is recorded in hb_reference, verified by this writer against the current organization ledger head (kernel.carried_hb_reference) before anything is written, CARRIED_PROVENANCE_UNVERIFIED otherwise; the fields are additive and absent for SUPPLIED and CLOCK references (B-P36f, coordinator ruling 07:22Z)"
         }
       ]
     },
@@ -134,7 +152,7 @@
     "resident-runtime/organization_manifest_ingress.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:5ce20fd990d72980aa835cd2de073a4141bacb33ec995d0ea229c42f8cf198c5",
-      "local_sha256": "sha256:29bcc3d6f7b641181d219a8654725056fc36fea39f383deade34c4ec487c60a5",
+      "local_sha256": "sha256:5b2eb8b95a324cc72ca372e58251180c57b9887109dff0f876797df09b9b9f16",
       "substitutions": [
         {
           "reference": "OWNER_REPOSITORY = \"StegVerse-org/.github\"",
@@ -179,10 +197,10 @@
           "why": "the refusal's organization receipt takes the SUPPLIED epoch, never one read back from the repository receipt (B-P36f)"
         },
         {
-          "reference": "    hb_epoch = repository_receipt[\"hb_reference\"][\"epoch\"]\n    organization_receipt = organization_ledger.append(\n        repository_receipt, \"REPO_STATE_PROPAGATION\",\n        predecessor_state, successor_state,\n        {\"receiving_operation\": OPERATION_ID,\n         \"resolved_service_id\": crossing[\"resolved_service_id\"],\n         \"ingress_packet_id\": crossing[\"ingress_packet_id\"],\n         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)\n",
-          "local": "    # The organization receipt takes the SUPPLIED epoch (B-P36f); the outbound\n    # frame then takes the repository receipt's epoch, CARRIED and validated.\n    carried = organization_ledger.kernel.carried_epoch(\n        repository_receipt[\"hb_reference\"], retry_entrypoint=\"resident-runtime/organization_manifest_ingress.py::receive\")\n    organization_receipt = organization_ledger.append(\n        repository_receipt, \"REPO_STATE_PROPAGATION\",\n        predecessor_state, successor_state,\n        {\"receiving_operation\": OPERATION_ID,\n         \"resolved_service_id\": crossing[\"resolved_service_id\"],\n         \"ingress_packet_id\": crossing[\"ingress_packet_id\"],\n         \"egress_packet_id\": crossing[\"egress_packet_id\"]},\n        \"NONE\", hb_epoch=hb_epoch, idempotent=True)\n    hb_epoch = carried\n",
+          "reference": "    # Everything after the repository receipt takes its epoch from that receipt,\n    # so a replay rebuilds the same organization receipt and the same outbound\n    # frame rather than ones stamped with whatever epoch this attempt carried.\n    hb_epoch = repository_receipt[\"hb_reference\"][\"epoch\"]\n",
+          "local": "    # Everything after the repository receipt takes the SUPPLIED epoch, never\n    # one read back from that receipt (B-P36f). A request already recorded is\n    # answered from the ledger before it is received again (--recorded-for).\n",
           "count": 1,
-          "why": "the organization receipt takes the SUPPLIED epoch; the outbound frame keeps the repository receipt's epoch, CARRIED through kernel.carried_epoch, which refuses a clock-derived or unmarked reference with six fields (B-P36f)"
+          "why": "the organization receipt and the outbound frame take the SUPPLIED epoch, never one read back from the repository receipt; a recorded request is answered from the ledger before it is received again (B-P36f, 07:08Z(2))"
         }
       ]
     }

@@ -111,6 +111,11 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         return emit.append("B_P36B:source", "B_P36B_TEST", "sha256:" + "0" * 64, "sha256:" + "1" * 64,
                            {}, "NONE", hb_epoch=32)
 
+    def repo_receipt_unwritten(self):
+        body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/.github",
+                "transition_id": "b-p36h-unwritten", "hb_reference": self.agg.kernel.hb_reference(epoch=32)}
+        return {**body, "receipt_sha256": self.agg.sha(body)}
+
     def test_the_aggregate_append_refuses_before_the_store_opens(self):
         source = self.repo_receipt()
         self.no_clock()
@@ -233,7 +238,9 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         clock = {**body["hb_reference"], "derived_from_clock": True, "sampled_unix_ns": 1}
         unflagged = {k: v for k, v in clock.items() if k != "derived_from_clock"}
         for name, reference, code in (("derived_from_clock true", clock, "HB_EPOCH_INVALID"),
-                                      ("sampled, unflagged", unflagged, "HB_EPOCH_PROVENANCE_UNMARKED")):
+                                      ("sampled, unflagged", unflagged, "HB_EPOCH_INVALID"),
+                                      ("unflagged", {k_: v for k_, v in body["hb_reference"].items()
+                                                     if k_ != "derived_from_clock"}, "HB_EPOCH_PROVENANCE_UNMARKED")):
             with self.subTest(head=name):
                 receipt = {**body, "hb_reference": reference}
                 receipt["receipt_sha256"] = self.agg.sha(receipt)
@@ -253,12 +260,16 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                         if (r.get("boundary_evidence") or {}).get("operation") == "ORGANIZATION_FEDERATION_CROSSING_EMITTED"]
         self.assertTrue(emitted and organization)
         for receipt, evidence in [(r, r["evidence"]) for r in emitted] + [(r, r["boundary_evidence"]) for r in organization]:
-            self.assertEqual(evidence["hb_epoch_provenance"], {
-                "provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD", "source": "ORGANIZATION_LEDGER_HEAD",
-                "head_receipt_sha256": genesis["receipt_sha256"], "epoch": genesis["hb_reference"]["epoch"],
-                "derived_from_clock": False})
+            # CARRIED is classified from hb_reference alone; evidence keeps a duplicate.
+            self.assertEqual(receipt["hb_reference"]["source"], "ORGANIZATION_LEDGER_HEAD")
+            self.assertEqual(receipt["hb_reference"]["head_receipt_sha"], genesis["receipt_sha256"])
             self.assertEqual(receipt["hb_reference"]["epoch"], genesis["hb_reference"]["epoch"])
             self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+            self.assertNotIn("sampled_unix_ns", receipt["hb_reference"])
+            self.assertEqual(evidence["hb_epoch_provenance"], {
+                "provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD", "source": "ORGANIZATION_LEDGER_HEAD",
+                "head_receipt_sha": genesis["receipt_sha256"], "epoch": genesis["hb_reference"]["epoch"],
+                "derived_from_clock": False})
 
     def kernel_custody(self):
         k = self.crossing.kernel
@@ -337,14 +348,26 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         # B-P36h (P): a heartbeat reference must mark derived_from_clock exactly
         # false, or carry a CARRIED provenance; an unmarked one is refused.
         k = self.crossing.kernel
-        unmarked = {k_: v for k_, v in k.hb_reference(epoch=4096).items() if k_ != "derived_from_clock"}
-        self.assertEqual(k.supplied_epoch_failure(4096, unmarked)[0], "HB_EPOCH_PROVENANCE_UNMARKED")
+        # 07:34Z: supplied_epoch_failure stays at its pinned text; the companion
+        # reference_provenance_failure decides provenance, in its ruled order.
+        supplied = k.hb_reference(epoch=4096)
+        unmarked = {k_: v for k_, v in supplied.items() if k_ != "derived_from_clock"}
+        self.assertIsNone(k.supplied_epoch_failure(4096, unmarked))
+        for reference, code in (([], "HB_EPOCH_INVALID"),
+                                ({**supplied, "derived_from_clock": True}, "HB_EPOCH_INVALID"),
+                                ({**supplied, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
+                                ({**unmarked, "sampled_unix_ns": 1}, "HB_EPOCH_INVALID"),
+                                (unmarked, "HB_EPOCH_PROVENANCE_UNMARKED")):
+            with self.subTest(reference=reference):
+                self.assertEqual(k.reference_provenance_failure(reference)[0], code)
+        self.assertIsNone(k.reference_provenance_failure(supplied))
+        self.assertIsNone(k.reference_provenance_failure(
+            {**supplied, "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": "sha256:" + "0" * 64}))
         with self.assertRaises(k.SuppliedEpochRefused) as raised:
             k.carried_epoch(unmarked, retry_entrypoint="test")
         self.assertEqual(raised.exception.refusal["failure_code"], "HB_EPOCH_PROVENANCE_UNMARKED")
         for field in SIX_FIELDS:
             self.assertTrue(raised.exception.refusal[field], field)
-        self.assertIsNone(k.supplied_epoch_failure(4096, {**unmarked, "provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD"}))
 
     def test_the_aggregate_refuses_a_clock_or_unmarked_source_receipt(self):
         # B-P36h (O-1): a CLOCK-provenance repository receipt is never consumed.
@@ -374,19 +397,31 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         self.open_ledger()
         self.no_clock()
         k, custody = self.kernel_custody()
-        for provenance in ({"source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha256": "sha256:" + "9" * 64,
-                            "derived_from_clock": False},
-                           {"source": "ORGANIZATION_LEDGER_HEAD", "derived_from_clock": False}):
+        head = self.org_genesis()["receipt_sha256"]
+        for provenance in ({"source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": "sha256:" + "9" * 64},
+                           {"source": "ORGANIZATION_LEDGER_HEAD"},
+                           {"source": "SOMEWHERE_ELSE", "head_receipt_sha": head}):
             with self.subTest(provenance=provenance):
                 before = files_under(self.base)
-                with self.assertRaises(k.SuppliedEpochRefused) as raised:
-                    k.publish_packet(self.packet("b-p36h-invented"), root=self.mesh, custody=custody, epoch=32,
-                                     epoch_provenance=provenance)
-                refusal = raised.exception.refusal
-                self.assertEqual(refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
-                for field in SIX_FIELDS:
-                    self.assertTrue(refusal[field], field)
-                self.assertEqual(files_under(self.base), before)
+                for name, call in (
+                        ("publish_packet", lambda: k.publish_packet(self.packet("b-p36h-invented"), root=self.mesh,
+                                                                     custody=custody, epoch=32,
+                                                                     epoch_provenance=provenance)),
+                        ("emit.append", lambda: self.egress.repository_ledger.append(
+                            "B:invented", "B", "sha256:" + "0" * 64, "sha256:" + "1" * 64, {}, "NONE", hb_epoch=32,
+                            hb_provenance=provenance, provenance_store=custody["organization_store"])),
+                        ("aggregate.append", lambda: self.agg.append(
+                            self.repo_receipt_unwritten(), "REPO_STATE_PROPAGATION", self.agg.FROM_HEAD,
+                            "sha256:" + "2" * 64, {}, "NONE", hb_epoch=32, hb_provenance=provenance))):
+                    with self.subTest(writer=name):
+                        # Each module loads its own kernel, so match the refusal, not the class.
+                        with self.assertRaises(ValueError) as raised:
+                            call()
+                        refusal = raised.exception.refusal
+                        self.assertEqual(refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
+                        for field in SIX_FIELDS:
+                            self.assertTrue(refusal[field], field)
+                        self.assertEqual(files_under(self.base), before)
 
     def test_an_answer_is_published_at_the_answered_frame_epoch(self):
         # B-P36g / 07:10Z: the inbound frame's validated epoch is SUPPLIED for the

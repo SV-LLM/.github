@@ -192,7 +192,7 @@ def main():
         print(json.dumps(exc.refusal, sort_keys=True))
         raise SystemExit(1)
     provenance = {"provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD", "source": "ORGANIZATION_LEDGER_HEAD",
-                  "head_receipt_sha256": head["receipt_sha256"], "epoch": epoch, "derived_from_clock": False}
+                  "head_receipt_sha": head["receipt_sha256"], "epoch": epoch, "derived_from_clock": False}
     custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
                                  org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
     # The kernel verifies the provenance against the current organization
