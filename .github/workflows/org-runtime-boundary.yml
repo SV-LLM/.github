@@ -33,7 +33,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Validate organization boundary
         run: |
           python org-runtime/runtime_boundary.py validate | tee /tmp/org-boundary.json
@@ -70,7 +70,7 @@ jobs:
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
         run: python -B resident-runtime/reference_adoption.py verify
       - name: Check out the recorded StegVerse-org reference commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           repository: StegVerse-org/.github
           ref: 2bacf5c918cac58d6a6b8af9cfe0b93e3060ee0c
