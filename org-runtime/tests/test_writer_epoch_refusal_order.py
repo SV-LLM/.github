@@ -118,6 +118,16 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                     source, "REPO_STATE_PROPAGATION", self.agg.GENESIS, "sha256:" + "2" * 64, {}, "NONE",
                     hb_epoch=epoch), epoch, self.agg.kernel.SuppliedEpochRefused)
 
+    def test_the_aggregate_append_takes_the_text_4096(self):
+        # V-P11 N1: the raw text "4096" used to reach kernel.hb_reference, whose
+        # int check refused it with a bare ValueError.
+        source = self.repo_receipt()
+        self.no_clock()
+        receipt = self.agg.append(source, "REPO_STATE_PROPAGATION", self.agg.GENESIS, "sha256:" + "2" * 64,
+                                  {}, "NONE", hb_epoch="4096")
+        self.assertEqual(receipt["hb_reference"]["epoch"], 4096)
+        self.assertIs(receipt["hb_reference"]["derived_from_clock"], False)
+
     def test_crossing_record_carries_the_six_field_refusal(self):
         self.no_clock()
         for epoch in REFUSED:
@@ -192,7 +202,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                    "subject": "purpose-neutral mesh diagnostic",
                    "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "b-p36b"}}
         emitted = self.egress.emit(PEER, payload, standing=STANDING, capability="intr-destination",
-                                   mesh_root=self.mesh, hb_epoch=4096)
+                                   mesh_root=self.mesh, hb_epoch="4096")
         self.assertEqual(emitted["disposition"], "ALLOW", emitted.get("detail"))
         frames = [json.loads(Path(p).read_text()) for p in files_under(self.mesh) if p.endswith(".json")]
         references = [f["heartbeat_reference"] for f in frames if isinstance(f, dict) and "heartbeat_reference" in f]
