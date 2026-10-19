@@ -116,6 +116,11 @@ class SdkPresence(unittest.TestCase):
         self.assertNotIn("pip install", text)
         self.assertIn('echo "PYTHONPATH=$GITHUB_WORKSPACE/sdk" >> "$GITHUB_ENV"', text)
 
+    def test_the_workflow_uses_no_action_beyond_checkout(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        actions = set(re.findall(r"uses: ([^@\s]+)@", text))
+        self.assertEqual(actions, {"actions/checkout"})
+
 
 class ContractBinding(unittest.TestCase):
     """sdk-manifest-ingress / SUBMIT_MANIFEST resolves to one operation owned here."""

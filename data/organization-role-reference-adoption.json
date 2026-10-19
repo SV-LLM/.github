@@ -125,7 +125,8 @@
         "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
-        "identity checks name SV-LLM/.github"
+        "identity checks name SV-LLM/.github",
+        "run evidence is written to the job summary instead of actions/upload-artifact; the durable receipts are on the ledger ref, and no third-party action beyond checkout is used"
       ]
     }
   }
