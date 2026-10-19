@@ -136,7 +136,7 @@ def supplied_epoch(hb_epoch:Any, entrypoint:str)->int:
     return kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=entrypoint+" (hb_epoch=, or --hb-epoch)")["epoch"]
 
 def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Path=ROOT, genesis:bool=False,
-           hb_epoch:int|None=None)->dict[str,Any]:
+           hb_epoch:int|None=None, idempotent:bool=False)->dict[str,Any]:
     """Append one transition to the repository ledger, then the organization ledger.
 
     ``hb_epoch`` is the caller's supplied heartbeat epoch. An absent or invalid
@@ -157,7 +157,11 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
                         "--transition-id",transition_id,"--transition-class",transition_class,
                         "--predecessor-state-sha256",predecessor,"--successor-state-sha256",successor,
                         "--evidence-json",json.dumps(outcome,sort_keys=True),"--authority-effect","NONE",
-                        "--hb-epoch",str(hb_epoch)],
+                        "--hb-epoch",str(hb_epoch),
+                        # A consumed frame's record is idempotent at both levels: a frame retried
+                        # after a fault in this organization's own ledger write is recorded once
+                        # (F-TRANSIENT-RT). Other records are a new transition each time.
+                        *(["--idempotent"] if idempotent else [])],
                        capture_output=True,text=True,env=dict(os.environ))
     if run.returncode!=0:
         try: refusal=json.loads(run.stdout)
@@ -170,7 +174,8 @@ def record(transition_class:str, *, subject:Any, outcome:dict[str,Any], root:Pat
         repo_receipt,org_transition_class=transition_class,
         boundary_evidence={"disposition":outcome["disposition"],"credential_authority":CREDENTIAL_AUTHORITY,
                            "transition_authority":"Interlock/InTr"},
-        authority_effect="NONE",genesis=genesis,hb_epoch=hb_epoch)  # the SUPPLIED epoch, not one read back (B-P36f)
+        authority_effect="NONE",genesis=genesis,hb_epoch=hb_epoch,  # the SUPPLIED epoch, not one read back (B-P36f)
+        idempotent=idempotent)
     return {"repo_receipt_sha256":repo_receipt["receipt_sha256"],"org_receipt_sha256":org_receipt["receipt_sha256"]}
 
 def open_organization_ledger(root:Path=ROOT, *, hb_epoch:int|None=None)->dict[str,Any]:
@@ -299,7 +304,7 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
             outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
                      "destination_service":result["service_id"],"terminal_receipt_id":result["reconstruction"]["terminal_receipt_id"],
                      **{key:result[key] for key in SELECTION_FIELDS}}
-            return {"transition_class":INGRESS_CONSUMED,**outcome,**record(INGRESS_CONSUMED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
+            return {"transition_class":INGRESS_CONSUMED,**outcome,**record(INGRESS_CONSUMED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch,idempotent=True)}
         manifest=require_manifest(manifest)
         if manifest["destination"]["organization"]!=ORG: raise Refused("MANIFEST_DESTINATION_ORGANIZATION_MISMATCH")
         standing=kernel.node_standing(root)
@@ -315,12 +320,12 @@ def _ingest(root:Path, frame:dict[str,Any], node_state:Any, custody:dict[str,Any
     except Refused as refused:
         outcome=refusal_outcome(refused,INGRESS_RETRY,packet_id=frame.get("packet_id"),
                                 origin_organization=frame.get("origin_org"))
-        return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
+        return {"transition_class":INGRESS_REFUSED,**outcome,**record(INGRESS_REFUSED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch,idempotent=True)}
     outcome={"disposition":ALLOW,"packet_id":packet["packet_id"],"origin_organization":packet["origin"]["org"],
              "manifest_id":manifest["manifest_id"],"manifest_sha256":sha(manifest),"destination_repository":ORG+"/"+name,
              "materialization_sha256":sha(materialized),**{key:selected[key] for key in SELECTION_FIELDS}}
     return {"transition_class":INGRESS_MATERIALIZED,**outcome,"materialization_path":path,
-            **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch)}
+            **record(INGRESS_MATERIALIZED,subject=subject,outcome=outcome,root=root,hb_epoch=hb_epoch,idempotent=True)}
 
 def epoch_conflict(frame:dict[str,Any], supplied:int, carried:int)->dict[str,Any]:
     """The six-field HB_EPOCH_CONFLICT of an ingress handed an epoch its frame contradicts."""
@@ -370,7 +375,7 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
         # A verified CARRIED frame is quarantined here: this route's receipts
         # (the emitter CLI) take no provenance, and stripping it is laundering (B-P36m).
         try:
-            kernel.recover_packet(item["frame"])  # digests and heartbeat reference first (B-P36o)
+            kernel.recover_admissible(item["frame"],retry_entrypoint="org-runtime/crossing.py::ingress")  # B-P36o
             frame_epoch,provenance=kernel.ingest_epoch(item["frame"],custody=custody,
                                                        retry_entrypoint="org-runtime/crossing.py::ingress")
             refusal=None
@@ -390,14 +395,21 @@ def ingress(*, mesh_root:Path|None=None, node_state_root:Path|None=None, root:Pa
             # B-P36l: the supplied epoch and the frame's disagree. Nothing is
             # written and the frame is not marked, so a pass at its epoch takes it.
             results.append(epoch_conflict(item["frame"],hb_epoch,frame_epoch)); continue
-        try: result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
-        except OSError as exc:  # dispatch or ledger IO here: no marker, the frame stays pending
-            results.append({"transition_class":INGRESS_REFUSED,"packet_id":item["frame"].get("packet_id"),
-                            **kernel.io_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")}); continue
-        except Exception as exc:  # any other per-frame error: quarantined, the pass goes on (B-P36o)
+        try:
+            result=_ingest(root,item["frame"],node_state,custody,hb_epoch)
+            kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},
+                                              store=node_state)
+        except (Exception,SystemExit) as exc:
+            if kernel.writer_fault(exc):
+                # This organization's own write (IO, a CAS race, contention, a collision): no
+                # marker, the frame stays pending, and the idempotent record takes it once.
+                results.append({"transition_class":INGRESS_REFUSED,"packet_id":item["frame"].get("packet_id"),
+                                **kernel.io_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")}); continue
+            if isinstance(exc,SystemExit):
+                raise
+            # any other per-frame error: quarantined, the pass goes on (B-P36o)
             refusal=kernel.frame_failure_refusal(exc,retry_entrypoint="org-runtime/crossing.py::ingress")
             results.append(kernel.quarantine_frame(root,item,refusal,store=node_state)["result"]); continue
-        kernel.mark_federation_frame_seen(root,item["path"],item["frame"],{"status":result["transition_class"]},store=node_state)
         results.append(result)
     return results
 

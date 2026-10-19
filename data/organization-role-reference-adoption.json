@@ -13,7 +13,7 @@
     ".stegverse/transition-ledger/emit.py": {
       "rule": "declared_substitutions",
       "reference_sha256": "sha256:0cfe86a62359ac9094ea9f0f84e653f70a0906409582250d6adfc6a72aa36b2e",
-      "local_sha256": "sha256:4eafddbf305fc06c17de48c69d22fd7d8158728c4f7a1a2681c2bd0c7649b33f",
+      "local_sha256": "sha256:d9e999f2ba753e91a0fc13e18bd47d2acd0dabb778150b2bed20ac04819ef034",
       "substitutions": [
         {
           "reference": "_ABSENT=object()\ndef append(",
@@ -35,9 +35,9 @@
         },
         {
           "reference": "p.add_argument(\"--hb-epoch\",type=int,default=None,help=\"heartbeat epoch; derived from the host clock, and marked as derived, when absent\")",
-          "local": "p.add_argument(\"--hb-epoch\",default=None,help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\")",
+          "local": "p.add_argument(\"--hb-epoch\",default=None,help=\"heartbeat epoch from the carrier tick; required, never derived from the host clock\");p.add_argument(\"--idempotent\",action=\"store_true\",help=\"return the receipt the chain already records for this transition rather than minting another\")",
           "count": 1,
-          "why": "the CLI takes the epoch as text so the kernel rule, not argparse coercion, decides it ('+33' is refused), and the help states it is required"
+          "why": "the CLI takes the epoch as text so the kernel rule, not argparse coercion, decides it ('+33' is refused), and the help states it is required; --idempotent returns the receipt the chain already records for this transition (F-TRANSIENT-RT)"
         },
         {
           "reference": "  print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)\n print(",
@@ -50,6 +50,12 @@
           "local": "hb_epoch=None,store=None,idempotent_on=None,hb_provenance=None,provenance_store=None):",
           "count": 1,
           "why": "append takes an optional CARRIED provenance and the organization ledger store it is verified against (B-P36f)"
+        },
+        {
+          "reference": "json.loads(a.evidence_json),a.authority_effect,a.hb_epoch)\n",
+          "local": "json.loads(a.evidence_json),a.authority_effect,a.hb_epoch,idempotent_on=() if a.idempotent else None)\n",
+          "count": 1,
+          "why": "the CLI's --idempotent maps to idempotent_on=() (F-TRANSIENT-RT)"
         }
       ]
     },
@@ -60,11 +66,11 @@
     "resident-runtime/aggregate_repo_transition.py": {
       "rule": "declared_insertion",
       "reference_sha256": "sha256:14f59a420696d19e88dccd842c3f4373e7a2494083e35a1d429fbaac8e1cfb7c",
-      "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main())",
-      "insertion_offset": 17442,
-      "insertion_bytes": 2402,
-      "insertion_sha256": "sha256:3519c180e35b139c60f67907b98757ed1e6c387fdafdfc5dbe62a47ef86fbd0c",
-      "local_sha256": "sha256:26f2a1e1a6127695eda96c818e9d96940561eff185b524a81a3d4d8b0d0db963",
+      "insertion": "SV_LLM_LEGACY_RECEIPT_CHAIN compatibility wrapper (temporary; between append() and main()); aggregate_transition passes idempotent through (F-TRANSIENT-RT)",
+      "insertion_offset": 17905,
+      "insertion_bytes": 2443,
+      "insertion_sha256": "sha256:0389531b99d8b6d8ee7edaa0c137022d3b583b82ce0812369d3682133a84425c",
+      "local_sha256": "sha256:ea5c820a732083fa2729b58209b4e993c965fa84b5e0e340321a97e1fe3cb6e8",
       "substitutions": [
         {
           "reference": "    source = verify_source(source_receipt)\n    if predecessor_state not in (FROM_HEAD, GENESIS):",
@@ -98,9 +104,9 @@
         },
         {
           "reference": "hb_epoch=None, store=None, idempotent=False):\n    # Admission",
-          "local": "hb_epoch=None, store=None, idempotent=False, hb_provenance=None):\n    # Admission",
+          "local": "hb_epoch=None, store=None, idempotent=False, hb_provenance=None):\n    if hb_provenance is not None:\n        # A CARRIED provenance is verified before admission, so an unverified one is\n        # six-field CARRIED_PROVENANCE_UNVERIFIED rather than a later bare exit.\n        kernel.carried_hb_reference(\n            hb_epoch, hb_provenance, store=store or open_store(ledger_root()), head_key=HEAD_KEY,\n            receipt_key=receipt_key, retry_entrypoint=\"resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)\")\n    # Admission",
           "count": 1,
-          "why": "append takes an optional CARRIED provenance (B-P36f)"
+          "why": "append takes an optional CARRIED provenance, verified before admission (B-P36f; V-P11 (6))"
         },
         {
           "reference": "    target = store or open_store(ledger_root())\n    target.initialize()\n    # The storage substrate owns serialization.",
@@ -253,7 +259,7 @@
       "deviations": [
         "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
-        "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; a push is a request",
+        "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; there is no push trigger: a push carries no epoch, so a committed request is received only when dispatched with mode=request and hb_epoch (B-P36n)",
         "identity checks name SV-LLM/.github",
         "a request is received only at a supplied hb_epoch: one that would append without one (HB_EPOCH_NOT_SUPPLIED) or with an invalid one (HB_EPOCH_INVALID) fails closed with kernel.writer_epoch_refusal's six fields before it is received (B-P31, B-P36), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
       ]

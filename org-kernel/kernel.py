@@ -254,8 +254,9 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
     head_receipt_sha is the current head of `store`, that head's heartbeat
     reference is SUPPLIED (passes supplied_epoch_failure), and the
     epoch is the head's. The reference returned is the supplied one plus
-    `source` and `head_receipt_sha` (derived_from_clock false). Anything else
-    is six-field CARRIED_PROVENANCE_UNVERIFIED. No clock is read.
+    `source` and `head_receipt_sha` (derived_from_clock false). The head
+    receipt's digest is recomputed, so a tampered head never verifies. Anything
+    else is six-field CARRIED_PROVENANCE_UNVERIFIED. No clock is read.
     """
     epoch=supplied_hb_reference(hb_epoch,retry_entrypoint=retry_entrypoint)["epoch"]
     head=store.get(head_key) if store is not None else None
@@ -266,6 +267,9 @@ def carried_hb_reference(hb_epoch:Any, provenance:Any, *, store:Any, head_key:st
         detail="the provenance source is not "+CARRIED_SOURCE_ORGANIZATION_LEDGER_HEAD
     elif head_receipt is None:
         detail="head_receipt_sha is not the current ledger head"
+    elif (head_receipt.get("receipt_sha256")!=head_sha
+          or sha({k:v for k,v in head_receipt.items() if k!="receipt_sha256"})!=head_sha):
+        detail="the ledger head receipt does not recompute to head_receipt_sha"
     else:
         reference=head_receipt.get("hb_reference")
         failure=supplied_epoch_failure((reference or {}).get("epoch") if isinstance(reference,dict) else None,
@@ -325,6 +329,12 @@ def ingest_epoch(frame:Any, *, custody:dict[str,Any], retry_entrypoint:str)->tup
         epoch=frame_epoch(frame,custody=custody,retry_entrypoint=retry_entrypoint)
     except SuppliedEpochRefused as exc:
         epoch_value=reference.get("epoch") if isinstance(reference,dict) else None
+        if isinstance(reference,dict) and ("source" in reference or "head_receipt_sha" in reference):
+            # A CARRIED claim on a clock-form reference never verifies; it is not consumed as CLOCK.
+            refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+            refusal.update(failure_code=CARRIED_PROVENANCE_UNVERIFIED,
+                           detail="a CARRIED claim on a clock-form heartbeat reference: "+exc.refusal["detail"])
+            raise SuppliedEpochRefused(refusal) from None
         if (exc.refusal.get("failure_code")=="HB_EPOCH_INVALID" and clock_reference(reference)
                 and supplied_epoch_failure(epoch_value) is None):
             return None,None  # a well-formed CLOCK frame; a malformed one stays refused (F-S1a)
@@ -363,12 +373,26 @@ def ingest_refusal(frame:Any, epoch:int|None, provenance:dict[str,Any]|None, reg
     return None
 
 FRAME_DISPATCH_IO_FAILED="FRAME_DISPATCH_IO_FAILED"
+
+class LedgerWriteFailed(RuntimeError):
+    """A fault writing this organization's own state: never the frame's defect, never terminal."""
+
+_WRITER_FAULT_MARKERS=("ledger_append_lost_comparison","CONTENTION_EXHAUSTED","ledger_receipt_collision",
+                       "write_once_collision","federation_seen_marker_collision","REPO_LEDGER_APPEND_FAILED",
+                       "git update-ref failed")
+
+def writer_fault(exc:BaseException)->bool:
+    """OSError, a CAS race, contention or a store collision while writing this organization's state."""
+    if isinstance(exc,(OSError,LedgerWriteFailed)):
+        return True
+    return any(marker in str(exc) for marker in _WRITER_FAULT_MARKERS)
 HB_REFERENCE_INVALID="HB_REFERENCE_INVALID"
 FRAME_INTEGRITY_INVALID="FRAME_INTEGRITY_INVALID"
 FRAME_INGEST_FAILED="FRAME_INGEST_FAILED"
 _REFERENCE_ERRORS=("heartbeat_reference_invalid","heartbeat_generation_mismatch","heartbeat_id_mismatch",
                    "heartbeat_frequency_mismatch","heartbeat_progression_not_oscillator")
-_INTEGRITY_ERRORS=("carrier_frame_hash_mismatch","packet_hash_mismatch","packet_id_mismatch","destination_org_mismatch")
+_INTEGRITY_ERRORS=("carrier_frame_hash_mismatch","packet_hash_mismatch","packet_id_mismatch","destination_org_mismatch",
+                   "carrier_channel_mismatch")
 
 def frame_failure_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
     """Any error ingesting one frame, as a six-field refusal (B-P36o).
@@ -402,11 +426,29 @@ def io_refusal(exc:BaseException, *, retry_entrypoint:str)->dict[str,Any]:
     pending, and the idempotent appends consume it exactly once on a later cycle.
     """
     refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
-    refusal.update(failure_code=FRAME_DISPATCH_IO_FAILED,failed_predicate=type(exc).__name__,
+    refusal.update(failure_code=FRAME_DISPATCH_IO_FAILED,failed_predicate=type(exc).__name__,terminal=False,
                    detail=type(exc).__name__+": "+str(exc),
                    required_evidence_or_repair="this organization's own dispatch or ledger storage is writable",
                    next_attempt="the frame is still pending; the next cycle consumes it, once")
     return refusal
+
+def recover_admissible(frame:Any, *, retry_entrypoint:str)->dict[str,Any]:
+    """Recover a consumed frame's packet, refusing what the frame itself gets wrong.
+
+    A heartbeat reference with no epoch is HB_EPOCH_NOT_SUPPLIED, not
+    INVALID. Recovery then checks the digests and the reference
+    (recover_packet), and the carrier channel must be the one the payload
+    derives (a wrong-typed or forged channel is FRAME_INTEGRITY_INVALID).
+    """
+    reference=frame.get("heartbeat_reference") if isinstance(frame,dict) else None
+    if isinstance(reference,dict) and reference.get("epoch") is None:
+        refusal=writer_epoch_refusal(None,retry_entrypoint=retry_entrypoint)
+        refusal["detail"]="the frame's heartbeat reference carries no epoch"
+        raise SuppliedEpochRefused(refusal)
+    packet=recover_packet(frame)
+    if frame.get("channel")!=derive_channel(sha(packet.get("payload",{}))):
+        raise ValueError("carrier_channel_mismatch")
+    return packet
 
 def admit_frame(frame:Any, *, custody:dict[str,Any], registry:dict[str,Any],
                 retry_entrypoint:str)->tuple[int|None,dict[str,Any]|None,dict[str,Any]|None]:
@@ -418,7 +460,7 @@ def admit_frame(frame:Any, *, custody:dict[str,Any], registry:dict[str,Any],
     quarantines, so one bad frame never stops the cycle (B-P36o, F-S1a).
     """
     try:
-        recover_packet(frame)
+        recover_admissible(frame,retry_entrypoint=retry_entrypoint)
         epoch,provenance=ingest_epoch(frame,custody=custody,retry_entrypoint=retry_entrypoint)
         return epoch,provenance,ingest_refusal(frame,epoch,provenance,registry,retry_entrypoint=retry_entrypoint)
     except OSError as exc:  # this organization's own storage (a CARRIED head read), not the frame
@@ -432,9 +474,10 @@ def quarantine_frame(repo_root:Path, item:dict[str,Any], refusal:dict[str,Any], 
     The frame is never re-processed and never blocks a later cycle (B-P36j).
     No receipt is written and no clock is read: the marker carries no time.
     """
-    result={"status":"REFUSED","disposition":"FAIL_CLOSED","failure_code":FRAME_REFUSED_QUARANTINED,
+    result={"status":"REFUSED","disposition":"FAIL_CLOSED","failure_code":refusal["failure_code"],
+            "quarantine":FRAME_REFUSED_QUARANTINED,"terminal":True,
             "failed_predicate":refusal["failed_predicate"],
-            "detail":refusal["failure_code"]+": "+refusal["detail"],
+            "detail":refusal["detail"],
             "required_evidence_or_repair":refusal["required_evidence_or_repair"],
             "retry_entrypoint":refusal["retry_entrypoint"],"owning_existing_goal":refusal["owning_existing_goal"],
             "next_attempt":"none for this frame: it is quarantined and never re-processed; its sender "
@@ -644,7 +687,8 @@ __all__=["hb_reference","derive_channel","carrier_frame","recover_packet","dispa
          "SHARED_VALIDATOR_SHA256",
          "require_supplied_source","carried_hb_reference",
          "frame_epoch","quarantine_frame","ingest_epoch","ingest_refusal",
-         "admit_frame","frame_failure_refusal","io_refusal",
+         "admit_frame","frame_failure_refusal","io_refusal","recover_admissible",
+         "LedgerWriteFailed","writer_fault",
          "MAX_FRAME_FILE_BYTES"]
 
 
@@ -735,6 +779,8 @@ def scan_addressed_frames(organization:str, *, root:Path|None=None, store:Any|No
             frame=target.get(key)
             if frame is not None and not isinstance(frame,dict):
                 raise TypeError("frame_is_not_an_object")
+            if frame is not None and not isinstance(frame.get("destination_org"),str):
+                raise TypeError("destination_org_is_not_a_string")  # F-TYPE: quarantined, never silently skipped
         except Exception as exc:  # this file's failure is this file's refusal
             if include_unreadable:
                 out.append({"key":key,"name":node_store_module.frame_name(key),"path":target.locator(key),
@@ -851,12 +897,13 @@ def consume_addressed_frames(repo_root:Path, *, mesh_root:Path|None=None, seen:s
             try:
                 result,recorded=ingest_recorded(repo_root,item,custody,registry,node_state=node_state,
                                                 epoch=epoch,mesh_root=mesh_root,hb_provenance=provenance)
-            except OSError as exc:
-                refusal=io_refusal(exc,retry_entrypoint=entry)
             except Exception as exc:
-                if any(marker in str(exc) for marker in CUSTODY_REFUSALS):
+                if writer_fault(exc):  # before the content guard: our own write, the frame stays pending
+                    refusal=io_refusal(exc,retry_entrypoint=entry)
+                elif any(marker in str(exc) for marker in CUSTODY_REFUSALS):
                     raise
-                refusal=frame_failure_refusal(exc,retry_entrypoint=entry)
+                else:
+                    refusal=frame_failure_refusal(exc,retry_entrypoint=entry)
         if refusal is not None:
             # Terminal when node state can hold the quarantine; without it the
             # refusal is returned, nothing is written, and the cycle goes on.
@@ -1159,6 +1206,19 @@ def _append_both(custody:dict[str,Any], identity:str, transition_class:str, pred
     """
     emitter=custody["emitter"]; organization_ledger=custody["organization_ledger"]
     carried={} if hb_provenance is None else {"hb_provenance":hb_provenance}
+    try:
+        return _append_both_writes(custody,emitter,organization_ledger,carried,identity,transition_class,
+                                   predecessor,successor,evidence,organization_evidence,epoch)
+    except SuppliedEpochRefused:
+        raise
+    except (Exception,SystemExit) as exc:  # this organization's own write: transient, never the frame's
+        if writer_fault(exc):
+            raise LedgerWriteFailed(type(exc).__name__+": "+str(exc)) from exc
+        raise
+
+def _append_both_writes(custody:dict[str,Any], emitter:Any, organization_ledger:Any, carried:dict[str,Any],
+                        identity:str, transition_class:str, predecessor:str, successor:str,
+                        evidence:dict[str,Any], organization_evidence:dict[str,Any], epoch:int|None)->dict[str,Any]:
     repository_receipt=emitter.append(
         identity,transition_class,predecessor,successor,evidence,"NONE",hb_epoch=epoch,
         store=custody["repository_store"],idempotent_on=("frame_sha256","packet_id"),
@@ -1323,12 +1383,13 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
             try:
                 result,recorded=ingest_recorded(repo_root,item,custody,registry,node_state=node_state,
                                                 epoch=epoch,mesh_root=mesh_root,hb_provenance=provenance)
-            except OSError as exc:
-                refusal=io_refusal(exc,retry_entrypoint=entry)
             except Exception as exc:
-                if any(marker in str(exc) for marker in CUSTODY_REFUSALS):
+                if writer_fault(exc):  # before the content guard: our own write, the frame stays pending
+                    refusal=io_refusal(exc,retry_entrypoint=entry)
+                elif any(marker in str(exc) for marker in CUSTODY_REFUSALS):
                     raise
-                refusal=frame_failure_refusal(exc,retry_entrypoint=entry)
+                else:
+                    refusal=frame_failure_refusal(exc,retry_entrypoint=entry)
         if refusal is not None:
             if refusal["failure_code"]==FRAME_DISPATCH_IO_FAILED:  # no marker: the frame stays pending
                 out.append({"path":item["path"],"result":{"status":"REFUSED",**refusal},"response_publication":None,
@@ -1344,12 +1405,21 @@ def consume_and_respond(repo_root:Path, *, mesh_root:Path|None=None, node_state_
         response_publication=None
         packet=result.get("packet") or {}
         message_class=(packet.get("payload") or {}).get("message_class")
-        if result.get("status")=="CONSUMED" and message_class in RESPONDED_REQUEST_CLASSES:
-            # The answer is the return leg of the crossing just recorded, so it
-            # is carried rather than recorded as a second emission.
-            response=build_control_response(packet,result["execution_result"])
-            response_publication=_carry(response,root=mesh_root,now_ns=None,epoch=answer_epoch)
-        marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=node_state)
+        try:
+            if result.get("status")=="CONSUMED" and message_class in RESPONDED_REQUEST_CLASSES:
+                # The answer is the return leg of the crossing just recorded, so it
+                # is carried rather than recorded as a second emission.
+                response=build_control_response(packet,result["execution_result"])
+                response_publication=_carry(response,root=mesh_root,now_ns=None,epoch=answer_epoch)
+            marker=mark_federation_frame_seen(repo_root,item["path"],item["frame"],result,store=node_state)
+        except Exception as exc:
+            if not writer_fault(exc):
+                raise
+            # The crossing is recorded; the answer is write-once and the record idempotent,
+            # so the frame stays pending and the next cycle completes it once.
+            out.append({"path":item["path"],"result":{"status":"REFUSED",**io_refusal(exc,retry_entrypoint=entry)},
+                        "response_publication":None,"organization_record":recorded,"seen_marker":None})
+            continue
         out.append({"path":item["path"],"result":result,"response_publication":response_publication,
                     "organization_record":recorded,"seen_marker":str(marker)})
     return out
@@ -1447,7 +1517,7 @@ def mark_federation_frame_seen(repo_root:Path, frame_path:str, frame:dict[str,An
       "authority_effect":"NONE_CARRIER_ONLY"
     }
     # A refusal's six fields travel with its marker (B-P36j quarantine).
-    marker.update({key:result[key] for key in ("disposition","failure_code","failed_predicate","detail",
+    marker.update({key:result[key] for key in ("disposition","failure_code","quarantine","failed_predicate","detail",
                                                "required_evidence_or_repair","retry_entrypoint",
                                                "owning_existing_goal","next_attempt") if key in result})
     key=node_store_module.seen_key(frame_name)

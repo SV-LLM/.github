@@ -30,11 +30,11 @@ name: Organization Ledger Transition
 # An existing chain is extended. The published ref is never force-updated.
 # Authority and time are constraint variables. The disposition is transition
 # evidence only.
+#
+# There is no push trigger (B-P36n): a push carries no epoch, so it could only
+# refuse. A committed request is received when dispatched with mode=request and
+# hb_epoch; a request already recorded is answered from the ledger.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.stegverse/transition-requests/**'
   workflow_dispatch:
     inputs:
       mode:
@@ -81,8 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LEDGER_REF: refs/stegverse/organization-ledger
-      # A push runs the committed-request mode. A dispatch names its mode.
-      MODE: ${{ github.event_name == 'push' && 'request' || github.event.inputs.mode || 'self-closure' }}
+      # A dispatch names its mode; without one it is a self-closure.
+      MODE: ${{ github.event.inputs.mode || 'self-closure' }}
       HB_EPOCH: ${{ github.event.inputs.hb_epoch }}
     steps:
       - name: Checkout organization boundary

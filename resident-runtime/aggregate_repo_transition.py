@@ -298,6 +298,12 @@ def recorded(store, head, source_transition_sha256):
 
 def append(source_receipt, org_transition_class, predecessor_state, successor_state,
            boundary_evidence, authority_effect, hb_epoch=None, store=None, idempotent=False, hb_provenance=None):
+    if hb_provenance is not None:
+        # A CARRIED provenance is verified before admission, so an unverified one is
+        # six-field CARRIED_PROVENANCE_UNVERIFIED rather than a later bare exit.
+        kernel.carried_hb_reference(
+            hb_epoch, hb_provenance, store=store or open_store(ledger_root()), head_key=HEAD_KEY,
+            receipt_key=receipt_key, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)")
     # Admission is decided before the append lock is taken; an inadmissible
     # source receipt never contends for the organization ledger.
     source = verify_source(source_receipt)
@@ -382,7 +388,7 @@ STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"
 def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TRANSITION",
                          predecessor_org_state_sha256=None, successor_org_state_sha256=None,
                          boundary_evidence=None, authority_effect="NONE", genesis=False,
-                         hb_epoch=None, store=None):
+                         hb_epoch=None, store=None, idempotent=False):
     """SV-LLM's existing caller shape over the reference append(); temporary.
 
     It preserves SV-LLM's legacy state-digest rule until callers pass explicit
@@ -421,7 +427,7 @@ def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TR
         evidence["state_digest_rule"] = STATE_DIGEST_RULE
         evidence["state_digest_rule_fields"] = applied
     return append(receipt, org_transition_class, predecessor, successor, evidence, authority_effect,
-                  hb_epoch=hb_epoch, store=store)
+                  hb_epoch=hb_epoch, store=store, idempotent=idempotent)
 
 
 def main():

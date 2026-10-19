@@ -515,11 +515,15 @@ class DispatchGuards(unittest.TestCase):
         self.assertEqual((refusal["failure_code"], refusal["failed_predicate"]),
                          ("HB_EPOCH_INVALID", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
 
-    def test_a_push_is_a_request_and_a_bare_dispatch_a_self_closure(self):
+    def test_no_push_trigger_and_a_bare_dispatch_is_a_self_closure(self):
+        # B-P36n: a push carries no epoch, so the workflow has no push trigger; a
+        # committed request is received only when dispatched with mode=request.
         text = WORKFLOW.read_text()
-        self.assertIn("MODE: ${{ github.event_name == 'push' && 'request' || github.event.inputs.mode || "
-                      "'self-closure' }}", text)
-        self.assertIn("      - '.stegverse/transition-requests/**'", text)
+        self.assertIn("MODE: ${{ github.event.inputs.mode || 'self-closure' }}", text)
+        trigger = text[text.index("\non:\n"):text.index("\npermissions:")]
+        self.assertNotIn("  push:", trigger)
+        self.assertNotIn("  schedule:", trigger)
+        self.assertIn("  workflow_dispatch:", trigger)
 
 
 @needs_sdk

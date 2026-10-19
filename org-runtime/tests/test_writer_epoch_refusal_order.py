@@ -352,13 +352,14 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         ledgers = {"repo_ledger_root": self.base / "repo-ledger", "org_ledger_root": self.base / "org-ledger"}
         first = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
         by_packet = {row["result"].get("packet", {}).get("packet_id") or row["path"]: row for row in first}
-        quarantined = [row for row in first if row["result"].get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+        quarantined = [row for row in first if row["result"].get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
         self.assertEqual(len(quarantined), 1, first)
         for field in SIX_FIELDS:
             self.assertTrue(quarantined[0]["result"][field], field)
         self.assertIsNone(quarantined[0]["organization_record"])
         marker = json.loads(Path(quarantined[0]["seen_marker"]).read_text())
-        self.assertEqual((marker["status"], marker["failure_code"]), ("REFUSED", "FRAME_REFUSED_QUARANTINED"))
+        self.assertEqual((marker["status"], marker["quarantine"], marker["failure_code"]),
+                         ("REFUSED", "FRAME_REFUSED_QUARANTINED", "HB_EPOCH_NOT_SUPPLIED"))
         self.assertEqual(len([row for row in first if row["result"].get("status") == "CONSUMED"]), 1, by_packet)
         before = files_under(self.base)
         second = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node, **ledgers)
@@ -456,8 +457,8 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         before = ledgers()
         out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=self.base / "node", root=self.root,
                                     hb_epoch="32")
-        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
-        self.assertIn("CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM", out[0]["detail"])
+        self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in out],
+                         [("FRAME_REFUSED_QUARANTINED", "CARRIED_PROVENANCE_NOT_CARRIED_DOWNSTREAM")], out)
         self.assertEqual(ledgers(), before)
         capability = self.reframed(k, "b-p36m-capability", carried, service="sv-llm.intr-destination",
                       payload={"message_class": "ecosystem.communication", "communication_id": "b-p36m",
@@ -484,7 +485,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         node = self.base / "node"
         rows = k.consume_and_respond(self.root, mesh_root=self.mesh, node_state_root=node,
                                      repo_ledger_root=self.base / "repo-ledger", org_ledger_root=self.base / "org-ledger")
-        self.assertEqual([r["result"]["detail"].split(":")[0] for r in rows], ["HB_EPOCH_NOT_SUPPLIED"], rows)
+        self.assertEqual([r["result"]["failure_code"] for r in rows], ["HB_EPOCH_NOT_SUPPLIED"], rows)
         crossing_node = self.base / "crossing-node"
         out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=crossing_node, root=self.root, hb_epoch="4096")
         self.assertEqual([r["disposition"] for r in out], ["ALLOW"], out)
@@ -498,8 +499,8 @@ class WriterEpochRefusalOrder(unittest.TestCase):
         unmarked = self.reframed(k, "b-p36-unmarked",
                                  lambda ref: {a: b for a, b in ref.items() if a != "derived_from_clock"})
         out = self.crossing.ingress(mesh_root=self.mesh, node_state_root=crossing_node, root=self.root, hb_epoch="4096")
-        self.assertEqual([r["failure_code"] for r in out], ["FRAME_REFUSED_QUARANTINED"], out)
-        self.assertIn("HB_EPOCH_PROVENANCE_UNMARKED", out[0]["detail"])
+        self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in out],
+                         [("FRAME_REFUSED_QUARANTINED", "HB_EPOCH_PROVENANCE_UNMARKED")], out)
         self.assertEqual([d for d in self.documents(self.base / "repo-ledger") if unmarked["packet_id"] in json.dumps(d)], [])
 
     def bad_frames(self, k):
@@ -545,15 +546,15 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                     run = lambda: self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
                                                         hb_epoch="4096")
                     results = run()
-                refused = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                refused = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
                 self.assertEqual(len(refused), sum(len(v) for v in bad.values()), results)
                 for code, frames in bad.items():
-                    hits = [r for r in refused if r["detail"].startswith(code)]
+                    hits = [r for r in refused if r["failure_code"] == code]
                     self.assertEqual(len(hits), len(frames), (code, refused))
                 for r in refused:
                     for field in SIX_FIELDS:
                         self.assertTrue(r[field], field)
-                adapter, = [r for r in refused if r["detail"].startswith("FRAME_INGEST_FAILED")]
+                adapter, = [r for r in refused if r["failure_code"] == "FRAME_INGEST_FAILED"]
                 self.assertEqual(adapter["failed_predicate"], "Error")
                 ledgered = json.dumps([*self.documents(self.base / "repo-ledger"), *self.documents(self.base / "org-ledger")])
                 self.assertIn(valid["packet_id"], ledgered)
@@ -585,10 +586,10 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                     run = lambda: self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
                                                         hb_epoch="4096")
                 results = run()
-                bad = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                bad = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
                 self.assertEqual(len(bad), 2, results)
                 for r in bad:
-                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"), r)
+                    self.assertEqual(r["failure_code"], "FRAME_INGEST_FAILED", r)
                     for field in SIX_FIELDS:
                         self.assertTrue(r[field], field)
                 ledgered = json.dumps([*self.documents(self.base / "repo-ledger"),
@@ -630,14 +631,14 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 self.no_clock()
                 run = self.consume_route(k, route, self.base / "node")
                 results = run()
-                bad = [r for r in results if r.get("failure_code") == "FRAME_REFUSED_QUARANTINED"]
+                bad = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
                 self.assertEqual(len(bad), 4, results)
                 for r in bad:
-                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"), r)
+                    self.assertEqual(r["failure_code"], "FRAME_INGEST_FAILED", r)
                     for field in SIX_FIELDS:
                         self.assertTrue(r[field], field)
                 markers = [json.loads(Path(f).read_text()) for f in files_under(self.base / "node")]
-                names = {m.get("frame_name") for m in markers if m.get("failure_code") == "FRAME_REFUSED_QUARANTINED"}
+                names = {m.get("frame_name") for m in markers if m.get("quarantine") == "FRAME_REFUSED_QUARANTINED"}
                 self.assertEqual(len(names), 4, markers)
                 ledgered = json.dumps([*self.documents(self.base / "repo-ledger"),
                                        *self.documents(self.base / "org-ledger")])
@@ -666,8 +667,7 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 typed = [r for r in results if r.get("failed_predicate") == "AttributeError"]
                 self.assertEqual(len(typed), 2, results)
                 for r in typed:
-                    self.assertEqual(r["failure_code"], "FRAME_REFUSED_QUARANTINED")
-                    self.assertTrue(r["detail"].startswith("FRAME_INGEST_FAILED"))
+                    self.assertEqual((r["quarantine"], r["failure_code"]), ("FRAME_REFUSED_QUARANTINED", "FRAME_INGEST_FAILED"))
                 self.assertIn(valid["packet_id"], json.dumps([*self.documents(self.base / "repo-ledger")]))
                 self.assertEqual([r for r in run() if r.get("failed_predicate") == "AttributeError"], [])
 
@@ -739,8 +739,8 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                     else:
                         results = self.crossing.ingress(mesh_root=self.mesh, node_state_root=node, root=self.root,
                                                         hb_epoch="4096")
-                    self.assertEqual([r["failure_code"] for r in results], ["FRAME_REFUSED_QUARANTINED"], results)
-                    self.assertRegex(results[0]["detail"], "^(HB_EPOCH_INVALID|HB_EPOCH_NOT_SUPPLIED)")
+                    self.assertEqual([r.get("quarantine") for r in results], ["FRAME_REFUSED_QUARANTINED"], results)
+                    self.assertIn(results[0]["failure_code"], ("HB_EPOCH_INVALID", "HB_EPOCH_NOT_SUPPLIED"))
 
     def test_a_forged_carried_frame_is_refused_on_every_route(self):
         # B-P36k: a self-asserted CARRIED claim is verified against this
@@ -768,12 +768,12 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                 node = self.base / ("node-" + name)
                 out = run(node)
                 results = [row.get("result", row) for row in out]
-                self.assertEqual([r["failure_code"] for r in results], ["FRAME_REFUSED_QUARANTINED"], out)
-                self.assertIn("CARRIED_PROVENANCE_UNVERIFIED", results[0]["detail"])
+                self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in results],
+                                 [("FRAME_REFUSED_QUARANTINED", "CARRIED_PROVENANCE_UNVERIFIED")], out)
                 self.assertEqual(ledger_files(), before)
                 written = files_under(node)
                 self.assertEqual(len(written), 1, written)
-                self.assertEqual(json.loads(Path(written[0]).read_text())["failure_code"], "FRAME_REFUSED_QUARANTINED")
+                self.assertEqual(json.loads(Path(written[0]).read_text())["quarantine"], "FRAME_REFUSED_QUARANTINED")
 
     def test_the_shared_rule_is_the_pinned_final_text(self):
         # StegVerse-Labs/.github#3282 FINAL: sha256(inspect.getsource(supplied_epoch_failure)).
@@ -928,6 +928,190 @@ class WriterEpochRefusalOrder(unittest.TestCase):
             self.assertEqual(reference["epoch"], 4096)
             self.assertIs(reference["derived_from_clock"], False)
             self.assertNotIn("sampled_unix_ns", reference)
+
+    def ingest_results(self, k, route, node):
+        return self.consume_route(k, route, node)()
+
+    def test_a_frame_with_no_epoch_is_not_supplied(self):
+        # 48b3bdc (2): a reference with no epoch (and no clock flag) is
+        # HB_EPOCH_NOT_SUPPLIED, quarantined, on every consume route.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                self.reframed(k, "v-2-no-epoch", lambda ref: {a: b for a, b in ref.items() if a != "epoch"})
+                results = self.ingest_results(k, route, self.base / "node")
+                self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in results],
+                                 [("FRAME_REFUSED_QUARANTINED", "HB_EPOCH_NOT_SUPPLIED")], results)
+                for field in SIX_FIELDS:
+                    self.assertTrue(results[0][field], field)
+
+    def test_a_carried_claim_on_a_clock_frame_is_unverified(self):
+        # 48b3bdc (3): CARRIED fields on a clock-flagged reference never verify;
+        # the frame is CARRIED_PROVENANCE_UNVERIFIED, not consumed as CLOCK.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                head = self.org_genesis()["receipt_sha256"]
+                self.reframed(k, "v-3-carried-clock", lambda ref: {
+                    **ref, "derived_from_clock": True, "sampled_unix_ns": k.HB_ANCHOR_UNIX_NS,
+                    "source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": head})
+                ledgers = lambda: files_under(self.base / "repo-ledger") + files_under(self.base / "org-ledger")
+                before = ledgers()
+                results = self.ingest_results(k, route, self.base / "node")
+                self.assertEqual([(r.get("quarantine"), r["failure_code"]) for r in results],
+                                 [("FRAME_REFUSED_QUARANTINED", "CARRIED_PROVENANCE_UNVERIFIED")], results)
+                self.assertEqual(ledgers(), before)
+
+    def test_a_tampered_head_receipt_never_verifies(self):
+        # 48b3bdc (6): the head receipt's digest is recomputed. A head whose epoch
+        # was edited to 7777 in place (receipt_sha256 kept) is refused by both writers.
+        self.open_ledger()
+        k, custody = self.kernel_custody()
+        genesis = self.org_genesis()
+        path, = [p for p in files_under(self.base / "org-ledger")
+                 if p.endswith(".json") and json.loads(Path(p).read_text()) == genesis]
+        tampered = {**genesis, "hb_reference": {**genesis["hb_reference"], "epoch": 7777}}
+        Path(path).write_text(json.dumps(tampered))
+        provenance = {"source": "ORGANIZATION_LEDGER_HEAD", "head_receipt_sha": genesis["receipt_sha256"]}
+        before = files_under(self.base)
+        for name, call in (
+                ("emit.append", lambda: self.egress.repository_ledger.append(
+                    "V:tampered", "V", "sha256:" + "0" * 64, "sha256:" + "1" * 64, {}, "NONE", hb_epoch=7777,
+                    hb_provenance=provenance, provenance_store=custody["organization_store"])),
+                ("aggregate.append", lambda: self.agg.append(
+                    self.repo_receipt_unwritten(), "REPO_STATE_PROPAGATION", self.agg.FROM_HEAD,
+                    "sha256:" + "2" * 64, {}, "NONE", hb_epoch=7777, hb_provenance=provenance))):
+            with self.subTest(writer=name):
+                with self.assertRaises(ValueError) as raised:
+                    call()
+                refusal = raised.exception.refusal
+                self.assertEqual(refusal["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
+                self.assertIn("recompute", refusal["detail"])
+                for field in SIX_FIELDS:
+                    self.assertTrue(refusal[field], field)
+                self.assertEqual(files_under(self.base), before)
+
+    def test_a_wrong_typed_channel_or_destination_is_quarantined(self):
+        # 48b3bdc (7) / F-TYPE: a channel that is not the payload's derived channel
+        # is FRAME_INTEGRITY_INVALID; a non-string destination_org is quarantined
+        # by the scan guard. The valid frame behind them is ledgered.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            with self.subTest(route=route):
+                self.setUp()
+                self.open_ledger()
+                k, _ = self.kernel_custody()
+                channel = self.reframed(k, "v-7-channel", lambda ref: ref)
+                frames = self.mesh / "frames.d"
+                for path in files_under(frames):  # only the wrong-typed re-publication stays
+                    if json.loads(Path(path).read_text()) == channel:
+                        Path(path).unlink()
+                body = {key: value for key, value in channel.items() if key != "frame_sha256"}
+                body["channel"] = 7
+                k._publish_frame({**body, "frame_sha256": k.sha(body)}, root=self.mesh)
+                (frames / "000-destination.json").write_text(json.dumps({**body, "destination_org": ["SV-LLM"]}))
+                valid = self.inbound(k, "v-7-valid", epoch=4096)
+                self.no_clock()
+                run = self.consume_route(k, route, self.base / "node")
+                results = run()
+                bad = [r for r in results if r.get("quarantine") == "FRAME_REFUSED_QUARANTINED"]
+                self.assertEqual(len(bad), 2, results)
+                self.assertIn("FRAME_INTEGRITY_INVALID", [r["failure_code"] for r in bad])
+                for r in bad:
+                    for field in SIX_FIELDS:
+                        self.assertTrue(r[field], field)
+                self.assertIn(valid["packet_id"], json.dumps([*self.documents(self.base / "repo-ledger")]))
+                self.assertEqual(run(), [])
+
+    def ledger_classes(self):
+        """Receipt counts per transition class on both ledgers (each receipt once)."""
+        counts = {}
+        for root in ("repo-ledger", "org-ledger"):
+            seen = {d["receipt_sha256"]: d for d in self.documents(self.base / root) if "receipt_sha256" in d}
+            for d in seen.values():
+                name = root + ":" + str(d.get("transition_class") or d.get("organization_transition_class")
+                                        or (d.get("boundary_evidence") or {}).get("operation"))
+                counts[name] = counts.get(name, 0) + 1
+        return counts
+
+    def inject(self, fault, at):
+        """Make the at-th in-process ledger append fail with `fault`; returns the call log."""
+        _, custody = self.kernel_custody()
+        found = [type(custody["organization_store"]), type(custody["repository_store"]),
+                 self.crossing.organization_ledger.open_store.__globals__["PosixLedgerStore"],
+                 *(getattr(m, "PosixLedgerStore") for m in list(sys.modules.values())
+                   if isinstance(getattr(m, "PosixLedgerStore", None), type))]
+        classes = {id(cls): cls for cls in found}
+        log = {"calls": 0, "patchers": []}
+        for cls in classes.values():
+            original = cls.append_transaction
+
+            def append(store, *args, _original=original, **kwargs):
+                log["calls"] += 1
+                if log["calls"] - 1 == at:
+                    if fault == "lost_comparison":
+                        raise RuntimeError("ledger_append_lost_comparison")
+                    if fault == "collision":
+                        raise ValueError("ledger_receipt_collision")
+                    if fault == "exhausted":
+                        log["exhaust"] = True
+                if log.get("exhaust"):
+                    if log["calls"] - 1 >= at + 127:  # the writers retry 128 times
+                        log["exhaust"] = False
+                    return False
+                return _original(store, *args, **kwargs)
+            patcher = mock.patch.object(cls, "append_transaction", append)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+            log["patchers"].append(patcher)
+        return log
+
+    @staticmethod
+    def heal(log):
+        for patcher in log["patchers"]:
+            patcher.stop()
+
+    def test_a_writer_fault_on_any_append_leaves_the_frame_pending(self):
+        # F-TRANSIENT-RT: a lost comparison, a collision or exhausted contention on
+        # any in-process append of a consume cycle is non-terminal
+        # FRAME_DISPATCH_IO_FAILED with no seen-marker; the next cycle consumes the
+        # frame exactly once (the same receipts a clean cycle writes), the one after none.
+        for route in ("consume_and_respond", "crossing.ingress"):
+            self.setUp()
+            self.open_ledger()
+            k, _ = self.kernel_custody()
+            self.inbound(k, "f-transient-clean", epoch=4096)
+            genesis = self.ledger_classes()
+            log = self.inject(None, -1)
+            self.assertTrue(self.ingest_results(k, route, self.base / "node"))
+            appends = log["calls"]
+            clean = {name: n - genesis.get(name, 0) for name, n in self.ledger_classes().items()}
+            self.heal(log)
+            self.assertGreater(appends, 0)
+            for fault in ("lost_comparison", "collision", "exhausted"):
+                for at in range(appends):
+                    with self.subTest(route=route, fault=fault, append=at):
+                        self.setUp()
+                        self.open_ledger()
+                        k, _ = self.kernel_custody()
+                        self.inbound(k, "f-transient-clean", epoch=4096)
+                        node = self.base / "node"
+                        faulted = self.inject(fault, at)
+                        first = self.ingest_results(k, route, node)
+                        self.assertEqual([(r["failure_code"], r.get("terminal")) for r in first],
+                                         [("FRAME_DISPATCH_IO_FAILED", False)], first)
+                        for field in SIX_FIELDS:
+                            self.assertTrue(first[0][field], field)
+                        self.assertEqual(files_under(node / "federation") if (node / "federation").exists() else [], [])
+                        self.heal(faulted)
+                        second = self.ingest_results(k, route, node)
+                        self.assertTrue(second and all(r.get("failure_code") is None for r in second), second)
+                        after = {name: n - genesis.get(name, 0) for name, n in self.ledger_classes().items()}
+                        self.assertEqual({n: c for n, c in after.items() if c}, {n: c for n, c in clean.items() if c})
+                        self.assertEqual(self.ingest_results(k, route, node), [])
 
     @staticmethod
     def documents(root):
