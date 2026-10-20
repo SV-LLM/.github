@@ -152,7 +152,7 @@ class OrganizationSteps(unittest.TestCase):
         self.store = self.agg.open_store(self.agg.ledger_root())
 
     def test_open_then_parent_in_one_execution_scoped_root(self):
-        result = self.steps.prepare(TARGET)
+        result = self.steps.prepare(TARGET, hb_epoch=32)
         genesis = self.store.get(self.agg.receipt_key(result["ledger_opened_org_receipt_sha256"]))
         parent = self.store.get(self.agg.receipt_key(result["parent_org_receipt_sha256"]))
         self.assertIs(genesis["chain_genesis"], True)
@@ -168,9 +168,9 @@ class OrganizationSteps(unittest.TestCase):
         self.assertEqual(result["ledger_persistence"], "EXECUTION_SCOPED_SAME_AS_REFERENCE")
 
     def test_a_second_run_on_the_same_root_continues_the_chain_without_a_second_genesis(self):
-        first = self.steps.prepare(TARGET)
+        first = self.steps.prepare(TARGET, hb_epoch=32)
         before = sorted(self.store.list_prefix(self.agg.RECEIPT_PREFIX))
-        second = self.steps.prepare(TARGET)
+        second = self.steps.prepare(TARGET, hb_epoch=32)
         self.assertIsNone(second["ledger_opened_org_receipt_sha256"])
         self.assertEqual(second["continued_from_org_receipt_sha256"], first["parent_org_receipt_sha256"])
         parent = self.store.get(self.agg.receipt_key(second["parent_org_receipt_sha256"]))
@@ -196,8 +196,8 @@ class OrganizationSteps(unittest.TestCase):
         organization = "git+" + str(self.tmp / "ledger.git") + "#" + contract["organization_ledger_ref"]
         with mock.patch.dict(os.environ, {"STEGVERSE_ORG_LEDGER_ROOT": organization,
                                           "STEGVERSE_REPO_LEDGER_ROOT": organization + ":" + location["namespace"]}):
-            first = self.steps.prepare(TARGET)   # one run: genesis, then the parent
-            second = self.steps.prepare(TARGET)  # the next run: continues from the published HEAD
+            first = self.steps.prepare(TARGET, hb_epoch=32)   # one run: genesis, then the parent
+            second = self.steps.prepare(TARGET, hb_epoch=32)  # the next run: continues from the published HEAD
             store = self.agg.open_store(self.agg.ledger_root())
         self.assertEqual(store.kind, "GIT_REF")
         self.assertEqual(first["ledger_persistence"], "DURABLE_GIT_REF_SAME_AS_REFERENCE")
@@ -215,7 +215,7 @@ class OrganizationSteps(unittest.TestCase):
 
     def test_a_target_without_an_id_is_refused_before_any_write(self):
         with self.assertRaisesRegex(SystemExit, "LIVE_TARGET_ID_REQUIRED"):
-            self.steps.prepare({})
+            self.steps.prepare({}, hb_epoch=32)
         self.assertIsNone(self.store.get(self.agg.HEAD_KEY))
 
 

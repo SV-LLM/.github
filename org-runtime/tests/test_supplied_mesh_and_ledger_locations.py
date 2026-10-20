@@ -75,7 +75,7 @@ class KernelMeshIsSupplied(Scratch):
         # Publishing is a recorded emission, so it needs this organization's
         # custody: both supplied ledgers, on a chain opened by declared genesis.
         self.supply_ledgers()
-        self.crossing("svllm_crossing_kernel_genesis").open_organization_ledger(root=self.root)
+        self.crossing("svllm_crossing_kernel_genesis").open_organization_ledger(root=self.root, hb_epoch=32)
         self.k = load("svllm_kernel_supplied", self.root / "org-kernel/kernel.py")
         self.custody = self.k.crossing_custody(self.root, repo_ledger_root=self.base / "repo-ledger",
                                                org_ledger_root=self.base / "org-ledger")
@@ -84,7 +84,7 @@ class KernelMeshIsSupplied(Scratch):
                                           payload={"probe": 1}, standing=STANDING, packet_id="supplied-probe")
 
     def test_an_unsupplied_mesh_fails_closed_and_the_host_is_untouched(self):
-        for call in (lambda: self.k.publish_packet(self.packet, now_ns=self.k.HB_ANCHOR_UNIX_NS, custody=self.custody),
+        for call in (lambda: self.k.publish_packet(self.packet, epoch=32, custody=self.custody),
                      lambda: self.k.scan_addressed_frames(PEER),
                      lambda: self.k.resolve_federation_root(None)):
             with self.assertRaisesRegex(ValueError, "mesh_location_required_from_materializer"):
@@ -99,7 +99,7 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_a_supplied_mesh_keeps_the_frame_layout(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+        published = self.k.publish_packet(self.packet, root=mesh, epoch=32,
                                           custody=self.custody)
         frame = published["frame"]
         import hashlib
@@ -130,7 +130,7 @@ class KernelMeshIsSupplied(Scratch):
 
     def test_node_markers_stay_in_the_node_state_root(self):
         mesh = self.base / "mesh"
-        published = self.k.publish_packet(self.packet, root=mesh, now_ns=self.k.HB_ANCHOR_UNIX_NS,
+        published = self.k.publish_packet(self.packet, root=mesh, epoch=32,
                                           custody=self.custody)
         # There is no default node state: the checkout is not node state.
         with self.assertRaisesRegex(ValueError, "node_state_location_required_from_materializer"):
@@ -162,11 +162,11 @@ class CrossingMeshIsSupplied(Scratch):
         super().setUp()
         self.supply_ledgers()
         self.c = self.crossing("svllm_crossing_supplied_mesh")
-        self.c.open_organization_ledger(root=self.root)
+        self.c.open_organization_ledger(root=self.root, hb_epoch=32)
 
     def test_egress_without_a_supplied_mesh_is_fail_closed_and_recorded(self):
         manifest = {"manifest_id": "unsupplied-mesh", "destination": {"organization": PEER}}
-        out = self.c.egress(manifest, standing=STANDING, root=self.root)
+        out = self.c.egress(manifest, standing=STANDING, root=self.root, hb_epoch=32)
         self.assertEqual((out["transition_class"], out["disposition"], out["failed_predicate"]),
                          ("ORGANIZATION_EGRESS_REFUSED", "FAIL_CLOSED", "MESH_LOCATION_REQUIRED_FROM_MATERIALIZER"))
         self.assertEqual(out["retry_entrypoint"], "org-runtime/crossing.py::egress")
@@ -175,7 +175,7 @@ class CrossingMeshIsSupplied(Scratch):
         self.assertHostUntouched()
 
     def test_ingress_without_a_supplied_mesh_is_fail_closed_and_recorded(self):
-        [out] = self.c.ingress(root=self.root)
+        [out] = self.c.ingress(root=self.root, hb_epoch=32)
         self.assertEqual((out["transition_class"], out["disposition"], out["failed_predicate"]),
                          ("ORGANIZATION_INGRESS_REFUSED", "FAIL_CLOSED", "MESH_LOCATION_REQUIRED_FROM_MATERIALIZER"))
         self.assertEqual(out["retry_entrypoint"], "org-runtime/crossing.py::ingress")
@@ -184,7 +184,7 @@ class CrossingMeshIsSupplied(Scratch):
     def test_ingress_without_supplied_node_state_is_fail_closed_and_recorded(self):
         mesh = self.base / "mesh"
         mesh.mkdir()
-        [out] = self.c.ingress(mesh_root=mesh, root=self.root)
+        [out] = self.c.ingress(mesh_root=mesh, root=self.root, hb_epoch=32)
         self.assertEqual((out["transition_class"], out["disposition"], out["failed_predicate"]),
                          ("ORGANIZATION_INGRESS_REFUSED", "FAIL_CLOSED", "NODE_STATE_LOCATION_REQUIRED_FROM_MATERIALIZER"))
         self.assertEqual(out["retry_entrypoint"], "org-runtime/crossing.py::ingress")
@@ -194,7 +194,7 @@ class CrossingMeshIsSupplied(Scratch):
 
     def test_a_denied_crossing_names_its_retry_edge(self):
         out = self.c.egress({"manifest_id": "nowhere", "destination": {"organization": "Not-A-Peer"}},
-                            standing=STANDING, mesh_root=self.base / "mesh", root=self.root)
+                            standing=STANDING, mesh_root=self.base / "mesh", root=self.root, hb_epoch=32)
         self.assertEqual((out["disposition"], out["failed_predicate"], out["retry_entrypoint"]),
                          ("DENY", "DESTINATION_NOT_IN_FEDERATION_DIRECTORY", "org-runtime/crossing.py::egress"))
 
@@ -215,7 +215,7 @@ class LedgersAreSupplied(Scratch):
                 self.supply_ledgers()
                 del os.environ[missing]
                 with self.assertRaises(c.LedgerLocationRefused) as refused:
-                    c.open_organization_ledger(root=self.root)
+                    c.open_organization_ledger(root=self.root, hb_epoch=32)
                 self.assertEqual((refused.exception.disposition, refused.exception.failed_predicate),
                                  ("FAIL_CLOSED", "LEDGER_LOCATION_REQUIRED_FROM_MATERIALIZER"))
                 self.assertIs(refused.exception.refusal["consequence_committed"], False)
@@ -231,9 +231,9 @@ class LedgersAreSupplied(Scratch):
         mesh.mkdir()
         with self.assertRaises(c.LedgerLocationRefused):
             c.egress({"manifest_id": "unrecordable", "destination": {"organization": PEER}},
-                     standing=STANDING, mesh_root=mesh, root=self.root)
+                     standing=STANDING, mesh_root=mesh, root=self.root, hb_epoch=32)
         with self.assertRaises(c.LedgerLocationRefused):
-            c.ingress(mesh_root=mesh, root=self.root)
+            c.ingress(mesh_root=mesh, root=self.root, hb_epoch=32)
         self.assertEqual(files_under(mesh), [])
         self.assertFalse((self.root / "resident-runtime/federation").exists())
         self.assertHostUntouched()

@@ -9,7 +9,9 @@ frozen reference commit and the digest of every adopted surface:
   declared_insertion the file is the reference file with exactly one declared
                      block inserted at a recorded offset (the temporary
                      SV_LLM_LEGACY_RECEIPT_CHAIN wrapper); removing it yields
-                     the reference byte for byte
+                     the reference byte for byte. It may also carry declared
+                     substitutions, reversed as below once the block (at its
+                     local offset) is removed
   declared_substitutions
                      the file is the reference file with each declared
                      (reference -> local) substitution applied exactly the
@@ -52,24 +54,30 @@ def contract_digest(document: dict, excluded: list[str]) -> str:
 
 
 def adopted_reference_bytes(path: str, data: bytes, entry: dict) -> tuple[bytes, list[str]]:
-    """The reference bytes this adopted file claims to be, and any mismatch found on the way."""
+    """The reference bytes this adopted file claims to be, and any mismatch found on the way.
+
+    A declared insertion may also carry declared substitutions. Its offset is
+    then the block's position in the local file: the insertion is removed
+    first, then the substitutions are reversed, and the local file's own
+    digest is checked.
+    """
     problems = []
+    if "substitutions" in entry and digest(data) != entry.get("local_sha256"):
+        problems.append(path + ": local bytes are not the recorded adaptation")
+    if "insertion_offset" in entry:
+        start, length = entry["insertion_offset"], entry["insertion_bytes"]
+        block = data[start:start + length]
+        if len(block) != length or digest(block) != entry["insertion_sha256"]:
+            problems.append(path + ": declared insertion missing or changed")
+        data = data[:start] + data[start + length:]
     if "substitutions" in entry:
-        if digest(data) != entry.get("local_sha256"):
-            problems.append(path + ": local bytes are not the recorded adaptation")
         text = data.decode("utf-8")
         for substitution in entry["substitutions"]:
             if text.count(substitution["local"]) != substitution["count"]:
                 problems.append(path + ": declared substitution missing or changed")
             text = text.replace(substitution["local"], substitution["reference"])
         return text.encode("utf-8"), problems
-    if "insertion_offset" not in entry:
-        return data, problems
-    start, length = entry["insertion_offset"], entry["insertion_bytes"]
-    block = data[start:start + length]
-    if len(block) != length or digest(block) != entry["insertion_sha256"]:
-        problems.append(path + ": declared insertion missing or changed")
-    return data[:start] + data[start + length:], problems
+    return data, problems
 
 
 def verify(root: Path = ROOT, record: dict | None = None, reference_root: Path | None = None) -> dict:

@@ -136,11 +136,11 @@ class ProcessingSelection(unittest.TestCase):
         self.assertTrue(all(s["boundary_role"].startswith("BOUNDARY_LOCAL_") for s in services))
         self.assertTrue(all("admits_processing" not in s for s in services))
         # process_boundary.py is the StegVerse-org reference processor adopted
-        # byte-identical for the SDK manifest crossing
-        # (data/organization-role-reference-adoption.json). Only that crossing
-        # runs it; the kernel's dispatch does not.
+        # for the SDK manifest crossing (data/organization-role-reference-adoption.json),
+        # with the PB-EXIT-SPLIT exit codes as declared substitutions. Only that
+        # crossing runs it; the kernel's dispatch does not.
         adopted = json.loads((REPO / "data/organization-role-reference-adoption.json").read_text())["files"]
-        self.assertEqual(adopted["org-boundary/runtime/process_boundary.py"]["rule"], "byte_identical")
+        self.assertEqual(adopted["org-boundary/runtime/process_boundary.py"]["rule"], "declared_substitutions")
         self.assertNotIn("process_boundary", (REPO / "org-kernel/kernel.py").read_text())
         self.assertNotIn("process_boundary", (REPO / "org-runtime/crossing.py").read_text())
 
@@ -483,7 +483,10 @@ class EmissionsAreRecordedOrRefused(SVLLMNode):
         env = {k: v for k, v in os.environ.items() if not k.startswith("STEGVERSE_")}
         env.update(STEGVERSE_REPO_LEDGER_ROOT=str(self.sv.repo_ledger), STEGVERSE_ORG_LEDGER_ROOT=str(self.sv.org_ledger),
                    PYTHONDONTWRITEBYTECODE="1")
-        receipt = self.sv.receipts("org")[0]
+        # The released head is the ledger's current head: its epoch is CARRIED from it (B-P36f).
+        custody = self.k.crossing_custody(REPO, **self.sv.ledgers())
+        ledger, store = custody["organization_ledger"], custody["organization_store"]
+        receipt = store.get(ledger.receipt_key(store.get(ledger.HEAD_KEY)["receipt_sha256"]))
         (self.base / "receipt.json").write_text(json.dumps(receipt))
         (self.base / "standing.json").write_text(json.dumps(GENESIS))
         command = [sys.executable, "-B", str(REPO / "resident-runtime/submit_org_transition_to_master_records.py"),
@@ -494,9 +497,15 @@ class EmissionsAreRecordedOrRefused(SVLLMNode):
         missing = subprocess.run(command, capture_output=True, text=True, env=env, timeout=120)
         self.assertEqual(missing.returncode, 2)
         self.assertIn("--mesh-root", missing.stderr)
-        outputs = [json.loads(subprocess.run(command + ["--mesh-root", str(self.mesh)], capture_output=True, text=True,
-                                             env=env, timeout=120, check=True).stdout) for _ in range(2)]
-        self.assertEqual(outputs[0]["frame_sha256"], outputs[1]["frame_sha256"])
+        released = json.loads(subprocess.run(command + ["--mesh-root", str(self.mesh)], capture_output=True, text=True,
+                                             env=env, timeout=120, check=True).stdout)
+        self.assertTrue(released["frame_sha256"])
+        # Releasing the same segment again: the release's own emission is now the
+        # head, so the carried provenance no longer verifies and nothing is written.
+        again = subprocess.run(command + ["--mesh-root", str(self.mesh)], capture_output=True, text=True,
+                               env=env, timeout=120)
+        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
+        self.assertEqual(json.loads(again.stdout)["failure_code"], "CARRIED_PROVENANCE_UNVERIFIED")
         frame, = [json.loads(p.read_text()) for p in (self.mesh / "frames.d").glob("*.json")]
         self.assertEqual(frame["heartbeat_reference"]["epoch"], receipt["hb_reference"]["epoch"])
         self.assertEqual(len(self.by_class(self.k.CROSSING_EMITTED_CLASS)), 1)

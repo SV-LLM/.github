@@ -29,8 +29,8 @@
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 26,
-      "TOTAL": 54
+      "NAMING_ONLY": 31,
+      "TOTAL": 59
     }
   },
   "not_changed_with_reason": {
@@ -646,6 +646,41 @@
       "file": "resident-runtime/organization_manifest_ingress.py",
       "line": 902,
       "text": "\"resident-runtime/submit_org_transition_to_master_records.py\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 36,
+      "text": "RELEASE_CLI = \"resident-runtime/submit_org_transition_to_master_records.py\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 178,
+      "text": "def test_the_master_records_release_refuses_a_head_receipt_without_a_supplied_epoch(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 197,
+      "text": "[sys.executable, \"-B\", str(self.root / \"resident-runtime/submit_org_transition_to_master_records.py\"),",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 212,
+      "text": "\"\"\"Run the Master Records release on a one-receipt segment; return the completed process.\"\"\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 1307,
+      "text": "def test_every_write_of_the_master_records_release_is_resumable(self):",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     }

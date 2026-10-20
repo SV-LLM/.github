@@ -73,6 +73,14 @@ jobs:
         run: python -B org-runtime/tests/test_workflow_action_pins.py
       - name: "Validate kernel parity with StegVerse-org PRs 93-97: processing selection, recorded crossings, supplied node state"
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_kernel_crossing_parity.py' -v
+      - name: Validate every --hb-epoch command line refuses through the kernel rule (B-P36c)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_cli_supplied_epoch.py' -v
+      - name: Validate every epoch-taking writer refuses before it writes or publishes (B-P36b)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_writer_epoch_refusal_order.py' -v
+      - name: Validate every inline hb_epoch gate in the ledger workflow is the kernel rule (B-P36d)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_workflow_epoch_gate.py' -v
+      - name: Validate every manifest-declared epoch-requiring entrypoint has an epoch binding (B-P36n)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_manifest_epoch_binding.py' -v
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
         run: python -B resident-runtime/reference_adoption.py verify
       - name: Check out the recorded StegVerse-org reference commit

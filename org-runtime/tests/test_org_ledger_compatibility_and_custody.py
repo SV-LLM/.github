@@ -30,7 +30,7 @@ record = load("svllm_organization_record", "resident-runtime/submit_org_transiti
 
 def repo_receipt(number):
     body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/sandbox",
-            "transition_id": "wrapper-" + str(number)}
+            "transition_id": "wrapper-" + str(number), "hb_reference": agg.kernel.hb_reference(epoch=32)}
     return {**body, "receipt_sha256": agg.sha(body)}
 
 
@@ -42,21 +42,21 @@ class Wrapper(unittest.TestCase):
 
     def test_default_on_empty_ledger_fails_closed_without_genesis(self):
         with self.assertRaises(agg.OrgLedgerAppendRefused) as refused:
-            agg.aggregate_transition(repo_receipt(1), store=self.store)
+            agg.aggregate_transition(repo_receipt(1), hb_epoch=32, store=self.store)
         self.assertEqual((refused.exception.disposition, refused.exception.failed_predicate),
                          ("FAIL_CLOSED", "ORG_LEDGER_GENESIS_NOT_DECLARED"))
         self.assertEqual(sorted(Path(self.tmp.name).rglob("*.json")), [])
 
     def test_T5_legacy_rule_is_declared_and_chain_is_preserved(self):
         first = agg.aggregate_transition(repo_receipt(1), org_transition_class="ORGANIZATION_INGRESS_MATERIALIZED",
-                                         genesis=True, boundary_evidence={"source": "SV-LLM/sandbox"}, store=self.store)
+                                         genesis=True, boundary_evidence={"source": "SV-LLM/sandbox"}, hb_epoch=32, store=self.store)
         self.assertIs(first["chain_genesis"], True)
         self.assertIsNone(first["predecessor_org_state_sha256"])
         self.assertEqual(first["successor_org_state_sha256"], first["source_transition_sha256"])
         self.assertEqual(first["boundary_evidence"]["state_digest_rule"], "SV_LLM_LEGACY_RECEIPT_CHAIN")
         self.assertEqual(first["boundary_evidence"]["state_digest_rule_fields"], ["successor_org_state_sha256"])
         self.assertEqual(first["boundary_evidence"]["source"], "SV-LLM/sandbox")
-        second = agg.aggregate_transition(repo_receipt(2), org_transition_class="SANDBOX_WORK_ADMITTED", store=self.store)
+        second = agg.aggregate_transition(repo_receipt(2), org_transition_class="SANDBOX_WORK_ADMITTED", hb_epoch=32, store=self.store)
         # Legacy rule: predecessor = the receipt it follows; successor = its source digest.
         self.assertEqual(second["predecessor_org_state_sha256"], first["receipt_sha256"])
         self.assertEqual(second["previous_receipt_sha256"], first["receipt_sha256"])
@@ -69,19 +69,19 @@ class Wrapper(unittest.TestCase):
         self.assertEqual(self.store.get(ledger.receipt_key(second["receipt_sha256"])), second)
 
     def test_explicit_digests_carry_no_legacy_rule(self):
-        agg.aggregate_transition(repo_receipt(1), genesis=True, store=self.store)
+        agg.aggregate_transition(repo_receipt(1), genesis=True, hb_epoch=32, store=self.store)
         explicit = agg.aggregate_transition(repo_receipt(2), predecessor_org_state_sha256="sha256:" + "a" * 64,
-                                            successor_org_state_sha256="sha256:" + "b" * 64, store=self.store)
+                                            successor_org_state_sha256="sha256:" + "b" * 64, hb_epoch=32, store=self.store)
         self.assertNotIn("state_digest_rule", explicit["boundary_evidence"])
 
     def test_genesis_refusals_propagate_unchanged(self):
-        agg.aggregate_transition(repo_receipt(1), genesis=True, store=self.store)
+        agg.aggregate_transition(repo_receipt(1), genesis=True, hb_epoch=32, store=self.store)
         with self.assertRaises(agg.OrgLedgerAppendRefused) as refused:
-            agg.aggregate_transition(repo_receipt(2), genesis=True, store=self.store)
+            agg.aggregate_transition(repo_receipt(2), genesis=True, hb_epoch=32, store=self.store)
         self.assertEqual(refused.exception.disposition, "DENY")
         with self.assertRaises(agg.OrgLedgerAppendRefused) as refused:
             agg.aggregate_transition(repo_receipt(3), genesis=True, predecessor_org_state_sha256="sha256:" + "a" * 64,
-                                     store=self.store)
+                                     hb_epoch=32, store=self.store)
         self.assertEqual(refused.exception.failed_predicate, "ORG_LEDGER_GENESIS_WITH_EXPLICIT_PREDECESSOR")
 
     def test_no_dangling_batch_custody_dependency(self):
@@ -95,8 +95,8 @@ class OrganizationRecord(unittest.TestCase):
     def segment(self, count):
         with tempfile.TemporaryDirectory() as root:
             store = ledger.PosixLedgerStore(root)
-            first = agg.aggregate_transition(repo_receipt(1), genesis=True, store=store)
-            return [first] + [agg.aggregate_transition(repo_receipt(n), store=store) for n in range(2, count + 1)]
+            first = agg.aggregate_transition(repo_receipt(1), genesis=True, hb_epoch=32, store=store)
+            return [first] + [agg.aggregate_transition(repo_receipt(n), hb_epoch=32, store=store) for n in range(2, count + 1)]
 
     def build(self, receipts, standing=None):
         return record.build_released_batch_packet(receipts, "sha256:" + "1" * 64, "sha256:" + "2" * 64, {},

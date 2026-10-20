@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -312,7 +313,7 @@ class AddressedAndClosedTests(RedirectedLedgers):
         super().setUp()
         # This kernel's custody requires a declared organization-ledger genesis.
         # The mesh and both ledgers stay in the temporary roots.
-        crossing.open_organization_ledger()
+        crossing.open_organization_ledger(hb_epoch=32)
 
     def publish(self, payload, service, packet_id, origin=PEER):
         packet = kernel.build_packet(
@@ -367,6 +368,9 @@ class AddressedAndClosedTests(RedirectedLedgers):
         self.assertIs(operation["organization_receipt_preserves_repository_receipt"], True)
         repository, = self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
                                     "stegverse.repo-transition-receipt/v1", OPERATION_ID)
+        # The receipt carries the consumed frame's epoch, not a clock reading.
+        self.assertEqual(repository["hb_reference"]["epoch"], 32)
+        self.assertIs(repository["hb_reference"]["derived_from_clock"], False)
         matched = [record for record in self.receipts(
             "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1")
             if record.get("repo_receipt_sha256") == repository["receipt_sha256"]]
@@ -374,9 +378,13 @@ class AddressedAndClosedTests(RedirectedLedgers):
 
     def test_a_manifest_addressed_to_this_capability_is_not_a_diagnostic(self):
         self.publish({"manifest": {"probe": True}}, ADDRESS, "not-a-diagnostic")
-        with self.assertRaises(ValueError) as refused:
-            self.consume()
-        self.assertIn("SUBMISSION_DECLARES_A_RESPONDED_REQUEST_CLASS", str(refused.exception))
+        # One frame's failure no longer stops the pass (B-P36o): it is returned
+        # as a six-field refusal (no node state here to hold a quarantine marker),
+        # and nothing is recorded.
+        rows = self.consume()
+        refused, = [row["result"] for row in rows if row["result"].get("status") == "REFUSED"]
+        self.assertEqual(refused["failure_code"], "FRAME_INGEST_FAILED")
+        self.assertIn("SUBMISSION_DECLARES_A_RESPONDED_REQUEST_CLASS", refused["detail"])
         self.assertEqual(self.receipts(
             "STEGVERSE_REPO_LEDGER_ROOT", "stegverse.repo-transition-receipt/v1", OPERATION_ID), [])
 
@@ -586,6 +594,97 @@ class DiagnosticSelfClosureTests(RedirectedLedgers):
         self.assertEqual(fresh_tip, tip_after)
         subprocess.check_call(
             ["git", "--git-dir", str(fresh), "merge-base", "--is-ancestor", tip_before, fresh_tip])
+
+
+class SuppliedEpochTests(RedirectedLedgers):
+    """A ledger receipt's epoch is supplied by its caller, never read off a clock."""
+
+    SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
+                  "retry_entrypoint", "owning_existing_goal", "next_attempt")
+
+    def assertSixFields(self, refusal, failure_code="HB_EPOCH_NOT_SUPPLIED"):
+        self.assertEqual(refusal["disposition"], "FAIL_CLOSED")
+        self.assertEqual(refusal["failure_code"], failure_code)
+        self.assertEqual(refusal["failed_predicate"], "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH")
+        self.assertEqual(refusal["owning_existing_goal"],
+                         "INTERLOCK-INTR-RUNTIME-INDEPENDENT-PROTOCOL-001")
+        for field in self.SIX_FIELDS:
+            self.assertTrue(refusal.get(field), field)
+        self.assertIs(refusal["derived_from_clock"], False)
+        self.assertIs(refusal["consequence_committed"], False)
+
+    def refused_append(self, **epoch):
+        """Append with `epoch` against a store and a clock that must not be touched."""
+        emit = ingress.repository_ledger
+
+        class Unopenable:
+            def __getattr__(self, name):
+                raise AssertionError("the store was touched: " + name)
+
+        def clock(*args, **kwargs):
+            raise AssertionError("a clock was read")
+        with mock.patch.object(emit.kernel, "hb_reference", clock), \
+                mock.patch.object(emit.ledger_store, "open_store", clock):
+            with self.assertRaises(emit.RepoLedgerEpochRefused) as raised:
+                emit.append("T:epoch", "T", "sha256:" + "0" * 64, "sha256:" + "1" * 64,
+                            {}, "NONE", store=Unopenable(), **epoch)
+        self.assertFalse(Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]).exists())
+        return raised.exception
+
+    def emit_cli(self, *epoch):
+        return subprocess.run(
+            ["python", str(ROOT / ".stegverse/transition-ledger/emit.py"),
+             "--transition-id", "T:epoch", "--transition-class", "T",
+             "--predecessor-state-sha256", "sha256:" + "0" * 64,
+             "--successor-state-sha256", "sha256:" + "1" * 64, *epoch],
+            capture_output=True, text=True, env=dict(os.environ))
+
+    def test_an_append_without_an_epoch_fails_closed_before_the_store_opens(self):
+        refused = self.refused_append()
+        self.assertIsInstance(refused, ingress.repository_ledger.kernel.SuppliedEpochRefused)
+        self.assertSixFields(refused.refusal)
+
+    def test_the_refusal_is_the_kernel_writer_refusal(self):
+        emit = ingress.repository_ledger
+        self.assertEqual(self.refused_append().refusal, emit.kernel.writer_epoch_refusal(
+            None, retry_entrypoint=emit.EPOCH_RETRY_ENTRYPOINT))
+
+    def test_an_append_with_an_invalid_epoch_fails_closed_before_the_store_opens(self):
+        for epoch in ("33.0", True, 31, "+33", 33.0, " 33", "3_3"):
+            with self.subTest(epoch=epoch):
+                self.assertSixFields(self.refused_append(hb_epoch=epoch).refusal, "HB_EPOCH_INVALID")
+
+    def test_the_emitter_cli_without_an_epoch_prints_the_refusal_and_writes_nothing(self):
+        run = self.emit_cli()
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertSixFields(json.loads(run.stdout))
+        self.assertFalse(Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]).exists())
+
+    def test_the_emitter_cli_with_an_invalid_epoch_prints_the_refusal_and_writes_nothing(self):
+        for epoch in ("33.0", "31", "+33", "True"):
+            with self.subTest(epoch=epoch):
+                run = self.emit_cli("--hb-epoch", epoch)
+                self.assertEqual(run.returncode, 1, run.stderr)
+                self.assertSixFields(json.loads(run.stdout), "HB_EPOCH_INVALID")
+                self.assertFalse(Path(os.environ["STEGVERSE_REPO_LEDGER_ROOT"]).exists())
+
+    def test_a_receiving_operation_handed_no_epoch_records_nothing(self):
+        with self.assertRaises(ingress.repository_ledger.RepoLedgerEpochRefused):
+            ingress.receive(diagnostic(), registry=REGISTRY, packet_id="no-epoch-diagnostic")
+        self.assertEqual(self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
+                                       "stegverse.repo-transition-receipt/v1"), [])
+        self.assertEqual(self.receipts("STEGVERSE_ORG_LEDGER_ROOT",
+                                       "stegverse.organization-transition-receipt/v1"), [])
+
+    def test_a_receiving_operation_handed_an_invalid_epoch_records_nothing(self):
+        with self.assertRaises(ingress.repository_ledger.RepoLedgerEpochRefused) as raised:
+            ingress.receive(diagnostic(), registry=REGISTRY, packet_id="invalid-epoch-diagnostic",
+                            hb_epoch="+33")
+        self.assertSixFields(raised.exception.refusal, "HB_EPOCH_INVALID")
+        self.assertEqual(self.receipts("STEGVERSE_REPO_LEDGER_ROOT",
+                                       "stegverse.repo-transition-receipt/v1"), [])
+        self.assertEqual(self.receipts("STEGVERSE_ORG_LEDGER_ROOT",
+                                       "stegverse.organization-transition-receipt/v1"), [])
 
 
 class LedgerWriterWorkflowTests(unittest.TestCase):

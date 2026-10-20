@@ -181,7 +181,7 @@ class ContractBinding(unittest.TestCase):
         self.assertEqual(record["sdk"]["commit"], SDK_PIN)
         entry = record["files"]["resident-runtime/organization_manifest_ingress.py"]
         self.assertEqual(entry["rule"], "declared_substitutions")
-        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 7)
+        self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 28)
         boundary_ci = (ROOT / ".github/workflows/org-runtime-boundary.yml").read_text()
         self.assertIn("ref: " + REFERENCE_COMMIT, boundary_ci)
 
@@ -353,11 +353,135 @@ class Receive(unittest.TestCase):
         result = capability.receive(ROOT, row(ADDRESS), {"payload": {"manifest": built()},
                                                          "standing": committed_request()["standing"],
                                                          "packet_id": "w04-address"},
-                                    registry=REGISTRY)
+                                    registry=REGISTRY, hb_epoch=32)
         self.assertEqual(result["receiving_operation_id"], OPERATION_ID)
         self.assertEqual(result["receiving_operation_result"]["disposition"], "ALLOW")
         with self.assertRaisesRegex(SystemExit, "SUBMISSION_CARRIES_A_MANIFEST"):
             capability.receive(ROOT, row(ADDRESS), {"payload": {}}, registry=REGISTRY)
+
+    # --- PB-EXIT-SPLIT (lead 09:54Z): the caller keeps the processor's exits apart ---
+
+    def kernel_route(self):
+        """A manifest frame addressed to this organization's capability, and a consuming cycle."""
+        kernel = load("w04_pb_kernel", "org-kernel/kernel.py")
+        crossing = load("w04_pb_crossing", "org-runtime/crossing.py")
+        crossing.open_organization_ledger(root=ROOT, hb_epoch=32)
+        mesh, node = self.work / "mesh", self.work / "node"
+        packet = kernel.build_packet(origin_org="StegVerse-org", origin_service="stegverse-org.org-control",
+                                     destination_org="SV-LLM", destination_service=ADDRESS,
+                                     payload={"manifest": built()}, standing=committed_request()["standing"],
+                                     packet_id="pb-exit-split")
+        kernel._publish_frame(kernel.carrier_frame(packet, epoch=32), root=mesh)
+        run = lambda: kernel.consume_and_respond(ROOT, mesh_root=mesh, node_state_root=node,
+                                                 repo_ledger_root=self.work / "repo", org_ledger_root=self.work / "org")
+        return run, node
+
+    def processor_fault(self, op, match):
+        """The next processor run faults once on `op` (write_text / read_text) of a path containing `match`."""
+        sys.path.insert(0, str(ROOT / "org-runtime/tests"))
+        self.addCleanup(sys.path.remove, str(ROOT / "org-runtime/tests"))
+        import fault_injection
+        hook = fault_injection.directory()
+        self.addCleanup(shutil.rmtree, hook, True)
+        counter = self.work.parent / (self.work.name + "-count")
+        self.addCleanup(lambda: counter.unlink(missing_ok=True))
+        saved = {k: os.environ.get(k) for k in ("PYTHONPATH", "STEGVERSE_FAULT_ROOT", "STEGVERSE_FAULT_COUNTER",
+                                                "STEGVERSE_FAULT_MATCH", "STEGVERSE_FAULT_AT", "STEGVERSE_FAULT_OPS")}
+        self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+                                 for k, v in saved.items()])
+        os.environ.update(PYTHONPATH=os.pathsep.join(filter(None, [str(hook), os.environ.get("PYTHONPATH")])),
+                          STEGVERSE_FAULT_ROOT="/", STEGVERSE_FAULT_COUNTER=str(counter),
+                          STEGVERSE_FAULT_MATCH=match, STEGVERSE_FAULT_AT="0", STEGVERSE_FAULT_OPS=op)
+
+        def clear():
+            for name in ("STEGVERSE_FAULT_AT", "STEGVERSE_FAULT_OPS"):
+                os.environ.pop(name, None)
+        return clear
+
+    def manifest_receipts(self):
+        return [r for r in self.receipts("repo", "stegverse.repo-transition-receipt/v1")
+                if (r.get("transition_class") or "").startswith("ORGANIZATION_SDK_MANIFEST_INGRESS")]
+
+    def test_a_processor_write_fault_exit_75_leaves_the_frame_pending(self):
+        # Exit 75: the processor's own --out write faulted, nothing durable was
+        # written. Six-field non-terminal, no seen-marker; the next cycle consumes
+        # the frame exactly once.
+        run, node = self.kernel_route()
+        clear = self.processor_fault("write_text", "execution.json")
+        first, = run()
+        clear()
+        self.assertEqual((first["result"]["failure_code"], first["result"]["terminal"]),
+                         ("FRAME_DISPATCH_IO_FAILED", False), first)
+        self.assertIn("PROCESS_BOUNDARY_WRITE_FAULT", first["result"]["detail"])
+        for field in ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                      "owning_existing_goal", "next_attempt"):
+            self.assertTrue(first["result"][field], field)
+        self.assertIsNone(first["seen_marker"])
+        self.assertEqual(self.manifest_receipts(), [])
+        second, = run()
+        self.assertEqual(second["result"]["status"], "CONSUMED", second)
+        self.assertTrue(second["seen_marker"])
+        self.assertEqual(len(self.manifest_receipts()), 1)
+        self.assertEqual(run(), [])
+
+    def test_a_processor_input_fault_exit_65_is_terminal_and_marked(self):
+        # Exit 65: the processor could not read its input. A terminal six-field
+        # refusal recorded on both ledgers, and the frame is marked: never pending.
+        run, node = self.kernel_route()
+        clear = self.processor_fault("read_text", "ingress.json")
+        first, = run()
+        clear()
+        self.assertTrue(first["seen_marker"], first)
+        refused = first["result"]["execution_result"]["application_result"]["receiving_operation_result"]
+        self.assertEqual(refused["failed_predicate"], "ADMITTED_CROSSING_REACHES_ITS_INTERNAL_ENDPOINT", refused)
+        self.assertIn("PROCESS_BOUNDARY_INPUT_FAULT", refused["detail"])
+        self.assertIs(refused["refusal_recorded"], True)
+        self.assertEqual(len(self.manifest_receipts()), 1)
+        self.assertEqual(run(), [])
+
+    def test_any_other_processor_exit_is_terminal(self):
+        # Exit 1 (a processor refusal), an unknown code, or a crash (traceback) is a
+        # terminal six-field refusal recorded on both ledgers: never pending.
+        for name, body in (("exit 1", "raise SystemExit('wrong-destination-org')"),
+                           ("unknown code", "print('{}'); raise SystemExit(3)"),
+                           ("crash", "raise RuntimeError('processor crashed')")):
+            with self.subTest(processor=name):
+                stub = self.work / ("stub-" + name.replace(" ", "-") + ".py")
+                stub.write_text(body + "\n")
+                original = ingress.crossing_module.PROCESSOR
+                ingress.crossing_module.PROCESSOR = stub
+                try:
+                    refused = ingress.receive(built(), registry=REGISTRY, standing=committed_request()["standing"],
+                                              packet_id="pb-exit-" + name.replace(" ", "-"), hb_epoch=32)
+                finally:
+                    ingress.crossing_module.PROCESSOR = original
+                self.assertEqual(refused["disposition"], "FAIL_CLOSED", refused)
+                self.assertEqual(refused["failed_predicate"], "ADMITTED_CROSSING_REACHES_ITS_INTERNAL_ENDPOINT")
+                self.assertIs(refused["refusal_recorded"], True)
+                for field in ("failure_code", "failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                              "owning_existing_goal", "next_attempt"):
+                    self.assertTrue(refused[field], field)
+
+    def test_the_processor_prints_six_fields_for_each_exit_class(self):
+        processor = ROOT / "org-boundary/runtime/process_boundary.py"
+        (self.work / "not.json").write_text("{not json")
+        (self.work / "deep.json").write_text('{"a":' + "[" * 100000)  # F-SCAN-RECURSION
+        (self.work / "registry.json").write_text(json.dumps(REGISTRY))
+        for name, argv, code, failure, terminal in (
+                ("missing envelope", ["--envelope", str(self.work / "missing.json"), "--registry",
+                                      str(self.work / "registry.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True),
+                ("non-JSON registry", ["--envelope", str(self.work / "registry.json"), "--registry",
+                                       str(self.work / "not.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True),
+                ("deeply nested envelope", ["--envelope", str(self.work / "deep.json"), "--registry",
+                                            str(self.work / "registry.json")], 65, "PROCESS_BOUNDARY_INPUT_FAULT", True)):
+            with self.subTest(case=name):
+                done = subprocess.run([sys.executable, "-B", str(processor), *argv, "--out", str(self.work / "out.json")],
+                                      capture_output=True, text=True, cwd=ROOT, timeout=60)
+                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
+                self.assertNotIn("Traceback", done.stderr)
+                record = json.loads(done.stdout)
+                self.assertEqual((record["failure_code"], record["terminal"]), (failure, terminal))
+                self.assertFalse((self.work / "out.json").exists())
 
 
 # --- the workflow's own steps, run locally ---------------------------------
@@ -511,13 +635,19 @@ class DispatchGuards(unittest.TestCase):
         env["REPO_LEDGER_NAMESPACE"] = REPO_LOCATION["namespace"]
         done = self.space.step(CLOSE, env, INPUT_COMMUNICATION_ID="c", INPUT_PACKET_ID="")
         self.assertNotEqual(done.returncode, 0)
-        self.assertIn("DISPATCH_HB_EPOCH_INVALID", done.stdout)
+        refusal = json.loads(done.stdout)
+        self.assertEqual((refusal["failure_code"], refusal["failed_predicate"]),
+                         ("HB_EPOCH_INVALID", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
 
-    def test_a_push_is_a_request_and_a_bare_dispatch_a_self_closure(self):
+    def test_no_push_trigger_and_a_bare_dispatch_is_a_self_closure(self):
+        # B-P36n: a push carries no epoch, so the workflow has no push trigger; a
+        # committed request is received only when dispatched with mode=request.
         text = WORKFLOW.read_text()
-        self.assertIn("MODE: ${{ github.event_name == 'push' && 'request' || github.event.inputs.mode || "
-                      "'self-closure' }}", text)
-        self.assertIn("      - '.stegverse/transition-requests/**'", text)
+        self.assertIn("MODE: ${{ github.event.inputs.mode || 'self-closure' }}", text)
+        trigger = text[text.index("\non:\n"):text.index("\npermissions:")]
+        self.assertNotIn("  push:", trigger)
+        self.assertNotIn("  schedule:", trigger)
+        self.assertIn("  workflow_dispatch:", trigger)
 
 
 @needs_sdk
@@ -530,8 +660,8 @@ class EndToEndDryRun(unittest.TestCase):
     is in a temporary directory.
     """
 
-    def run_request(self, space, event, **step_env):
-        env = space.job("request", GITHUB_EVENT_NAME=event)
+    def run_request(self, space, event, hb_epoch="41", **step_env):
+        env = space.job("request", GITHUB_EVENT_NAME=event, HB_EPOCH=hb_epoch)
         for name in (SDK_PATH, VALIDATE, BIND):
             done = space.step(name, env)
             self.assertEqual(done.returncode, 0, name + "\n" + done.stdout + done.stderr)
@@ -586,7 +716,10 @@ class EndToEndDryRun(unittest.TestCase):
         self.assertEqual(readback["disposition"], "ALLOW", readback)
         self.assertEqual(space.published(), tip_after)
 
-    def test_the_push_that_commits_a_request_opens_the_ledger_and_reads_it_back(self):
+    def test_a_push_without_a_supplied_epoch_fails_closed_and_publishes_nothing(self):
+        # A push carries no hb_epoch. The request used to be received anyway,
+        # its receipts stamped from the runner's clock; it now fails closed
+        # before it is received and nothing is appended or published.
         space = Workspace(self, with_request=False)
         before = space.git("rev-parse", "HEAD")
         target = space.ws / REQUEST
@@ -595,13 +728,23 @@ class EndToEndDryRun(unittest.TestCase):
         space.git("add", REQUEST)
         space.git("commit", "-q", "-m", "commit the W04 request")
         space.git("push", "-q", "origin", "HEAD:refs/heads/main")
-        self.assertIsNone(space.published())
-        ingress_result, readback, _ = self.run_request(space, "push", INPUT_REQUEST="", BEFORE=before)
+        env = space.job("request", GITHUB_EVENT_NAME="push")
+        for name in (SDK_PATH, VALIDATE, BIND):
+            done = space.step(name, env)
+            self.assertEqual(done.returncode, 0, name + "\n" + done.stdout + done.stderr)
+        done = space.step(SELECT, env, INPUT_REQUEST="", BEFORE=before)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual((space.temp / "requests.txt").read_text(), REQUEST + "\n")
-        self.assertEqual(ingress_result["disposition"], "ALLOW", ingress_result)
-        self.assertEqual(readback["disposition"], "ALLOW", readback)
-        self.assertEqual(readback["chain_length"], 1)
-        self.assertTrue(space.published())
+        received = space.step(RECEIVE, env)
+        self.assertNotEqual(received.returncode, 0)
+        refusal = json.loads(received.stdout.strip().splitlines()[-1])
+        self.assertEqual(refusal["failure_code"], "HB_EPOCH_NOT_SUPPLIED")
+        self.assertEqual(refusal["failed_predicate"], "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH")
+        for field in ("failed_predicate", "required_evidence_or_repair", "retry_entrypoint",
+                      "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
+        self.assertFalse((space.temp / "results" / Path(REQUEST).stem / "ingress.json").exists())
+        self.assertIsNone(space.published())
 
 
 class ExemptionStaysUntilAReceiptIsReadBack(unittest.TestCase):
