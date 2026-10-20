@@ -22,7 +22,12 @@
       "name": "StegVerse_AI",
       "class": "ECOSYSTEM_ENTITY",
       "role": "Ecosystem-purpose reconstruction, evidence-versus-receipted-history matching, capability-gap recognition and intelligence orchestration.",
-      "authority_effect": "NONE"
+      "authority_effect": "NONE",
+      "capability_declaration_ref": {
+        "repository": "StegVerse_AI",
+        "path": "contracts/entity-capability.json",
+        "declaration_sha256": "sha256:6304ca7f674213dc1bee43a924bce55a17697d9c70e6c75df9f8099271c5b5c8"
+      }
     },
     {
       "name": "Ecosystem_Chat",
