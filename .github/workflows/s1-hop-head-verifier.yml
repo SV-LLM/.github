@@ -1,0 +1,436 @@
+name: S1 hop head verifier
+
+# S1 SV-LLM sandbox verifier (sandbox/s1_hop_head_verifier.py). `test` runs
+# its unit tests. `rederive` re-derives, on this runner, every committed
+# receipt whose head is in a public repository: it fetches that pull request's
+# head read-only (no credential), runs the verifier offline against it, and
+# requires the receipt bytes to equal the committed ones. The verifier itself
+# reads no clock, dispatches nothing and appends no ledger. Receipts are
+# admission-input evidence, not authentic organization-ledger receipts.
+# `rederive-required-checks` re-derives every public head's
+# sandbox/s1_required_checks_verifier.py receipt: it fetches the head and each
+# dependency commit the head's own .sv/required-checks.json declares (interim
+# basis until SV-CHANGE-REQUIRED-CHECKS-001 is published), runs the declared
+# checks offline twice, and requires byte equality with the committed receipt.
+# `rederive-stage-evaluation` re-derives the committed nwi-s0-exit-gate stage
+# evaluation (sandbox/s1_nwi_s0_exit_gate.py) byte for byte. It is a verifier
+# rederive on this PR, NOT a stage-gate trigger: the gate is evaluated once per
+# STAGE_GATE evaluation subject, never on push, PR head or schedule, and this
+# job evaluates only the committed subject, appending nothing.
+on:
+  pull_request:
+    paths:
+      - 'sandbox/**'
+      - 'evidence/s1-hop-head/**'
+      - 'evidence/s1-required-checks/**'
+      - 'evidence/sv-check-receipts/**'
+      - 'evidence/stage-evaluations/**'
+      - 'tests/s1_gate_negatives.py'
+      - 'tests/test_s1_hop_head_verifier.py'
+      - 'tests/test_s1_required_checks_verifier.py'
+      - 'tests/test_s1_sv_check_receipts.py'
+      - '.github/workflows/s1-hop-head-verifier.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sandbox/**'
+      - 'evidence/s1-hop-head/**'
+      - 'evidence/s1-required-checks/**'
+      - 'evidence/sv-check-receipts/**'
+      - 'evidence/stage-evaluations/**'
+      - 'tests/s1_gate_negatives.py'
+      - 'tests/test_s1_hop_head_verifier.py'
+      - 'tests/test_s1_required_checks_verifier.py'
+      - 'tests/test_s1_sv_check_receipts.py'
+      - '.github/workflows/s1-hop-head-verifier.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Unit tests (negatives, determinism, shared epoch rule, committed receipts)
+        run: |
+          python3 -m py_compile sandbox/s1_hop_head_verifier.py
+          python3 -B tests/test_s1_hop_head_verifier.py -v
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Required-checks verifier unit tests (not declared, invalid, dependency, clock, network, two-run, failing, allow)
+        run: |
+          python3 -m py_compile sandbox/s1_required_checks_verifier.py
+          python3 -B tests/test_s1_required_checks_verifier.py -v
+      - name: SV_CHANGE sv-check-receipt minter unit tests (pins, six ids, schema, negatives)
+        run: |
+          python3 -m py_compile sandbox/s1_sv_check_receipts.py
+          python3 -B tests/test_s1_sv_check_receipts.py -v
+      - name: P1 files resolve through the pinned contract-pins.json (sha256 317aef68) at StegVerse-Labs/.github#3264 7898cedb; vendored P1 segments are its bytes
+        run: |
+          set -euo pipefail
+          pin=$(python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; print(m.CONTRACT_PINS["commit"])')
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
+          git -C "$RUNNER_TEMP/labs" show "$pin:data/sv-work-items/contract-pins.json" | cmp - sandbox/s1_pins/contract-pins.json
+          python3 - "$RUNNER_TEMP/labs" "$pin" <<'PY'
+          import hashlib, json, subprocess, sys
+          sys.path.insert(0, "sandbox")
+          import s1_sv_check_receipts as m, s1_supplied_epoch_binder as eb
+          labs, pin = sys.argv[1], sys.argv[2]
+          def show(path):
+              return subprocess.run(["git", "-C", labs, "show", pin + ":" + path], check=True, capture_output=True).stdout
+          def blob(data):
+              return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+          manifest = show(m.CONTRACT_PINS["file"])
+          assert "sha256:" + hashlib.sha256(manifest).hexdigest() == m.CONTRACT_PINS["sha256"], "contract-pins.json drifted"
+          entries = json.loads(manifest)["files"]
+          for path in m.USED_P1_FILES:  # each used file: its bytes at the pin match its manifest entry
+              data = show(path)
+              assert entries[path] == {"blob": blob(data), "sha256": "sha256:" + hashlib.sha256(data).hexdigest()}, path
+              assert m.p1_blob(path) == entries[path]["blob"], path
+          for path, want in m.UNLISTED_P1_FILES.items():
+              assert path not in entries and blob(show(path)) == want, path
+          for vendored, path in (("required-checks.json", m.ROW_FILE), ("sv-check-receipt.v1.schema.json", m.RECEIPT_SCHEMA_FILE),
+                                 ("NWI-S0.json", m.STAGE_GATE_MANIFEST_FILE), ("sv-change.v1.schema.json", "schemas/sv-change.v1.schema.json")):
+              assert blob(open("sandbox/s1_pins/" + vendored, "rb").read()) == m.p1_blob(path), vendored
+          assert eb.P1_REFERENCE["commit"] == m.PIN_COMMIT and eb.P1_REFERENCE["blob_sha"] == m.p1_blob("resident-runtime/sv_work_items.py")
+          print("contract-pins", m.CONTRACT_PINS["sha256"], "resolves", len(m.USED_P1_FILES), "used P1 files at", pin)
+          PY
+          git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > "$RUNNER_TEMP/sv_work_items.py"
+          python3 - "$RUNNER_TEMP/sv_work_items.py" <<'PY'
+          import ast, hashlib, sys
+          sys.path.insert(0, "sandbox")
+          import s1_sv_check_receipts as m
+          src = open(sys.argv[1]).read(); lines = src.split("\n")
+          found = {}
+          for n in ast.parse(src).body:
+              name = getattr(n, "name", None) or (n.targets[0].id if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) else None)
+              if name in m.P1_SEGMENT_SHA256:
+                  found[name] = hashlib.sha256("\n".join(lines[n.lineno - 1:n.end_lineno]).encode()).hexdigest()
+          assert found == m.P1_SEGMENT_SHA256, found
+          print("P1 segments byte-identical at", m.PIN_COMMIT)
+          PY
+      - name: Pinned readback equals StegVerse-Labs/.github#3266 at 2ba0e329; vendored canon/seal are its bytes
+        run: |
+          set -euo pipefail
+          rb=2ba0e329c224c94863dac15de3f8011f777cb34f
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$rb"
+          test "$(git -C "$RUNNER_TEMP/labs" rev-parse "$rb:resident-runtime/sv_change_base_state_readback.py")" = 2c730142254b78a5b9e1c05566fe6f5111b7d571
+          test "$(git hash-object sandbox/s1_pins/sv_change_base_state_readback.py)" = 2c730142254b78a5b9e1c05566fe6f5111b7d571
+          git -C "$RUNNER_TEMP/labs" show "$rb:resident-runtime/sv_change_base_state_readback.py" | cmp - sandbox/s1_pins/sv_change_base_state_readback.py
+          python3 - <<'PY'
+          import ast, hashlib, sys
+          sys.path.insert(0, "sandbox")
+          import s1_supplied_epoch_binder as eb
+          def seg(path):
+              src = open(path).read()
+              return {n.name: hashlib.sha256(ast.get_source_segment(src, n).encode()).hexdigest()
+                      for n in ast.parse(src).body if isinstance(n, ast.FunctionDef)}
+          theirs, mine = seg("sandbox/s1_pins/sv_change_base_state_readback.py"), seg("sandbox/s1_supplied_epoch_binder.py")
+          for name in ("canon", "seal"):
+              assert theirs[name] == mine[name] == eb.READBACK_SEGMENT_SHA256[name], name
+          assert mine["supplied_epoch_failure"] == eb.SHARED_RULE_SHA256
+          print("#3266 canon/seal and the 726248a5 rule byte-identical at", eb.READBACK_PIN_COMMIT)
+          PY
+      - name: Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin
+        run: |
+          set -euo pipefail
+          pin=7898cedba1400c8545cebcb463fd26deb25f7d5a
+          git -C "$RUNNER_TEMP/labs" show "$pin:resident-runtime/sv_work_items.py" > /dev/null
+          rm -rf "$RUNNER_TEMP/p1" && mkdir -p "$RUNNER_TEMP/p1"
+          git -C "$RUNNER_TEMP/labs" archive "$pin" | tar -x -C "$RUNNER_TEMP/p1"
+          python3 - "$RUNNER_TEMP/p1" <<'PY'
+          import glob, json, sys
+          sys.path.insert(0, sys.argv[1] + "/resident-runtime")
+          import sv_work_items as w
+          n = 0
+          for f in sorted(glob.glob("evidence/sv-check-receipts/*/*.json")):
+              if f.endswith("/bundle.json"):
+                  continue
+              w.validate_check_receipt(json.load(open(f)))
+              n += 1
+          print(n, "committed receipts accepted by sv_work_items.validate_check_receipt")
+          PY
+      - name: Built-in supplied-epoch-binder-check agrees with P1's verify_admission_hb_epoch at the pin
+        run: python3 -B tests/s1_binder_parity.py "$RUNNER_TEMP/p1"
+      - name: Built-in supplied-epoch-binder-check receipts (fixture ALLOW and DENY HB_EPOCH_MISMATCH) pass P1's validate_check_receipt
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/p1" <<'PY'
+          import sys, tempfile
+          from pathlib import Path
+          from unittest import mock
+          sys.path.insert(0, sys.argv[1] + "/resident-runtime"); sys.path.insert(0, "tests")
+          import sv_work_items as w
+          import test_s1_sv_check_receipts as t
+          for supplied, want in (("4000", "ALLOW"), ("4001", "DENY")):
+              with tempfile.TemporaryDirectory() as tmp:
+                  _, receipts = t.Fixture(Path(tmp), {"README": b"x\n"}, supplied=supplied).mint()
+              r = receipts["supplied-epoch-binder-check"]
+              assert r["disposition"] == want, r
+              w.validate_check_receipt(r)
+              print(supplied, r["disposition"], r.get("failure_code"), "accepted by sv_work_items.validate_check_receipt")
+          PY
+
+  rederive:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: SV-LLM/.github, input: SV-LLM-41-97c8e43c}
+          - {repository: StegVerse-org/.github, input: StegVerse-org-181-22b1ef4a}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3206-e07326f6}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3263-690d3ef1}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-fbf1fa46}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-4dcf3cd4}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-ca7ca797}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-7d2b7394}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-56c9943c}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-cae3398c}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch the declared head read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "sandbox/s1-inputs/$INPUT.json")
+          git init -q "$RUNNER_TEMP/head"
+          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
+          test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+          echo "fetched $REPOSITORY at $head"
+      - name: Re-derive the receipt and compare bytes
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          committed="evidence/s1-hop-head/$INPUT.json"
+          code=0
+          python3 -P sandbox/s1_hop_head_verifier.py --input "sandbox/s1-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" --out "$RUNNER_TEMP/receipt.json" || code=$?
+          echo "verifier exit $code (0 only for ALLOW; the committed receipt decides the expected disposition)"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
+          cmp "$committed" "$RUNNER_TEMP/receipt.json"
+          echo "re-derived receipt is byte-identical to $committed"
+
+  rederive-required-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: SV-LLM/.github, input: SV-LLM-41-97c8e43c}
+          - {repository: StegVerse-org/.github, input: StegVerse-org-181-22b1ef4a}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3206-e07326f6}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3263-690d3ef1}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-fbf1fa46}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-3ac2c028}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-ca7ca797}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-4dcf3cd4}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-06575f0b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-2a22541b}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-39-1a514339}
+          - {repository: SV-LLM/sandbox, input: SV-LLM-sandbox-40-41938d3f}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-7d2b7394}
+          - {repository: SV-LLM/.github, input: SV-LLM-47-56c9943c}
+          - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-cae3398c}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the head and its declared dependency commits read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "sandbox/s1-required-checks-inputs/$INPUT.json")
+          git init -q "$RUNNER_TEMP/head"
+          git -C "$RUNNER_TEMP/head" fetch -q --no-tags --depth 1 "https://github.com/$REPOSITORY.git" "$head"
+          test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+          echo "fetched $REPOSITORY at $head"
+          : > "$RUNNER_TEMP/deps.args"
+          if git -C "$RUNNER_TEMP/head" cat-file -e "$head:.sv/required-checks.json" 2>/dev/null; then
+            git -C "$RUNNER_TEMP/head" show "$head:.sv/required-checks.json" > "$RUNNER_TEMP/declaration.json"
+            python3 -c 'import json,sys
+          d=json.load(open(sys.argv[1]))
+          for x in d.get("dependencies", []) if isinstance(d, dict) else []:
+              print(x["id"], x["repository"], x["commit"])' "$RUNNER_TEMP/declaration.json" 2>/dev/null |
+            while read -r id repo commit; do
+              git init -q "$RUNNER_TEMP/dep-$id"
+              git -C "$RUNNER_TEMP/dep-$id" fetch -q --no-tags --depth 1 "https://github.com/$repo.git" "$commit"
+              echo "--dependency $id=$RUNNER_TEMP/dep-$id" >> "$RUNNER_TEMP/deps.args"
+              echo "fetched dependency $id: $repo at $commit"
+            done
+          else
+            echo "head declares no .sv/required-checks.json"
+          fi
+      - name: Re-derive the required-checks receipt and compare bytes
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          committed="evidence/s1-required-checks/$INPUT.json"
+          code=0
+          python3 -P sandbox/s1_required_checks_verifier.py --input "sandbox/s1-required-checks-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" $(cat "$RUNNER_TEMP/deps.args") --out "$RUNNER_TEMP/receipt.json" || code=$?
+          echo "verifier exit $code (0 only for ALLOW; the committed receipt decides the expected disposition)"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["disposition"], r.get("failure_code"), r["receipt_sha256"])' "$RUNNER_TEMP/receipt.json"
+          cmp "$committed" "$RUNNER_TEMP/receipt.json" || { diff <(python3 -m json.tool "$committed") <(python3 -m json.tool "$RUNNER_TEMP/receipt.json") || true; exit 1; }
+          echo "re-derived receipt is byte-identical to $committed"
+
+  rederive-sv-check-receipts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3225-e6ba9601}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3226-f82c0324}
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3234-e29493af}
+          # P1's #3264 head itself; its SV_CHANGE record is P1's out-of-tree record, pinned by sha256 (not copied here)
+          - {repository: StegVerse-Labs/.github, input: StegVerse-Labs-3264-7898cedb}
+          # dd8bfd02 is not fetchable (no public ref) and has no #3266 readback: HB_EPOCH_SOURCE_UNOBSERVED
+          - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the pinned row/schema/SV_CHANGE commit and the head read-only
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          in="sandbox/s1-sv-check-inputs/$INPUT.json"
+          pin=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["required_checks_row"]["commit"])' "$in")
+          head=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "$in")
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags --depth 1 https://github.com/StegVerse-Labs/.github.git "$pin"
+          git init -q "$RUNNER_TEMP/head"
+          if [ -n "$REPOSITORY" ]; then
+            # full history: the row's {base_commit} binding must be an ancestor present in the clone
+            git -C "$RUNNER_TEMP/head" fetch -q --no-tags "https://github.com/$REPOSITORY.git" "$head"
+            test "$(git -C "$RUNNER_TEMP/head" rev-parse FETCH_HEAD)" = "$head"
+            base=$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])).get("base_commit") or {}).get("sha",""))' "$in")
+            if [ -n "$base" ]; then git -C "$RUNNER_TEMP/head" merge-base --is-ancestor "$base" "$head"; echo "base_commit $base is an ancestor of $head"; fi
+          fi
+      - name: Mint again and compare every receipt byte for byte
+        env:
+          INPUT: ${{ matrix.input }}
+        run: |
+          set -euo pipefail
+          in="sandbox/s1-sv-check-inputs/$INPUT.json"
+          record=$(python3 -c 'import json,sys; s=json.load(open(sys.argv[1]))["sv_change"]; print(s["file"] if s["repository"] == "OUT_OF_TREE" else "")' "$in")
+          if [ -n "$record" ] && [ ! -f "$record" ]; then
+            # The record is out of tree (box-only): the bundle cannot be re-minted here. Re-derive its change_id from the
+            # fetched head instead and require it to be the committed one; the receipts are re-checked by the test job.
+            b="evidence/sv-check-receipts/$INPUT/bundle.json"
+            python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); sv=b["sv_change"]; json.dump({"target_repository": b["repository"], "base_ref": sv["base_ref"], "projection": {"base_sha": sv["base_sha"]}}, open(sys.argv[2], "w"))' "$b" "$RUNNER_TEMP/identity.json"
+            derived=$(python3 -P sandbox/s1_sv_check_receipts.py derive-change-id --checkout "$RUNNER_TEMP/head" \
+              --head "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head_sha"])' "$in")" --record-identity "$RUNNER_TEMP/identity.json")
+            python3 - "$b" "$in" "$derived" <<'PY'
+          import json, sys
+          b, i = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+          assert b["sv_change"]["sha256"] == i["sv_change"]["sha256"], "bundle is not over the pinned record"
+          assert b["sv_change"]["change_id"] == b["sv_change"]["derived_change_id"] == sys.argv[3], (b["sv_change"], sys.argv[3])
+          print("record out of tree; change_id", sys.argv[3], "derived from the fetched head equals the committed bundle's")
+          PY
+            exit 0
+          fi
+          code=0
+          python3 -P sandbox/s1_sv_check_receipts.py mint --input "sandbox/s1-sv-check-inputs/$INPUT.json" \
+            --checkout "$RUNNER_TEMP/head" --dependency "labs-row=$RUNNER_TEMP/labs" --out-dir "$RUNNER_TEMP/out" || code=$?
+          echo "minter exit $code (0 only when all six are ALLOW; the committed receipts decide)"
+          python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); print("bundle", b["disposition"], b.get("failure_code"), "hb_epoch", b.get("hb_epoch"))' "$RUNNER_TEMP/out/bundle.json"
+          diff -r "evidence/sv-check-receipts/$INPUT" "$RUNNER_TEMP/out"
+          for f in "$RUNNER_TEMP"/out/*.json; do
+            python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(sys.argv[1].rsplit("/",1)[1], r.get("disposition"), r.get("failure_code"))' "$f"
+          done
+          echo "re-minted receipts are byte-identical to evidence/sv-check-receipts/$INPUT"
+  rederive-stage-evaluation:
+    # Verifier rederive of committed evidence on this PR; not a stage-gate trigger (see the header).
+    name: "verifier rederive: nwi-s0-exit-gate stage evaluation (not a stage-gate trigger)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # head-side (#3264 7898cedb, ALLOW) and base-side (main 978b8880, manifest from the contract pins, FAIL_CLOSED)
+        evaluation: [NWI-S0-StegVerse-Labs-7898cedb, NWI-S0-StegVerse-Labs-978b8880]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch the contract pin and the evaluated commit read-only
+        env:
+          EVALUATION: ${{ matrix.evaluation }}
+        run: |
+          set -euo pipefail
+          in="sandbox/s1-stage-evaluations/$EVALUATION.json"
+          pin=$(python3 -c 'import sys; sys.path.insert(0, "sandbox"); import s1_sv_check_receipts as m; print(m.CONTRACT_PINS["commit"])')
+          commit=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["evaluated_commit"])' "$in")
+          git init -q "$RUNNER_TEMP/labs"
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags https://github.com/StegVerse-Labs/.github.git "$pin" "$commit"
+          git -C "$RUNNER_TEMP/labs" cat-file -e "$pin^{commit}"
+          git -C "$RUNNER_TEMP/labs" cat-file -e "$commit^{commit}"
+      - name: Evaluate the committed subject again and compare every byte
+        env:
+          EVALUATION: ${{ matrix.evaluation }}
+        run: |
+          set -euo pipefail
+          code=0
+          python3 -P sandbox/s1_nwi_s0_exit_gate.py evaluate --input "sandbox/s1-stage-evaluations/$EVALUATION.json" \
+            --checkout "$RUNNER_TEMP/labs" --p1 "$RUNNER_TEMP/labs" --out-dir "$RUNNER_TEMP/out" || code=$?
+          echo "evaluator exit $code"
+          python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(e["disposition"], e.get("failure_code"), e["evaluation_subject_digest"], e["receipts"])' "$RUNNER_TEMP/out/evaluation.json"
+          diff -r "evidence/stage-evaluations/$EVALUATION" "$RUNNER_TEMP/out"
+      - name: Both sides name the contract-pinned manifest (manifest_source CONTRACT_PINS, NWI-S0 20b37917, contract-pins 317aef68)
+        run: |
+          python3 - <<'PY'
+          import json
+          for c in ("7898cedb", "978b8880"):
+              d = "evidence/stage-evaluations/NWI-S0-StegVerse-Labs-" + c
+              e = json.load(open(d + "/evaluation.json"))
+              assert json.load(open("sandbox/s1-stage-evaluations/NWI-S0-StegVerse-Labs-" + c + ".json"))["manifest_source"] == "CONTRACT_PINS", c
+              assert e["manifest_source"] == "CONTRACT_PINS", c
+              assert e["evaluation_subject"]["manifest_blob"] == e["manifest"]["blob"] == "20b37917e1454ec788e8f1b8c75d1562ba76d1b3", c
+              assert e["contract_pins"]["sha256"].startswith("sha256:317aef68"), c
+          print("both stage evaluations: manifest_source CONTRACT_PINS, manifest_blob", e["manifest"]["blob"], e["contract_pins"]["sha256"])
+          PY
+      - name: Issue derivation from the committed evaluations (pure, simulated append in memory; nothing appended)
+        run: |
+          set -euo pipefail
+          for c in 7898cedb 978b8880; do
+            test -d "evidence/stage-evaluations/NWI-S0-StegVerse-Labs-$c"
+          done
+          git -C "$RUNNER_TEMP/labs" fetch -q --no-tags https://github.com/StegVerse-Labs/.github.git 978b8880d238dc3e3a8b690c0675d8bb0e9d6985 7898cedba1400c8545cebcb463fd26deb25f7d5a
+          python3 -P sandbox/s1_gate_issue_derivation.py --evaluation evidence/stage-evaluations/NWI-S0-StegVerse-Labs-978b8880 \
+            --evaluation evidence/stage-evaluations/NWI-S0-StegVerse-Labs-7898cedb --p1 "$RUNNER_TEMP/labs" \
+            --change-bundle evidence/sv-check-receipts/StegVerse-Labs-3264-7898cedb/bundle.json --out "$RUNNER_TEMP/issue.json"
+          cmp "$RUNNER_TEMP/issue.json" evidence/stage-evaluations/NWI-S0-issue-derivation.json
+      - name: Gate negatives (subject, epoch, declaration, failing producer) against the fetched P1 tree
+        run: |
+          set -euo pipefail
+          git config --global user.name ci && git config --global user.email ci@invalid
+          python3 -B tests/s1_gate_negatives.py "$RUNNER_TEMP/labs"

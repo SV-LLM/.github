@@ -1,0 +1,28 @@
+{
+  "schema": "stegverse.sv-change.s1-sv-check-input/v1",
+  "type": "SV_CHANGE",
+  "repository": "StegVerse-Labs/.github",
+  "head_sha": "f82c0324aa4b6ac74adc44a3541ac98b33826447",
+  "required_checks_row": {
+    "repository": "StegVerse-Labs/.github",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+    "file": "data/sv-work-items/required-checks.json",
+    "blob_sha": "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d",
+    "receipt_schema_blob_sha": "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3",
+    "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
+  },
+  "sv_change": {
+    "repository": "StegVerse-Labs/.github",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+    "file": "data/sv-work-items/migration/sv-changes.jsonl",
+    "change_id": "svc:4c217bcf70d2761371703408ea2be8861b9d31e716dfa266f15f4068dcc1c912"
+  },
+  "base_commit": {
+    "sha": "bfcf031811caaa65bc44a48c894fce19800b5d90",
+    "basis": "git merge-base <head> origin/main in the local StegVerse-Labs/.github clone (origin/main 978b8880 when computed)"
+  },
+  "hb_epoch_readback": {
+    "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-bfcf031811caaa65bc44a48c894fce19800b5d90.json",
+    "sha256": "sha256:6c7d9abbce96f7373611ed5448941508697a063b5935cd1e2fc529d7461ad1b0"
+  }
+}

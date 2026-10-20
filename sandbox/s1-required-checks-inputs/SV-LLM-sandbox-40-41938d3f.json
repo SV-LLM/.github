@@ -1,0 +1,7 @@
+{
+  "head_sha": "41938d3f75b14110f19531acae2bec121fd66621",
+  "pull_request": 40,
+  "repository": "SV-LLM/sandbox",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}
