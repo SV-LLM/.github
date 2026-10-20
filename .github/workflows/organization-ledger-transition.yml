@@ -252,12 +252,20 @@ jobs:
                 "$recorded" "$canonical" "$out/ingress.json"
               continue
             fi
+            # No clock is read and no epoch is derived (NWI-S1): the epoch is the
+            # dispatch's supplied hb_epoch only. Without one -- a push carries none --
+            # the receive is FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED and nothing is recorded;
+            # epochs already on the ledger never stand in for it.
+            epoch="$HB_EPOCH"
+            echo "supplied hb_epoch for $name: ${epoch:-<none>}"
+            epoch_args=()
+            [ -z "$epoch" ] || epoch_args=(--hb-epoch "$epoch")
             # A refusal is recorded too; the publish step carries it, and the
             # readback step fails the run on a receipt it cannot find.
             python resident-runtime/organization_manifest_ingress.py \
               --registry org-boundary/registry/services.json \
               --manifest "$out/manifest.json" --standing "$out/standing.json" \
-              --packet-id "$name" --out "$out/ingress.json" || true
+              --packet-id "$name" "${epoch_args[@]}" --out "$out/ingress.json" || true
             test -f "$out/ingress.json"
             python -c 'import json,sys; x=json.load(open(sys.argv[1])); print("ingress disposition:", x["disposition"], x.get("failed_predicate"), x.get("organization_receipt_sha256"))' "$out/ingress.json"
           done < "$RUNNER_TEMP/requests.txt"

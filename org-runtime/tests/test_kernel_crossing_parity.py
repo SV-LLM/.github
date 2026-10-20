@@ -270,10 +270,13 @@ class ConsumedCrossingsAreRecorded(SVLLMNode):
         self.assertEqual(self.mesh_frames(), before)
         self.assertEqual(len(self.answers()), 1)
 
-    def test_a_local_status_read_is_labelled_as_a_clock_sample(self):
+    def test_a_local_status_read_without_an_epoch_carries_the_refusal_not_a_clock_sample(self):
+        # NWI-S1: the kernel reads no clock; a status read with no epoch reports
+        # the six-field HB_EPOCH_NOT_SUPPLIED refusal in place of a reference.
         status = self.k.resident_status(self.sv.root)
-        self.assertIs(status["heartbeat_reference"]["derived_from_clock"], True)
-        self.assertIn("sampled_unix_ns", status["heartbeat_reference"])
+        self.assertEqual((status["heartbeat_reference"]["disposition"], status["heartbeat_reference"]["failure_code"]),
+                         ("FAIL_CLOSED", "HB_EPOCH_NOT_SUPPLIED"))
+        self.assertNotIn("sampled_unix_ns", status["heartbeat_reference"])
         self.assertEqual(self.k.resident_status(self.sv.root, epoch=self.k.HB_ANCHOR_EPOCH + 1)
                          ["heartbeat_reference"]["derived_from_clock"], False)
 
@@ -462,7 +465,7 @@ class EmissionsAreRecordedOrRefused(SVLLMNode):
                 "carry_packet": lambda: self.k.carry_packet(self.packet(), custody=None, root=self.mesh, epoch=700),
                 "publish_frame": lambda: self.k.publish_frame(frame, root=self.mesh),
                 "dispatch": lambda: self.k.dispatch(REPO, self.packet()),
-                "forged_custody": lambda: self.k.carry_packet(self.packet(), custody={"schema": "x"}, root=self.mesh)}.items():
+                "forged_custody": lambda: self.k.carry_packet(self.packet(), custody={"schema": "x"}, root=self.mesh, epoch=4000)}.items():
             with self.subTest(primitive=name):
                 with self.assertRaisesRegex(ValueError, "crossing_custody_required_from_recording_operation"):
                     call()

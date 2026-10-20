@@ -713,6 +713,14 @@ def receive(manifest: Mapping[str, Any], *, registry: Mapping[str, Any], standin
     NON-ALLOW with no derivable request is recorded here and is not emitted.
     """
     request: dict[str, Any] | None = None
+    # SV-LLM declared substitution (data/organization-role-reference-adoption.json):
+    # this organization's kernel reads no clock (NWI-S1), so a receive without a
+    # supplied epoch is refused six-field before anything is read or recorded.
+    epoch_refusal = repository_ledger.kernel.hb_epoch_refusal(hb_epoch)
+    if epoch_refusal is not None:
+        return {**epoch_refusal, "receiving_operation_id": OPERATION_ID, "consequence_committed": False,
+                "retry_entrypoint": "resident-runtime/organization_manifest_ingress.py --hb-epoch <supplied>"}
+    hb_epoch = int(str(hb_epoch))
     submitted_epoch = hb_epoch
 
     def refused(failed_predicate: str, detail: str, **extra: Any) -> dict[str, Any]:
@@ -914,9 +922,10 @@ def main() -> int:
                         help="JSON declaring mode, node_ref and the predecessor key; "
                              "required unless the manifest declares its own chain position")
     parser.add_argument("--packet-id", default="organization-sdk-manifest-ingress")
-    parser.add_argument("--hb-epoch", type=int, default=None,
-                        help="heartbeat epoch; derived from the host clock, and marked as "
-                             "derived, when absent")
+    # SV-LLM declared substitution: the epoch is supplied; absent is refused, not derived.
+    parser.add_argument("--hb-epoch", type=str, default=None,
+                        help="supplied heartbeat epoch (ASCII [0-9]+, >= 32); absent or malformed is "
+                             "FAIL_CLOSED HB_EPOCH_NOT_SUPPLIED / HB_EPOCH_INVALID, and no clock is read")
     parser.add_argument("--mesh-root", type=Path, default=None,
                         help="federation mesh this node was materialized with; a governance "
                              "request leaves on it")

@@ -64,7 +64,9 @@ class ReferenceAdoption(unittest.TestCase):
                                                 "org-boundary/runtime/node_standing.py"})
         self.assertEqual(set(record["adapted"]), {".github/workflows/organization-ledger-transition.yml"})
         rules = {entry["rule"] for entry in record["files"].values()}
-        self.assertEqual(rules, {"byte_identical", "declared_insertion", "declared_substitutions"})
+        # G4 (SV_LLM_LEDGER_APPEND_CLOCK_FALLBACK): the aggregate's legacy wrapper and its
+        # supplied-epoch refusal are declared substitutions, reversible to the reference.
+        self.assertEqual(rules, {"byte_identical", "declared_substitutions"})
         self.assertEqual(set(record["contracts"]), {".stegverse/transition-ledger/org-contract.json",
                                                     ".stegverse/transition-ledger/contract.json"})
 
@@ -90,7 +92,7 @@ class ReferenceAdoption(unittest.TestCase):
         path = root / "resident-runtime/aggregate_repo_transition.py"
         path.write_text(path.read_text().replace('STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"',
                                                  'STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIX"'))
-        self.assertMismatch(root, "declared insertion missing or changed")
+        self.assertMismatch(root, "aggregate_repo_transition.py: declared substitution missing or changed")
 
     def test_a_changed_byte_outside_a_declared_substitution_is_a_mismatch(self):
         root = self.copy()
@@ -152,7 +154,7 @@ class OrganizationSteps(unittest.TestCase):
         self.store = self.agg.open_store(self.agg.ledger_root())
 
     def test_open_then_parent_in_one_execution_scoped_root(self):
-        result = self.steps.prepare(TARGET)
+        result = self.steps.prepare(TARGET, hb_epoch=4000)
         genesis = self.store.get(self.agg.receipt_key(result["ledger_opened_org_receipt_sha256"]))
         parent = self.store.get(self.agg.receipt_key(result["parent_org_receipt_sha256"]))
         self.assertIs(genesis["chain_genesis"], True)
@@ -168,9 +170,9 @@ class OrganizationSteps(unittest.TestCase):
         self.assertEqual(result["ledger_persistence"], "EXECUTION_SCOPED_SAME_AS_REFERENCE")
 
     def test_a_second_run_on_the_same_root_continues_the_chain_without_a_second_genesis(self):
-        first = self.steps.prepare(TARGET)
+        first = self.steps.prepare(TARGET, hb_epoch=4000)
         before = sorted(self.store.list_prefix(self.agg.RECEIPT_PREFIX))
-        second = self.steps.prepare(TARGET)
+        second = self.steps.prepare(TARGET, hb_epoch=4000)
         self.assertIsNone(second["ledger_opened_org_receipt_sha256"])
         self.assertEqual(second["continued_from_org_receipt_sha256"], first["parent_org_receipt_sha256"])
         parent = self.store.get(self.agg.receipt_key(second["parent_org_receipt_sha256"]))
@@ -196,8 +198,8 @@ class OrganizationSteps(unittest.TestCase):
         organization = "git+" + str(self.tmp / "ledger.git") + "#" + contract["organization_ledger_ref"]
         with mock.patch.dict(os.environ, {"STEGVERSE_ORG_LEDGER_ROOT": organization,
                                           "STEGVERSE_REPO_LEDGER_ROOT": organization + ":" + location["namespace"]}):
-            first = self.steps.prepare(TARGET)   # one run: genesis, then the parent
-            second = self.steps.prepare(TARGET)  # the next run: continues from the published HEAD
+            first = self.steps.prepare(TARGET, hb_epoch=4000)   # one run: genesis, then the parent
+            second = self.steps.prepare(TARGET, hb_epoch=4000)  # the next run: continues from the published HEAD
             store = self.agg.open_store(self.agg.ledger_root())
         self.assertEqual(store.kind, "GIT_REF")
         self.assertEqual(first["ledger_persistence"], "DURABLE_GIT_REF_SAME_AS_REFERENCE")
@@ -215,7 +217,7 @@ class OrganizationSteps(unittest.TestCase):
 
     def test_a_target_without_an_id_is_refused_before_any_write(self):
         with self.assertRaisesRegex(SystemExit, "LIVE_TARGET_ID_REQUIRED"):
-            self.steps.prepare({})
+            self.steps.prepare({}, hb_epoch=4000)
         self.assertIsNone(self.store.get(self.agg.HEAD_KEY))
 
 
