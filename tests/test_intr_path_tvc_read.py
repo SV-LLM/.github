@@ -18,6 +18,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    import pytest
+    pytestmark = pytest.mark.repository_ledger_locus
+except (ImportError, AttributeError):
+    pass
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 import test_intr_path_ingress as ti  # noqa: E402  (same module objects: pi, synthetic_source, Ledger)

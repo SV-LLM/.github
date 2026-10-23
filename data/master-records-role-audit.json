@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 28,
+      "PROPER": 32,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
       "NAMING_ONLY": 31,
-      "TOTAL": 62
+      "TOTAL": 66
     }
   },
   "not_changed_with_reason": {
@@ -704,6 +704,34 @@
       "text": "\"master_records_in_path\": false,",
       "classification": "PROPER",
       "rationale": "Byte snapshot of StegVerse-org/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 310,
+      "text": "\"organization\": \"master-records\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 311,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 315,
+      "text": "\"file\": \"master-records.interlock-intr.json\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 320,
+      "text": "\"file\": \"master-records.services.json\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     }
   ]
 }
