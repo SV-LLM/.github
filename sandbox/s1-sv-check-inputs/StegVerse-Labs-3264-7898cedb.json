@@ -1,0 +1,28 @@
+{
+  "schema": "stegverse.sv-change.s1-sv-check-input/v1",
+  "type": "SV_CHANGE",
+  "repository": "StegVerse-Labs/.github",
+  "head_sha": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+  "required_checks_row": {
+    "repository": "StegVerse-Labs/.github",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+    "file": "data/sv-work-items/required-checks.json",
+    "blob_sha": "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d",
+    "receipt_schema_blob_sha": "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3",
+    "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
+  },
+  "base_commit": {
+    "sha": "978b8880d238dc3e3a8b690c0675d8bb0e9d6985",
+    "basis": "git merge-base <head> origin/main in the local StegVerse-Labs/.github clone (origin/main 978b8880 when computed)"
+  },
+  "sv_change": {
+    "repository": "OUT_OF_TREE",
+    "file": "/workspace/p1/posted/SV_CHANGE_3264_7898cedb.json",
+    "sha256": "sha256:a5d021317e1de82399dacfedac829586a11f5ed23a5a10b08abd4ab1a2d516c4",
+    "derived_by": "/workspace/p1/redo6/derive_3264.py (P1)"
+  },
+  "hb_epoch_readback": {
+    "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json",
+    "sha256": "sha256:7f66b725d563920df316e945b625db70a93287b81018d8a0cf9ae5511dbbf5db"
+  }
+}

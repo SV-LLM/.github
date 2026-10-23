@@ -69,8 +69,17 @@ def recorded(target,head,transition_id,transition_class):
  for receipt in chain(target,head):
   if found is None and receipt.get("transition_id")==transition_id and receipt.get("transition_class")==transition_class:found=receipt
  return found
+# SV-LLM declared substitution (data/organization-role-reference-adoption.json):
+# a receipt with no supplied epoch used to fall back to kernel.hb_reference(),
+# which reads the host clock, so the receipt's time base depended on that host's
+# clock discipline and a replay at another moment minted a different receipt.
+# The epoch is now required from the caller and checked by the kernel's shared
+# supplied-epoch rule: an absent or invalid one fails closed with the kernel's
+# six-field refusal before the store is opened, and no clock is read.
 _ABSENT=object()
-def append(transition_id,transition_class,predecessor_state_sha256,successor_state_sha256,evidence=None,authority_effect="NONE",hb_epoch=None,store=None,idempotent_on=None):
+EPOCH_RETRY_ENTRYPOINT=".stegverse/transition-ledger/emit.py::append (hb_epoch=, or --hb-epoch)"
+RepoLedgerEpochRefused=kernel.SuppliedEpochRefused
+def append(transition_id,transition_class,predecessor_state_sha256,successor_state_sha256,evidence=None,authority_effect="NONE",hb_epoch=None,store=None,idempotent_on=None,hb_provenance=None,provenance_store=None):
  """Append one repository transition receipt through the substrate transaction.
 
  With `idempotent_on` (a tuple of evidence keys, possibly empty) a transition
@@ -87,8 +96,18 @@ def append(transition_id,transition_class,predecessor_state_sha256,successor_sta
  Every attempt, idempotent or not, first verifies the whole chain reachable
  from HEAD and raises `RepoLedgerChainBreak` on a missing or corrupted node,
  so no receipt is ever minted on top of a broken chain.
+
+ `hb_epoch` is required. An absent or invalid one raises
+ `RepoLedgerEpochRefused` (kernel.SuppliedEpochRefused) before the store is
+ opened; no clock is read and nothing is written.
  """
+ hb=kernel.supplied_hb_reference(hb_epoch,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)
+ if hb_provenance is not None:hb=kernel.carried_hb_reference(hb_epoch,hb_provenance,store=provenance_store,head_key=ledger_store.HEAD_KEY,receipt_key=ledger_store.receipt_key,retry_entrypoint=EPOCH_RETRY_ENTRYPOINT)
  target=store or ledger_store.open_store(lr());target.initialize()
+ recovered=getattr(target,"recovered_receipt",None)
+ if (isinstance(recovered,dict) and recovered.get("transition_id")==transition_id and recovered.get("transition_class")==transition_class
+     and recovered.get("predecessor_state_sha256")==predecessor_state_sha256 and recovered.get("successor_state_sha256")==successor_state_sha256):
+  return recovered  # the store finished this very transaction after a fault: returned, never appended twice
  for _attempt in range(128):
   expected_head=target.get(ledger_store.HEAD_KEY)
   prev=(expected_head or {}).get("receipt_sha256")
@@ -100,9 +119,9 @@ def append(transition_id,transition_class,predecessor_state_sha256,successor_sta
        or prior.get("successor_state_sha256")!=successor_state_sha256
        or prior.get("authority_effect")!=authority_effect
        or any(theirs.get(k,_ABSENT)!=mine.get(k,_ABSENT) for k in idempotent_on)):
-    raise ValueError("ledger_receipt_collision")
+    raise kernel.TransitionContentCollision("ledger_receipt_collision")
    return prior
-  b={"schema":"stegverse.repo-transition-receipt/v1","repository":C["repository"],"transition_id":transition_id,"transition_class":transition_class,"predecessor_state_sha256":predecessor_state_sha256,"successor_state_sha256":successor_state_sha256,"evidence":evidence if evidence is not None else {},"authority_effect":authority_effect,"hb_reference":kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference(),"previous_receipt_sha256":prev}
+  b={"schema":"stegverse.repo-transition-receipt/v1","repository":C["repository"],"transition_id":transition_id,"transition_class":transition_class,"predecessor_state_sha256":predecessor_state_sha256,"successor_state_sha256":successor_state_sha256,"evidence":evidence if evidence is not None else {},"authority_effect":authority_effect,"hb_reference":hb,"previous_receipt_sha256":prev}
   dg=sha(b);r={**b,"receipt_sha256":dg};key=ledger_store.receipt_key(dg)
   new_head={"repository":C["repository"],"receipt_sha256":dg,"receipt_path":target.locator(key)}
   if target.append_transaction(key,r,expected_head,new_head):
@@ -110,9 +129,12 @@ def append(transition_id,transition_class,predecessor_state_sha256,successor_sta
  raise SystemExit("REPO_LEDGER_APPEND_CONTENTION_EXHAUSTED")
 
 def main():
- p=argparse.ArgumentParser();p.add_argument("--transition-id",required=True);p.add_argument("--transition-class",required=True);p.add_argument("--predecessor-state-sha256",required=True);p.add_argument("--successor-state-sha256",required=True);p.add_argument("--evidence-json",default="{}");p.add_argument("--authority-effect",default="NONE");p.add_argument("--hb-epoch",type=int,default=None,help="heartbeat epoch; derived from the host clock, and marked as derived, when absent");a=p.parse_args()
- try:r=append(a.transition_id,a.transition_class,a.predecessor_state_sha256,a.successor_state_sha256,json.loads(a.evidence_json),a.authority_effect,a.hb_epoch)
+ p=argparse.ArgumentParser();p.add_argument("--transition-id",required=True);p.add_argument("--transition-class",required=True);p.add_argument("--predecessor-state-sha256",required=True);p.add_argument("--successor-state-sha256",required=True);p.add_argument("--evidence-json",default="{}");p.add_argument("--authority-effect",default="NONE");p.add_argument("--hb-epoch",default=None,help="heartbeat epoch from the carrier tick; required, never derived from the host clock");p.add_argument("--idempotent",action="store_true",help="return the receipt the chain already records for this transition rather than minting another");p.add_argument("--hb-provenance-json",default=None,help="an admitted CARRIED provenance, verified against the organization ledger at STEGVERSE_ORG_LEDGER_ROOT");a=p.parse_args()
+ carried={} if a.hb_provenance_json is None else {"hb_provenance":json.loads(a.hb_provenance_json),"provenance_store":ledger_store.open_store(os.environ["STEGVERSE_ORG_LEDGER_ROOT"]) if os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") else None}
+ try:r=append(a.transition_id,a.transition_class,a.predecessor_state_sha256,a.successor_state_sha256,kernel.parse_cli_json(a.evidence_json,argument="--evidence-json",retry_entrypoint=".stegverse/transition-ledger/emit.py --evidence-json"),a.authority_effect,a.hb_epoch,idempotent_on=() if a.idempotent else None,**carried)
  except RepoLedgerChainBreak as exc:
   print(json.dumps(chain_break_refusal(exc),sort_keys=True));raise SystemExit(1)
+ except RepoLedgerEpochRefused as exc:
+  print(json.dumps(exc.refusal,sort_keys=True));raise SystemExit(1)
  print(json.dumps(r,sort_keys=True))
-if __name__=="__main__":main()
+if __name__=="__main__":raise SystemExit(kernel.run_cli(main,retry_entrypoint=".stegverse/transition-ledger/emit.py (the same command again)"))

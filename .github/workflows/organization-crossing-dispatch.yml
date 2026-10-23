@@ -1,0 +1,92 @@
+name: Organization Crossing Dispatch
+
+# B-P36n: the in-tree dispatcher of org-runtime/crossing.py (ingress, egress,
+# open-ledger), the operation org-runtime/interlock-intr.json declares for this
+# organization's inter-organization crossings. It supplies the dispatch input
+# hb_epoch as --hb-epoch, after the kernel's shared rule has refused an absent
+# or invalid one with six fields; nothing is invoked then. GitHub Actions holds
+# no runtime authority here (org-runtime/activation.json): the mesh, node state
+# and both ledger locations are inputs the materializer supplies, and one that
+# is not supplied fails closed in crossing.py.
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'crossing.py operation'
+        required: true
+        type: choice
+        options: [ingress, egress, open-ledger]
+      hb_epoch:
+        description: 'supplied heartbeat epoch the receipts carry (ASCII digits, value >= 32); no clock is read for it'
+        required: false
+        default: ''
+        type: string
+      mesh_root:
+        description: 'federation mesh location (ingress, egress)'
+        required: false
+        default: ''
+        type: string
+      node_state_root:
+        description: 'node state location (ingress)'
+        required: false
+        default: ''
+        type: string
+      repo_ledger_root:
+        description: 'repository ledger location'
+        required: false
+        default: ''
+        type: string
+      org_ledger_root:
+        description: 'organization ledger location'
+        required: false
+        default: ''
+        type: string
+      manifest:
+        description: 'manifest JSON path (egress)'
+        required: false
+        default: ''
+        type: string
+      standing:
+        description: 'standing JSON path (egress)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cross:
+    runs-on: ubuntu-latest
+    env:
+      HB_EPOCH: ${{ github.event.inputs.hb_epoch }}
+      OPERATION: ${{ github.event.inputs.operation }}
+    steps:
+      - name: Checkout organization boundary
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cross the organization boundary at the supplied epoch
+        env:
+          STEGVERSE_REPO_LEDGER_ROOT: ${{ github.event.inputs.repo_ledger_root }}
+          STEGVERSE_ORG_LEDGER_ROOT: ${{ github.event.inputs.org_ledger_root }}
+          INPUT_MESH_ROOT: ${{ github.event.inputs.mesh_root }}
+          INPUT_NODE_STATE_ROOT: ${{ github.event.inputs.node_state_root }}
+          INPUT_MANIFEST: ${{ github.event.inputs.manifest }}
+          INPUT_STANDING: ${{ github.event.inputs.standing }}
+        run: |
+          set -euo pipefail
+          # Time is supplied with the dispatch, never sampled from a clock. A
+          # dispatched "" cannot be told from an absent input and is
+          # HB_EPOCH_NOT_SUPPLIED; any other text is the kernel rule's to decide.
+          python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-crossing-dispatch.yml (dispatch with hb_epoch)" || exit 1
+          args=()
+          case "$OPERATION" in
+            ingress) args=(--mesh-root "$INPUT_MESH_ROOT" --node-state-root "$INPUT_NODE_STATE_ROOT") ;;
+            egress) args=(--manifest "$INPUT_MANIFEST" --standing "$INPUT_STANDING" --mesh-root "$INPUT_MESH_ROOT") ;;
+            open-ledger) args=() ;;
+          esac
+          python org-runtime/crossing.py "$OPERATION" \
+            --hb-epoch "$HB_EPOCH" \
+            "${args[@]}"

@@ -98,7 +98,7 @@ class CanonicalTree(unittest.TestCase):
         tree = reg.load_tree()
         with_ref = {row["name"] for row in tree["repositories"] if "capability_declaration_ref" in row}
         providers = {row["name"] for row in tree["repositories"] if row["class"] == "INTELLIGENCE_PROVIDER"}
-        self.assertEqual(with_ref, providers | {"Ecosystem_Chat"})
+        self.assertEqual(with_ref, providers | {"Ecosystem_Chat", "StegVerse_AI"})
         for row in tree["repositories"]:
             result = reg.register(row["name"], declaration=None)
             self.assertEqual(result["disposition"], reg.DENY)

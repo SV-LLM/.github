@@ -1,0 +1,21 @@
+{
+  "schema": "stegverse.sv-change.s1-sv-check-input/v1",
+  "type": "SV_CHANGE",
+  "repository": "StegVerse-org/.github",
+  "head_sha": "dd8bfd027ca11f8c2c48d505d901d153cb0c8601",
+  "required_checks_row": {
+    "repository": "StegVerse-Labs/.github",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+    "file": "data/sv-work-items/required-checks.json",
+    "blob_sha": "9c75778f0a88e0bb4c50a44a9d54a72bc40a496d",
+    "receipt_schema_blob_sha": "a4934cc1afb5f9c65d12f4ab5ae29f462b76b3f3",
+    "row_id": "SV-CHANGE-REQUIRED-CHECKS-001"
+  },
+  "sv_change": {
+    "repository": "StegVerse-Labs/.github",
+    "commit": "7898cedba1400c8545cebcb463fd26deb25f7d5a",
+    "file": "data/sv-work-items/migration/sv-changes.jsonl",
+    "change_id": "svc:dd6acf613fd9001dd369cb3ef9428a9f216edec28cb05af0de9305c366281be0"
+  },
+  "hb_epoch_readback": null
+}

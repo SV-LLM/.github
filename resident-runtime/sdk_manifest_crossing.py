@@ -191,6 +191,13 @@ def cross(manifest, *, registry, origin=None, packet_id="sdk-manifest-crossing",
         completed = subprocess.run(
             [sys.executable, str(PROCESSOR), "--envelope", str(envelope), "--registry", str(registry_path), "--out", str(execution)],
             cwd=str(ROOT), capture_output=True, text=True, check=False)
+        if completed.returncode == 75:
+            # SV-LLM declared substitution (PB-EXIT-SPLIT): the processor's own write
+            # faulted and nothing durable was written. Raised as this organization's
+            # own-state fault, so the consuming loop leaves the frame pending (no
+            # marker) rather than recording a far-side refusal. Exit 65, 1, any other
+            # code or a crash stays the terminal disposition below.
+            raise OSError("PROCESS_BOUNDARY_WRITE_FAULT: " + (completed.stdout or completed.stderr or "").strip()[-300:])
         if completed.returncode != 0 or not execution.is_file():
             # The far side refused or could not be reached. Say which, and say
             # it as a disposition rather than as a crossing that happened.

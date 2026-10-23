@@ -1,0 +1,18 @@
+{
+  "base_ref": {
+    "ledger_head": "a5bb54d81893b392a3ce28182986fc39857807e1",
+    "registry_generation": 319
+  },
+  "evaluated_commit": "978b8880d238dc3e3a8b690c0675d8bb0e9d6985",
+  "hb_epoch_readback": {
+    "file": "sandbox/s1-base-state-readbacks/StegVerse-Labs-978b8880d238dc3e3a8b690c0675d8bb0e9d6985.json",
+    "sha256": "sha256:7f66b725d563920df316e945b625db70a93287b81018d8a0cf9ae5511dbbf5db"
+  },
+  "manifest_source": "CONTRACT_PINS",
+  "note": "base-side evaluation (orchestrator 16:57Z): subject at base main 978b8880; base_ref {registry_generation 319 read at 978b8880 (data/canonical-task-registry.json), ledger_head a5bb54d8 from the #3266 2ba0e329 readback of that base}; manifest_blob is the contract-pinned NWI-S0 manifest (20b37917), which 978b8880 does not carry",
+  "repository": "StegVerse-Labs/.github",
+  "schema": "stegverse.sv-llm.s1-stage-evaluation-input/v1",
+  "stage_id": "NWI-S0",
+  "target_stage": "NWI-S1",
+  "trigger": "STAGE_GATE_EVALUATION"
+}

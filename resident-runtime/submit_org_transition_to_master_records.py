@@ -167,22 +167,51 @@ def main():
     # The mesh this node was materialized with; the kernel refuses without one.
     p.add_argument("--mesh-root", type=Path, required=True)
     a = p.parse_args()
-    receipts = [load(path) for path in a.org_receipt]
+    # Inputs are read before any write and outside the fault classifier (F-INPUT-TRACE).
+    receipts = [K.read_cli_json(path, argument="--org-receipt", retry_entrypoint=RETRY_ENTRYPOINT + " --org-receipt")
+                for path in a.org_receipt]
+    relation = K.parse_cli_json(a.relation_evidence_json, argument="--relation-evidence-json",
+                                retry_entrypoint=RETRY_ENTRYPOINT + " --relation-evidence-json")
+    standing = K.read_cli_json(a.standing, argument="--standing", retry_entrypoint=RETRY_ENTRYPOINT + " --standing")
     packet = build_released_batch_packet(receipts, a.predecessor_ecosystem_state_sha256,
-                                         a.successor_ecosystem_state_sha256, json.loads(a.relation_evidence_json),
-                                         load(a.standing))
+                                         a.successor_ecosystem_state_sha256, relation, standing)
     # The release is an emission of this organization, so it is recorded on
     # both ledgers its materializer supplied (STEGVERSE_REPO_LEDGER_ROOT and
     # STEGVERSE_ORG_LEDGER_ROOT) before the frame is written; without them the
     # kernel refuses and nothing is published. Stamped with the epoch of the
-    # segment's head receipt, so releasing the same segment again publishes the
-    # same frame -- a write-once no-op -- instead of a second record request
-    # stamped by the host clock. Publication is fire-and-forget evidence: no
+    # segment's head receipt, which must be the current organization ledger
+    # head: any other segment, the same one released again included, is refused
+    # rather than stamped by the host clock. Publication is fire-and-forget evidence: no
     # answer is requested and nothing waits for Master Records to record it.
+    # The epoch is CARRIED from the segment's head receipt, never supplied: it is
+    # admitted only when that head's heartbeat reference passes the shared rule
+    # and is not clock-derived, and the emission records where it came from. A
+    # head with no epoch, an invalid one, or a clock reading is refused with the
+    # six fields and nothing is published (B-P36e, B-P36f).
+    head = receipts[-1]
+    try:
+        epoch = K.carried_epoch(head.get("hb_reference"),
+                                retry_entrypoint=RETRY_ENTRYPOINT + " (a head --org-receipt carrying hb_reference.epoch)")
+    except K.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
+        raise SystemExit(1)
+    provenance = {"provenance": "CARRIED:ORGANIZATION_LEDGER_HEAD", "source": "ORGANIZATION_LEDGER_HEAD",
+                  "head_receipt_sha": head["receipt_sha256"], "epoch": epoch, "derived_from_clock": False}
     custody = K.crossing_custody(ROOT, repo_ledger_root=os.environ.get("STEGVERSE_REPO_LEDGER_ROOT") or None,
                                  org_ledger_root=os.environ.get("STEGVERSE_ORG_LEDGER_ROOT") or None)
-    published = K.publish_packet(packet, root=a.mesh_root, custody=custody,
-                                 epoch=(receipts[-1].get("hb_reference") or {}).get("epoch"))
+    # The kernel verifies the provenance against the current organization
+    # ledger head (CARRIED_PROVENANCE_UNVERIFIED otherwise) before anything is
+    # written, so only the current head is released and a re-release is refused.
+    # A fault in any step (the admission, either receipt, the frame) is the
+    # six-field, non-terminal LEDGER_WRITE_FAULT_RESUMABLE: the same release run
+    # again resumes from its admission and completes once (B-P36q).
+    try:
+        published = K.resumable(lambda: K.publish_packet(packet, root=a.mesh_root, custody=custody, epoch=epoch,
+                                                         epoch_provenance=provenance),
+                                retry_entrypoint=RETRY_ENTRYPOINT)
+    except (K.SuppliedEpochRefused, K.WriterFaultRefused) as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
+        raise SystemExit(1)
     print(json.dumps({"status": "RELEASED_ORGANIZATION_BATCH_PUBLISHED_FOR_DOWNSTREAM_RECORD",
                       "packet_id": packet["packet_id"], "receipt_count": len(receipts),
                       "frame_sha256": published["frame"]["frame_sha256"], "authority_effect": "NONE",
@@ -190,4 +219,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(K.run_cli(main, retry_entrypoint=RETRY_ENTRYPOINT + " (the same command again)"))
