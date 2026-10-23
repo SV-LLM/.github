@@ -51,14 +51,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
       - name: Unit tests (negatives, determinism, shared epoch rule, committed receipts)
         run: |
           python3 -m py_compile sandbox/s1_hop_head_verifier.py
           python3 -B tests/test_s1_hop_head_verifier.py -v
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: '3.13'
       - name: Required-checks verifier unit tests (not declared, invalid, dependency, clock, network, two-run, failing, allow)
@@ -197,7 +197,7 @@ jobs:
           - {repository: SV-LLM/.github, input: SV-LLM-47-56c9943c}
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-cae3398c}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
       - name: Fetch the declared head read-only
@@ -247,10 +247,10 @@ jobs:
           - {repository: SV-LLM/.github, input: SV-LLM-47-56c9943c}
           - {repository: Admissible-Existence/.github, input: Admissible-Existence-95-cae3398c}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: '3.13'
       - name: Fetch the head and its declared dependency commits read-only
@@ -308,10 +308,10 @@ jobs:
           # dd8bfd02 is not fetchable (no public ref) and has no #3266 readback: HB_EPOCH_SOURCE_UNOBSERVED
           - {repository: '', input: StegVerse-org-nopr-dd8bfd02}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: '3.13'
       - name: Fetch the pinned row/schema/SV_CHANGE commit and the head read-only
@@ -376,10 +376,10 @@ jobs:
         # head-side (#3264 7898cedb, ALLOW) and base-side (main 978b8880, manifest from the contract pins, FAIL_CLOSED)
         evaluation: [NWI-S0-StegVerse-Labs-7898cedb, NWI-S0-StegVerse-Labs-978b8880]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: '3.13'
       - name: Fetch the contract pin and the evaluated commit read-only

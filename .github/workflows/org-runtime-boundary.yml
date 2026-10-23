@@ -79,6 +79,8 @@ jobs:
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_writer_epoch_refusal_order.py' -v
       - name: Validate every inline hb_epoch gate in the ledger workflow is the kernel rule (B-P36d)
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_workflow_epoch_gate.py' -v
+      - name: Validate one supplied-epoch guard per repository, bound to the pinned kernel segment (C8)
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_one_supplied_epoch_guard.py' -v
       - name: Validate every manifest-declared epoch-requiring entrypoint has an epoch binding (B-P36n)
         run: python -B -m unittest discover -s org-runtime/tests -p 'test_manifest_epoch_binding.py' -v
       - name: Reference adoption parity against the recorded StegVerse-org digests (offline)
