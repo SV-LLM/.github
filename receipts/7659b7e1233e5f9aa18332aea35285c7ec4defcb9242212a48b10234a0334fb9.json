@@ -1,0 +1,38 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "communication_id": "intr-path-v1:Triad-Test->SV-LLM",
+    "disposition": "ALLOW",
+    "operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "path_id": "Triad-Test->SV-LLM:intr-destination",
+    "profile_id": "intr-destination",
+    "source_organization_receipt_sha256": "sha256:16733d9ac870b24dcc40908f854c42f37cc9664385dad6607739cc50a8c044ab",
+    "source_repository": "Triad-Test/.github",
+    "source_repository_receipt_sha256": "sha256:e7b5ebee4cfdfc6888dde2a316b0cb27af28365503ed70224d27ea5868e79a1b"
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "org_transition_class": "REPO_STATE_PROPAGATION",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:1d410d9ed3641bc084ce66a724303a57948690c17c306cb9ab5037fbd17f2e8b",
+  "previous_receipt_sha256": "sha256:73ab7ebdfcec89b70ff60194ffeabd1b859964139d79bedfb3b17208e4bb746c",
+  "receipt_sha256": "sha256:7659b7e1233e5f9aa18332aea35285c7ec4defcb9242212a48b10234a0334fb9",
+  "repo_receipt_sha256": "sha256:600354a12fa8e809d194193aae86995b4052bba8ea7f14101e92eee3f04a8b49",
+  "repo_transition_id": "INTR_MESH_PATH_INGRESS:Triad-Test->SV-LLM:intr-destination@intr-path-v1:Triad-Test->SV-LLM",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/.github",
+  "source_transition_id": "INTR_MESH_PATH_INGRESS:Triad-Test->SV-LLM:intr-destination@intr-path-v1:Triad-Test->SV-LLM",
+  "source_transition_sha256": "sha256:600354a12fa8e809d194193aae86995b4052bba8ea7f14101e92eee3f04a8b49",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:124543e4c7227944a5a29739701ee4297cd05be97610c63ab819782187df2ceb"
+}
