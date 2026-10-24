@@ -1,0 +1,45 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "capability": "intr-destination",
+    "communication_id": "intr-path-v1:SV-LLM->StegVerse-002",
+    "destination_address": "stegverse-002.intr-destination",
+    "destination_organization": "StegVerse-002",
+    "disposition": "ALLOW",
+    "merge_transfer_organization_receipt_sha256": "sha256:717a7e9f0a4b28459aa79c79c7c694cfb364765c614e2d1c4c684ab0ab49cea6",
+    "message": {
+      "body": {
+        "path_id": "SV-LLM->StegVerse-002:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "a6503e37c4ba554470446347f972972d5cbffbc2"
+      },
+      "communication_id": "intr-path-v1:SV-LLM->StegVerse-002",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:373032cd9211389f963d418ca457b9906ba88e8e2285ac77e7269e3991b37bc0",
+    "path_id": "SV-LLM->StegVerse-002:intr-destination",
+    "payload_sha256": "sha256:f97012b8e23c7bdb27f9a91c9c36463ee31f21de311b6796975e9f20655c2a5f",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-transfer-evidence/v1",
+    "source_organization": "SV-LLM",
+    "transfer_commit": "a6503e37c4ba554470446347f972972d5cbffbc2"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:f97012b8e23c7bdb27f9a91c9c36463ee31f21de311b6796975e9f20655c2a5f",
+  "previous_receipt_sha256": "sha256:ffafe9d3d509dab333e9cfe87ee3e05417b6b185d9fc42a444814cdb013286a3",
+  "receipt_sha256": "sha256:8e1d38ce88183c87f9654bcd73bea6016e1e4623027782ba5073151aa241e5c4",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:036866d3d3e3b754ab30ccfa8d9fd7ecff7690c364e6e93301af82cbce74f967",
+  "transition_class": "INTR_MESH_PATH_TRANSFER",
+  "transition_id": "INTR_MESH_PATH_TRANSFER:SV-LLM->StegVerse-002:intr-destination@intr-path-v1:SV-LLM->StegVerse-002"
+}
