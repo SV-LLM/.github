@@ -271,7 +271,36 @@
       "peer_serves_this_capability_is_proven_here": false,
       "unserved_capability_address_is_observable_as_an_unclosed_crossing": true,
       "default_without_a_declared_capability": "ORG_CONTROL_SERVICE"
-    }
+    },
+    "capability_destination_bindings": [
+      {
+        "profile_id": "organization-record",
+        "capability": "organization-record",
+        "transition_reference": "ecosystem.transition.organization-record.v1",
+        "destination_organization": "master-records",
+        "destination_repository": "master-records/.github",
+        "destination_service": "organization.ecosystem-transition-ledger",
+        "destination_service_boundary_role": "INTERNAL_ENDPOINT",
+        "destination_service_dispatched_by": "master-records/.github org-kernel/kernel.py::dispatch",
+        "request_operation": "RECORD_RELEASED_ORGANIZATION_BATCH",
+        "emitting_operation": "resident-runtime/submit_org_transition_to_master_records.py::build_released_batch_packet",
+        "address_resolution": "resident-runtime/organization_egress_boundary.py::select_outbound_binding",
+        "federation_directory_row_changed": false,
+        "governing": [
+          "StegVerse-org/.github#163 comment 6387335336 (Lane B, federation-directory owner): address the service from the sending org's overlay through a capability_destination_bindings entry",
+          "StegVerse-Labs/.github@86382e60 resident-runtime/organization_egress_boundary.py:292-296 declared_service = (binding or {}).get(\"destination_service\") ... service = declared_service",
+          "StegVerse-Labs/.github@86382e60 org-runtime/interlock-intr.json:104 a_peer_may_be_addressed_at_a_service_that_is_not_a_control_service: true",
+          "master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration"
+        ],
+        "transport": "INTERLOCK_INTR",
+        "records_authority": "ORGANIZATION_RECORDS_ONLY",
+        "master_records_in_path": true,
+        "receiver_unavailable_disposition": "DURABLE_QUEUE_OR_EVENT_EPHEMERAL_MATERIALIZATION",
+        "always_on_receiver_required": false,
+        "awaited_by_organization": false,
+        "authority_effect": "NONE_BINDING_ONLY"
+      }
+    ]
   },
   "heartbeat_derived_carrier": {
     "reference_frequency_hz": 100,

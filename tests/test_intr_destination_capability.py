@@ -33,6 +33,7 @@ ADDRESS = "sv-llm." + PROFILE_ID
 PAYLOAD_SCHEMA = "stegverse.org-intr-destination-diagnostic/v1"
 THIS = "SV-LLM"
 PEER = "StegVerse-org"
+LEDGER_PROFILE = "organization-record"
 CONSTRAINT = "CONSTRAINT_VARIABLE"
 DISPOSITION_ROLE = "TRANSITION_EVIDENCE_ONLY"
 CONSTRAINT_FIELDS = (
@@ -167,7 +168,67 @@ class DeclarationTests(unittest.TestCase):
                 self.assertNotIn(PROFILE_ID, str(entry.get(key) or ""))
 
     def test_no_governance_or_remediation_destination_binding_was_added(self):
-        self.assertNotIn("capability_destination_bindings", BOUNDARY["egress"])
+        # The only outbound binding is the master-records ledger binding below
+        # (StegVerse-org/.github#163 c6387335336); none is governance or remediation.
+        bindings = BOUNDARY["egress"].get("capability_destination_bindings") or []
+        self.assertEqual([b["profile_id"] for b in bindings], [LEDGER_PROFILE])
+        for b in bindings:
+            self.assertNotIn(b.get("capability"), ("governance", "remediation"))
+            self.assertNotIn("binding_role", b)
+
+
+class MasterRecordsLedgerBindingTests(unittest.TestCase):
+    """Sender-side binding to master-records' ledger intake (#163 c6387335336).
+
+    Labs/.github@86382e60 resident-runtime/organization_egress_boundary.py:292-296:
+    ``declared_service = (binding or {}).get("destination_service")`` ...
+    ``service = declared_service``. The federation directory keeps one row per
+    organization (org-kernel/kernel.py:620-621), so no row is added.
+    """
+
+    def binding(self):
+        return egress.select_outbound_binding(LEDGER_PROFILE, "master-records", root=ROOT)
+
+    def test_the_binding_has_the_routed_shape(self):
+        b = self.binding()
+        self.assertEqual(b["destination_organization"], "master-records")
+        self.assertEqual(b["destination_repository"], "master-records/.github")
+        self.assertEqual(b["destination_service"], "organization.ecosystem-transition-ledger")
+        self.assertEqual(b["transport"], "INTERLOCK_INTR")
+        self.assertEqual(b["authority_effect"], "NONE_BINDING_ONLY")
+        self.assertIs(b["federation_directory_row_changed"], False)
+        self.assertIs(b["always_on_receiver_required"], False)
+
+    def test_the_bound_service_is_the_one_the_release_addresses(self):
+        release = _module("submit_org_transition_to_master_records",
+                          "resident-runtime/submit_org_transition_to_master_records.py")
+        b = self.binding()
+        self.assertEqual(b["destination_service"], release.DESTINATION_SERVICE)
+        self.assertEqual(b["destination_organization"], release.DESTINATION_ORG)
+        self.assertEqual(b["transition_reference"], release.TRANSITION_REFERENCE)
+        self.assertTrue((ROOT / b["emitting_operation"].split("::")[0]).is_file())
+
+    def test_resolution_addresses_the_declared_service_through_the_one_directory_row(self):
+        resolved = egress.resolve_destination("master-records", capability=LEDGER_PROFILE, root=ROOT)
+        self.assertEqual(resolved["destination_service"], "organization.ecosystem-transition-ledger")
+        self.assertEqual(resolved["destination_repository"], "master-records/.github")
+        self.assertEqual(resolved["destination_org_control_service"], "master-records.org-control")
+        self.assertEqual(resolved["destination_binding_authority_effect"], "NONE_BINDING_ONLY")
+
+    def test_the_directory_is_unchanged(self):
+        rows = [r for r in FEDERATION["organizations"] if r["organization"] == "master-records"]
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("addressed_service", rows[0])
+        self.assertEqual(FEDERATION["denominator"], len(FEDERATION["organizations"]))
+
+    def test_another_organization_is_refused_for_this_capability(self):
+        with self.assertRaises(egress.EgressRefused) as caught:
+            egress.select_outbound_binding(LEDGER_PROFILE, PEER, root=ROOT)
+        self.assertEqual(caught.exception.failed_predicate, "CAPABILITY_IS_SENT_TO_THE_ORGANIZATION_THAT_OWNS_IT")
+
+    def test_default_crossings_to_master_records_still_address_its_control_service(self):
+        resolved = egress.resolve_destination("master-records", root=ROOT)
+        self.assertEqual(resolved["destination_service"], "master-records.org-control")
 
 
 class OverlayAuthorityTests(unittest.TestCase):

@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 25,
+      "PROPER": 51,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
       "NAMING_ONLY": 31,
-      "TOTAL": 59
+      "TOTAL": 85
     }
   },
   "not_changed_with_reason": {
@@ -683,6 +683,188 @@
       "text": "def test_every_write_of_the_master_records_release_is_resumable(self):",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 280,
+      "text": "\"destination_organization\": \"master-records\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 281,
+      "text": "\"destination_repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 284,
+      "text": "\"destination_service_dispatched_by\": \"master-records/.github org-kernel/kernel.py::dispatch\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 286,
+      "text": "\"emitting_operation\": \"resident-runtime/submit_org_transition_to_master_records.py::build_released_batch_packet\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 293,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 293,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 293,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 293,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 293,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 297,
+      "text": "\"master_records_in_path\": true,",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 171,
+      "text": "# The only outbound binding is the master-records ledger binding below",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 180,
+      "text": "class MasterRecordsLedgerBindingTests(unittest.TestCase):",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 181,
+      "text": "\"\"\"Sender-side binding to master-records' ledger intake (#163 c6387335336).",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 190,
+      "text": "return egress.select_outbound_binding(LEDGER_PROFILE, \"master-records\", root=ROOT)",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 194,
+      "text": "self.assertEqual(b[\"destination_organization\"], \"master-records\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 195,
+      "text": "self.assertEqual(b[\"destination_repository\"], \"master-records/.github\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 203,
+      "text": "release = _module(\"submit_org_transition_to_master_records\",",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 204,
+      "text": "\"resident-runtime/submit_org_transition_to_master_records.py\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 212,
+      "text": "resolved = egress.resolve_destination(\"master-records\", capability=LEDGER_PROFILE, root=ROOT)",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 214,
+      "text": "self.assertEqual(resolved[\"destination_repository\"], \"master-records/.github\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 215,
+      "text": "self.assertEqual(resolved[\"destination_org_control_service\"], \"master-records.org-control\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 219,
+      "text": "rows = [r for r in FEDERATION[\"organizations\"] if r[\"organization\"] == \"master-records\"]",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 229,
+      "text": "def test_default_crossings_to_master_records_still_address_its_control_service(self):",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 230,
+      "text": "resolved = egress.resolve_destination(\"master-records\", root=ROOT)",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_destination_capability.py",
+      "line": 231,
+      "text": "self.assertEqual(resolved[\"destination_service\"], \"master-records.org-control\")",
+      "classification": "PROPER",
+      "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
+    },
+    {
+      "file": "tests/test_organization_manifest_ingress.py",
+      "line": 169,
+      "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
+      "classification": "PROPER",
+      "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."
     }
   ]
 }
