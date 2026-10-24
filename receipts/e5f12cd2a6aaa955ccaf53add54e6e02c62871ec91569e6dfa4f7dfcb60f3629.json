@@ -1,0 +1,38 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "communication_id": "intr-path-v1:StegVerse-org->SV-LLM",
+    "disposition": "ALLOW",
+    "operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "path_id": "StegVerse-org->SV-LLM:intr-destination",
+    "profile_id": "intr-destination",
+    "source_organization_receipt_sha256": "sha256:d0dbf3526c586c521e14163f29173d86b2cbff763c3c89f337146a19ddfb3131",
+    "source_repository": "StegVerse-org/.github",
+    "source_repository_receipt_sha256": "sha256:ec8836b231fcbac4cf863ce0e0dd278be1026e41285a30e97cb1c886d9e352a0"
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "org_transition_class": "REPO_STATE_PROPAGATION",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:5c5c6c5aeb6a026586d71503c6867619bd1bd1194cd53a2a5b8119fffc77cd6e",
+  "previous_receipt_sha256": "sha256:4a386bbc07b3a74c9a2a0cbb2e0ed594c8a022768ea69d207f40982cd360eae9",
+  "receipt_sha256": "sha256:e5f12cd2a6aaa955ccaf53add54e6e02c62871ec91569e6dfa4f7dfcb60f3629",
+  "repo_receipt_sha256": "sha256:deb7d37be84eda31431a686cb870500234cb3794df73474edc0ef80c149b111e",
+  "repo_transition_id": "INTR_MESH_PATH_INGRESS:StegVerse-org->SV-LLM:intr-destination@intr-path-v1:StegVerse-org->SV-LLM",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/.github",
+  "source_transition_id": "INTR_MESH_PATH_INGRESS:StegVerse-org->SV-LLM:intr-destination@intr-path-v1:StegVerse-org->SV-LLM",
+  "source_transition_sha256": "sha256:deb7d37be84eda31431a686cb870500234cb3794df73474edc0ef80c149b111e",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:e917870ae8db0b7bea68a7ee738fef479b753c43dbf47080c4894115700065a2"
+}
