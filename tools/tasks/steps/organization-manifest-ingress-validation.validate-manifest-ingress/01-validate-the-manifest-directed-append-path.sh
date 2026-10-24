@@ -1,0 +1,1 @@
+python -B tests/test_organization_manifest_ingress.py -v

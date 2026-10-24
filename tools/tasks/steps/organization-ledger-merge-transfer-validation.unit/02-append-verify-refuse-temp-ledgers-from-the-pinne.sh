@@ -1,0 +1,1 @@
+python3 -m unittest tests.test_merge_transfer_dry_run_check -v

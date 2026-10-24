@@ -1,0 +1,2651 @@
+{
+  "schema": "stegverse.task-catalog/v1",
+  "repository": "SV-LLM/.github",
+  "goal_id": "G17-WORKFLOW-SURFACE-MINIMIZATION",
+  "owner": "P1 Ecosystem AI Lane, StegVerse-org/.github#163",
+  "authority": "Rigel 2026-10-24 retroactive G17 enforcement; StegVerse-Labs/.github#167/#168; pattern StegVerse-org/.github#238 @70ce02af",
+  "dispatcher": ".github/workflows/validation-dispatcher.yml",
+  "runner": "tools/tasks/run_catalog.py",
+  "rule": "Every check a folded workflow job ran is one group here (a matrix job: one group per include row); its step bodies are the original run blocks byte for byte, pinned by sha256. A new check is a new group (or a step in one), never a new workflow file.",
+  "path_filters": "The dispatcher runs every pull_request and every push to main with no path filter (StegVerse-org/.github#238 model); the folded workflows' path filters are not carried, so every folded check runs at least as often as before.",
+  "folded_from_commit": {
+    "SV-LLM/.github main": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+    "SV-LLM/.github#50 head": "c0444fbcd6793d09c2b8e46311b57225408b81ae"
+  },
+  "groups": [
+    {
+      "id": "intr-destination-capability-validation.validate-intr-destination",
+      "source": {
+        "workflow": ".github/workflows/intr-destination-capability-validation.yml",
+        "workflow_name": "Validate InTr Destination Capability",
+        "job": "validate-intr-destination",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        }
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "The boundary enforces the advertised address and the served set",
+          "run_file": "tools/tasks/steps/intr-destination-capability-validation.validate-intr-destination/01-the-boundary-enforces-the-advertised-address-and.sh",
+          "run_sha256": "d37c95d9ba9ec44a52325ce87acc8da8de428127dde5f20f530e4ecb761f2b35"
+        },
+        {
+          "name": "Validate advertise, address, resolve, emit, and close",
+          "run_file": "tools/tasks/steps/intr-destination-capability-validation.validate-intr-destination/02-validate-advertise-address-resolve-emit-and-clos.sh",
+          "run_sha256": "fa5d3b43d4155d01f7c9f699483ad195165460db950e22b9b4364315f4135250",
+          "env": {
+            "STEGVERSE_REPO_LEDGER_ROOT": "${{ runner.temp }}/repo-ledger",
+            "STEGVERSE_ORG_LEDGER_ROOT": "${{ runner.temp }}/org-ledger"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "org-runtime-boundary.validate",
+      "source": {
+        "workflow": ".github/workflows/org-runtime-boundary.yml",
+        "workflow_name": "Validate Organization Resident Runtime and Interlock-InTr Boundary",
+        "job": "validate",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        }
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Validate organization boundary",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/01-validate-organization-boundary.sh",
+          "run_sha256": "c9c2fd2dfe2c5d29536cc797227f7bbfa4e717660d99b88410cbd839f9899cfe"
+        },
+        {
+          "name": "Validate activation request generation",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/02-validate-activation-request-generation.sh",
+          "run_sha256": "bd504d8d215c130fb9b5f823c4851682ac89ebdfc1515de16017138e9d4603b7"
+        },
+        {
+          "name": "Validate Interlock/InTr ingress generation",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/03-validate-interlock-intr-ingress-generation.sh",
+          "run_sha256": "1e839eaf709caf91c71c5ffc27049b8590735ad5bf13e46492805caa709661a8"
+        },
+        {
+          "name": "Validate Interlock/InTr egress generation",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/04-validate-interlock-intr-egress-generation.sh",
+          "run_sha256": "153882a73b231e18f324f59519bb2e13cdda510de9a998665392fa46b829401c"
+        },
+        {
+          "name": "Validate vendored organization kernel",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/05-validate-vendored-organization-kernel.sh",
+          "run_sha256": "13578e79d29ae80fa756f32aeb499ed04d5cf800f685b1357957f24b5d4edf71"
+        },
+        {
+          "name": "Validate federation directory projection",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/06-validate-federation-directory-projection.sh",
+          "run_sha256": "3c6b56151b700f44b736d96729b2e4c75139da297712969919adcbe7fdd4afa6"
+        },
+        {
+          "name": "Validate SV-LLM manifest-bound ledgered crossings",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/07-validate-sv-llm-manifest-bound-ledgered-crossing.sh",
+          "run_sha256": "e2da3c6d5b273452de5b581cb82e3c572ed1668ff52111ca05d3a61653f38e95"
+        },
+        {
+          "name": "Validate SV-LLM egress addressed by a manifest-declared capability",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/08-validate-sv-llm-egress-addressed-by-a-manifest-d.sh",
+          "run_sha256": "ffb861808bce0057ff87f73df5e58b9185200eaefdcfb6c7ecd8227aecf78f3b"
+        },
+        {
+          "name": "Validate organization ledger predecessor resolution, explicit genesis and source retention",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/09-validate-organization-ledger-predecessor-resolut.sh",
+          "run_sha256": "379b97da0d9f3a98558c6efd887b0fde5d025a631e9f40c83c814088faa8a11d"
+        },
+        {
+          "name": "Validate the SV-LLM compatibility wrapper and per-transition custody",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/10-validate-the-sv-llm-compatibility-wrapper-and-pe.sh",
+          "run_sha256": "71b576fa908900875f39d6083ba5ebaf00aa483d3e0274a7bf30233d5a4fde6c"
+        },
+        {
+          "name": "Validate the mesh and the ledgers are written only where supplied",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/11-validate-the-mesh-and-the-ledgers-are-written-on.sh",
+          "run_sha256": "2e24f9dad6aa561268e2444f171cbffa1fa45ad608deca027c152fd40184dd6f"
+        },
+        {
+          "name": "Workflow actions pinned to commit SHAs (offline)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/12-workflow-actions-pinned-to-commit-shas-offline.sh",
+          "run_sha256": "5e001a1cc605c49f6d8c0111db47366f061b551590ce931138ca76e85db00a2a"
+        },
+        {
+          "name": "Validate kernel parity with StegVerse-org PRs 93-97: processing selection, recorded crossings, supplied node state",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/13-validate-kernel-parity-with-stegverse-org-prs-93.sh",
+          "run_sha256": "2b027270d98beac8161971d0f09bc8ddd2faabb8c2947b3c8c143f91f350f15c"
+        },
+        {
+          "name": "Validate every --hb-epoch command line refuses through the kernel rule (B-P36c)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/14-validate-every-hb-epoch-command-line-refuses-thr.sh",
+          "run_sha256": "dd9b9b464b87b9b5ddf134926a140d384fa2dd30faaaafbcbafad4d1339433d2"
+        },
+        {
+          "name": "Validate every epoch-taking writer refuses before it writes or publishes (B-P36b)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/15-validate-every-epoch-taking-writer-refuses-befor.sh",
+          "run_sha256": "ee953dbd13bb34874b7cfccbae33d68b26973736284cb59cdc2bc15370d45c71"
+        },
+        {
+          "name": "Validate every inline hb_epoch gate in the ledger workflow is the kernel rule (B-P36d)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/16-validate-every-inline-hb-epoch-gate-in-the-ledge.sh",
+          "run_sha256": "df5584cc5068d88ce39403e8d1ddc0212c70f6e5fc50de774dda6e863f4563d1"
+        },
+        {
+          "name": "Validate every manifest-declared epoch-requiring entrypoint has an epoch binding (B-P36n)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/17-validate-every-manifest-declared-epoch-requiring.sh",
+          "run_sha256": "beb76896cc54d8b433f50e3915238474ddda41b02c3011bae5f5c4404a9c3655"
+        },
+        {
+          "name": "Reference adoption parity against the recorded StegVerse-org digests (offline)",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/18-reference-adoption-parity-against-the-recorded-s.sh",
+          "run_sha256": "44ceb0e1d051e592d7533fc45a6eade5806b64006cd763b4e28bff72a1eb3b7b"
+        },
+        {
+          "name": "Recorded digests are the reference commit's",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/19-recorded-digests-are-the-reference-commit-s.sh",
+          "run_sha256": "c7b478bee48e4ea1736c79c85fba343be5da2a240f3ea71dfb212696204b8fa9"
+        },
+        {
+          "name": "Validate reference adoption and the organization's authentic-run steps",
+          "run_file": "tools/tasks/steps/org-runtime-boundary.validate/20-validate-reference-adoption-and-the-organization.sh",
+          "run_sha256": "30f01921389b90b0cea58c8fdc1bf5edee9ebfba8d6269147539924d9c2b06ca"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "x_repository": "StegVerse-org/.github",
+        "x_ref": "10d141041fd0fa3b8bd696f6c6236bef199845b8",
+        "x_path": "stegverse-org-reference",
+        "x_persist_credentials": "false",
+        "x_fetch_depth": "1"
+      }
+    },
+    {
+      "id": "organization-manifest-ingress-validation.validate-manifest-ingress",
+      "source": {
+        "workflow": ".github/workflows/organization-manifest-ingress-validation.yml",
+        "workflow_name": "Validate Organization Manifest Ingress",
+        "job": "validate-manifest-ingress",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        }
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Validate the manifest-directed append path",
+          "run_file": "tools/tasks/steps/organization-manifest-ingress-validation.validate-manifest-ingress/01-validate-the-manifest-directed-append-path.sh",
+          "run_sha256": "0eff51dbb50ea505b982dd878b83e286af4154913f0639c83ab119f06508fe87",
+          "env": {
+            "STEGVERSE_SDK_ROOT": "${{ github.workspace }}/sdk",
+            "STEGVERSE_SDK_REQUIRED": "1"
+          }
+        },
+        {
+          "name": "Validate the manifest ingress command line refuses its epoch through the kernel rule (B-P36c)",
+          "run_file": "tools/tasks/steps/organization-manifest-ingress-validation.validate-manifest-ingress/02-validate-the-manifest-ingress-command-line-refus.sh",
+          "run_sha256": "dd9b9b464b87b9b5ddf134926a140d384fa2dd30faaaafbcbafad4d1339433d2",
+          "env": {
+            "STEGVERSE_SDK_ROOT": "${{ github.workspace }}/sdk",
+            "STEGVERSE_SDK_REQUIRED": "1"
+          }
+        },
+        {
+          "name": "Validate the manifest ingress command line prints six fields for bad input and own-write faults (F-INPUT-TRACE, F-WRITER-TRACE)",
+          "run_file": "tools/tasks/steps/organization-manifest-ingress-validation.validate-manifest-ingress/03-validate-the-manifest-ingress-command-line-print.sh",
+          "run_sha256": "69a6f0deae38d453e16677281e29cb55de0d09b8044b21fb48f2ae832339f63b",
+          "env": {
+            "STEGVERSE_SDK_ROOT": "${{ github.workspace }}/sdk",
+            "STEGVERSE_SDK_REQUIRED": "1"
+          }
+        },
+        {
+          "name": "Reference adoption parity (offline)",
+          "run_file": "tools/tasks/steps/organization-manifest-ingress-validation.validate-manifest-ingress/04-reference-adoption-parity-offline.sh",
+          "run_sha256": "44ceb0e1d051e592d7533fc45a6eade5806b64006cd763b4e28bff72a1eb3b7b"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "x_repository": "StegVerse-org/StegVerse-SDK",
+        "x_ref": "74d9b473aa415b06a9d550c28b2779a691b4ba32",
+        "x_path": "sdk",
+        "x_persist_credentials": "false",
+        "x_fetch_depth": "1"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.test",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "test",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Unit tests (negatives, determinism, shared epoch rule, committed receipts)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/01-unit-tests-negatives-determinism-shared-epoch-ru.sh",
+          "run_sha256": "284f042fd3144e395a4c59d125e55890fad1ddd72ef74b08ea33b7f3540507b6"
+        },
+        {
+          "name": "Required-checks verifier unit tests (not declared, invalid, dependency, clock, network, two-run, failing, allow)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/02-required-checks-verifier-unit-tests-not-declared.sh",
+          "run_sha256": "5f510d8828703456cbbf2441f5ca16ac5b4e50f432e503fa96dadd2f617f8034"
+        },
+        {
+          "name": "SV_CHANGE sv-check-receipt minter unit tests (pins, six ids, schema, negatives)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/03-sv-change-sv-check-receipt-minter-unit-tests-pin.sh",
+          "run_sha256": "bc5222c7f386735e95c0d76c8d4085ece0cc1b9f9adcf0d5997bd258b3d6a746"
+        },
+        {
+          "name": "P1 files resolve through the pinned contract-pins.json (sha256 317aef68) at StegVerse-Labs/.github#3264 7898cedb; vendored P1 segments are its bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/04-p1-files-resolve-through-the-pinned-contract-pin.sh",
+          "run_sha256": "38be398c61a45e5b70172fc7cd05afea7ac5fef6be02c809c2a458d26d2321b1"
+        },
+        {
+          "name": "Pinned readback equals StegVerse-Labs/.github#3266 at 2ba0e329; vendored canon/seal are its bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/05-pinned-readback-equals-stegverse-labs-github-326.sh",
+          "run_sha256": "1080e26ce4cac15e2ec149253e5ae288e819053952189566a7eaa712128c4aaa"
+        },
+        {
+          "name": "Every committed sv-check-receipt passes P1's own validate_check_receipt at the pin",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/06-every-committed-sv-check-receipt-passes-p1-s-own.sh",
+          "run_sha256": "15753659b7abf696efe9c107306676643e6c257ea01539579f64110f9086fbd4"
+        },
+        {
+          "name": "Built-in supplied-epoch-binder-check agrees with P1's verify_admission_hb_epoch at the pin",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/07-built-in-supplied-epoch-binder-check-agrees-with.sh",
+          "run_sha256": "c14ec281434219614b602d8c04360539bb9ddbd3164e479711ad8f0dc4fd7d26"
+        },
+        {
+          "name": "Built-in supplied-epoch-binder-check receipts (fixture ALLOW and DENY HB_EPOCH_MISMATCH) pass P1's validate_check_receipt",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.test/08-built-in-supplied-epoch-binder-check-receipts-fi.sh",
+          "run_sha256": "2912b4ac6b6cf3ca7276e072b01c5b81cbd336de087fc0108aa07355481318f2"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-41-97c8e43c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-41-97c8e43c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-41-97c8e43c"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-41-97c8e43c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.stegverse-org-181-22b1ef4a",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-org/.github",
+          "input": "StegVerse-org-181-22b1ef4a"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "StegVerse-org/.github",
+            "INPUT": "StegVerse-org-181-22b1ef4a"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "StegVerse-org-181-22b1ef4a"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.stegverse-labs-3206-e07326f6",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3206-e07326f6"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3206-e07326f6"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "StegVerse-Labs-3206-e07326f6"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.stegverse-labs-3263-690d3ef1",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3263-690d3ef1"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3263-690d3ef1"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "StegVerse-Labs-3263-690d3ef1"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.admissible-existence-95-fbf1fa46",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-fbf1fa46"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-fbf1fa46"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "Admissible-Existence-95-fbf1fa46"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.admissible-existence-95-3ac2c028",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-3ac2c028"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-3ac2c028"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "Admissible-Existence-95-3ac2c028"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-47-4dcf3cd4",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-4dcf3cd4"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-4dcf3cd4"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-47-4dcf3cd4"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-sandbox-39-2a22541b",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/sandbox",
+          "input": "SV-LLM-sandbox-39-2a22541b"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/sandbox",
+            "INPUT": "SV-LLM-sandbox-39-2a22541b"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-sandbox-39-2a22541b"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.admissible-existence-95-ca7ca797",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-ca7ca797"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-ca7ca797"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "Admissible-Existence-95-ca7ca797"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-47-06575f0b",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-06575f0b"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-06575f0b"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-47-06575f0b"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-sandbox-39-1a514339",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/sandbox",
+          "input": "SV-LLM-sandbox-39-1a514339"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/sandbox",
+            "INPUT": "SV-LLM-sandbox-39-1a514339"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-sandbox-39-1a514339"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-47-7d2b7394",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-7d2b7394"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-7d2b7394"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-47-7d2b7394"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.sv-llm-47-56c9943c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-56c9943c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-56c9943c"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "SV-LLM-47-56c9943c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive.admissible-existence-95-cae3398c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-cae3398c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the declared head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/01-fetch-the-declared-head-read-only.sh",
+          "run_sha256": "aafa42c4a7fe1ed7955de4c2e3513d521a9ae774f7f5747e789332f6ffb06398",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-cae3398c"
+          }
+        },
+        {
+          "name": "Re-derive the receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive/02-re-derive-the-receipt-and-compare-bytes.sh",
+          "run_sha256": "ea808ffc639ea063e9a8d5dbb6fb14c838e8a8890638e1fa5e7604df61c7ab12",
+          "env": {
+            "INPUT": "Admissible-Existence-95-cae3398c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-41-97c8e43c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-41-97c8e43c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-41-97c8e43c"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-41-97c8e43c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.stegverse-org-181-22b1ef4a",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-org/.github",
+          "input": "StegVerse-org-181-22b1ef4a"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "StegVerse-org/.github",
+            "INPUT": "StegVerse-org-181-22b1ef4a"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "StegVerse-org-181-22b1ef4a"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.stegverse-labs-3206-e07326f6",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3206-e07326f6"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3206-e07326f6"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "StegVerse-Labs-3206-e07326f6"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.stegverse-labs-3263-690d3ef1",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3263-690d3ef1"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3263-690d3ef1"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "StegVerse-Labs-3263-690d3ef1"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.admissible-existence-95-fbf1fa46",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-fbf1fa46"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-fbf1fa46"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "Admissible-Existence-95-fbf1fa46"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.admissible-existence-95-3ac2c028",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-3ac2c028"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-3ac2c028"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "Admissible-Existence-95-3ac2c028"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.admissible-existence-95-ca7ca797",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-ca7ca797"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-ca7ca797"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "Admissible-Existence-95-ca7ca797"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-47-4dcf3cd4",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-4dcf3cd4"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-4dcf3cd4"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-47-4dcf3cd4"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-47-06575f0b",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-06575f0b"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-06575f0b"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-47-06575f0b"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-sandbox-39-2a22541b",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/sandbox",
+          "input": "SV-LLM-sandbox-39-2a22541b"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/sandbox",
+            "INPUT": "SV-LLM-sandbox-39-2a22541b"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-sandbox-39-2a22541b"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-sandbox-39-1a514339",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/sandbox",
+          "input": "SV-LLM-sandbox-39-1a514339"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/sandbox",
+            "INPUT": "SV-LLM-sandbox-39-1a514339"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-sandbox-39-1a514339"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-sandbox-40-41938d3f",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/sandbox",
+          "input": "SV-LLM-sandbox-40-41938d3f"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/sandbox",
+            "INPUT": "SV-LLM-sandbox-40-41938d3f"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-sandbox-40-41938d3f"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-47-7d2b7394",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-7d2b7394"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-7d2b7394"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-47-7d2b7394"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.sv-llm-47-56c9943c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "SV-LLM/.github",
+          "input": "SV-LLM-47-56c9943c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "SV-LLM/.github",
+            "INPUT": "SV-LLM-47-56c9943c"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "SV-LLM-47-56c9943c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-required-checks.admissible-existence-95-cae3398c",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-required-checks",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "Admissible-Existence/.github",
+          "input": "Admissible-Existence-95-cae3398c"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the head and its declared dependency commits read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/01-fetch-the-head-and-its-declared-dependency-commi.sh",
+          "run_sha256": "95d5e77eeb594d433daa36ee963816f2263c7939f368cdd41e7499bef4fc882a",
+          "env": {
+            "REPOSITORY": "Admissible-Existence/.github",
+            "INPUT": "Admissible-Existence-95-cae3398c"
+          }
+        },
+        {
+          "name": "Re-derive the required-checks receipt and compare bytes",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-required-checks/02-re-derive-the-required-checks-receipt-and-compar.sh",
+          "run_sha256": "38e13ad37dd77ef19420be2cafe54f2b270fb5c210e9b9bfcead45e26f574e8b",
+          "env": {
+            "INPUT": "Admissible-Existence-95-cae3398c"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-sv-check-receipts.stegverse-labs-3225-e6ba9601",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-sv-check-receipts",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3225-e6ba9601"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the pinned row/schema/SV_CHANGE commit and the head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/01-fetch-the-pinned-row-schema-sv-change-commit-and.sh",
+          "run_sha256": "9e37dea31ae927f8f59fff0e3fc21101c14cb09a4f22901c04b2dcabd566234a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3225-e6ba9601"
+          }
+        },
+        {
+          "name": "Mint again and compare every receipt byte for byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/02-mint-again-and-compare-every-receipt-byte-for-by.sh",
+          "run_sha256": "2d9a74a8067e98779ca2153046d2c6d5af97d13e6854d3226e0ff33b60ad3200",
+          "env": {
+            "INPUT": "StegVerse-Labs-3225-e6ba9601"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-sv-check-receipts.stegverse-labs-3226-f82c0324",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-sv-check-receipts",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3226-f82c0324"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the pinned row/schema/SV_CHANGE commit and the head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/01-fetch-the-pinned-row-schema-sv-change-commit-and.sh",
+          "run_sha256": "9e37dea31ae927f8f59fff0e3fc21101c14cb09a4f22901c04b2dcabd566234a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3226-f82c0324"
+          }
+        },
+        {
+          "name": "Mint again and compare every receipt byte for byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/02-mint-again-and-compare-every-receipt-byte-for-by.sh",
+          "run_sha256": "2d9a74a8067e98779ca2153046d2c6d5af97d13e6854d3226e0ff33b60ad3200",
+          "env": {
+            "INPUT": "StegVerse-Labs-3226-f82c0324"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-sv-check-receipts.stegverse-labs-3234-e29493af",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-sv-check-receipts",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3234-e29493af"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the pinned row/schema/SV_CHANGE commit and the head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/01-fetch-the-pinned-row-schema-sv-change-commit-and.sh",
+          "run_sha256": "9e37dea31ae927f8f59fff0e3fc21101c14cb09a4f22901c04b2dcabd566234a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3234-e29493af"
+          }
+        },
+        {
+          "name": "Mint again and compare every receipt byte for byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/02-mint-again-and-compare-every-receipt-byte-for-by.sh",
+          "run_sha256": "2d9a74a8067e98779ca2153046d2c6d5af97d13e6854d3226e0ff33b60ad3200",
+          "env": {
+            "INPUT": "StegVerse-Labs-3234-e29493af"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-sv-check-receipts.stegverse-labs-3264-7898cedb",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-sv-check-receipts",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "StegVerse-Labs/.github",
+          "input": "StegVerse-Labs-3264-7898cedb"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the pinned row/schema/SV_CHANGE commit and the head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/01-fetch-the-pinned-row-schema-sv-change-commit-and.sh",
+          "run_sha256": "9e37dea31ae927f8f59fff0e3fc21101c14cb09a4f22901c04b2dcabd566234a",
+          "env": {
+            "REPOSITORY": "StegVerse-Labs/.github",
+            "INPUT": "StegVerse-Labs-3264-7898cedb"
+          }
+        },
+        {
+          "name": "Mint again and compare every receipt byte for byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/02-mint-again-and-compare-every-receipt-byte-for-by.sh",
+          "run_sha256": "2d9a74a8067e98779ca2153046d2c6d5af97d13e6854d3226e0ff33b60ad3200",
+          "env": {
+            "INPUT": "StegVerse-Labs-3264-7898cedb"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-sv-check-receipts.stegverse-org-nopr-dd8bfd02",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-sv-check-receipts",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "repository": "",
+          "input": "StegVerse-org-nopr-dd8bfd02"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the pinned row/schema/SV_CHANGE commit and the head read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/01-fetch-the-pinned-row-schema-sv-change-commit-and.sh",
+          "run_sha256": "9e37dea31ae927f8f59fff0e3fc21101c14cb09a4f22901c04b2dcabd566234a",
+          "env": {
+            "REPOSITORY": "",
+            "INPUT": "StegVerse-org-nopr-dd8bfd02"
+          }
+        },
+        {
+          "name": "Mint again and compare every receipt byte for byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-sv-check-receipts/02-mint-again-and-compare-every-receipt-byte-for-by.sh",
+          "run_sha256": "2d9a74a8067e98779ca2153046d2c6d5af97d13e6854d3226e0ff33b60ad3200",
+          "env": {
+            "INPUT": "StegVerse-org-nopr-dd8bfd02"
+          }
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-stage-evaluation.nwi-s0-stegverse-labs-7898cedb",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-stage-evaluation",
+        "job_name": "verifier rederive: nwi-s0-exit-gate stage evaluation (not a stage-gate trigger)",
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "evaluation": "NWI-S0-StegVerse-Labs-7898cedb"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the contract pin and the evaluated commit read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/01-fetch-the-contract-pin-and-the-evaluated-commit-.sh",
+          "run_sha256": "c7d572831eeeb3d8604d2c4aa20879873ff4a544ed8b3db574f116ff1af54139",
+          "env": {
+            "EVALUATION": "NWI-S0-StegVerse-Labs-7898cedb"
+          }
+        },
+        {
+          "name": "Evaluate the committed subject again and compare every byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/02-evaluate-the-committed-subject-again-and-compare.sh",
+          "run_sha256": "28d8c62a2b9f50b8710f9b53e579b165eea6f103facda4e50f0ae85ec0197bfa",
+          "env": {
+            "EVALUATION": "NWI-S0-StegVerse-Labs-7898cedb"
+          }
+        },
+        {
+          "name": "Both sides name the contract-pinned manifest (manifest_source CONTRACT_PINS, NWI-S0 20b37917, contract-pins 317aef68)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/03-both-sides-name-the-contract-pinned-manifest-man.sh",
+          "run_sha256": "36cf5e3a27aed9db43d0aea2b8601eaedb08ee9677a4a111adb5b6ec11a374ba"
+        },
+        {
+          "name": "Issue derivation from the committed evaluations (pure, simulated append in memory; nothing appended)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/04-issue-derivation-from-the-committed-evaluations-.sh",
+          "run_sha256": "9d3a7baaa0be5e4759123831b09befe1ed45c3725f14825405de40385f97c210"
+        },
+        {
+          "name": "Gate negatives (subject, epoch, declaration, failing producer) against the fetched P1 tree",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/05-gate-negatives-subject-epoch-declaration-failing.sh",
+          "run_sha256": "82eae8bf546f78e3ee4b5b2be7256f5c8409e46a61d017e5de4785880e017371"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "s1-hop-head-verifier.rederive-stage-evaluation.nwi-s0-stegverse-labs-978b8880",
+      "source": {
+        "workflow": ".github/workflows/s1-hop-head-verifier.yml",
+        "workflow_name": "S1 hop head verifier",
+        "job": "rederive-stage-evaluation",
+        "job_name": "verifier rederive: nwi-s0-exit-gate stage evaluation (not a stage-gate trigger)",
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "matrix_row": {
+          "evaluation": "NWI-S0-StegVerse-Labs-978b8880"
+        },
+        "not_carried": [
+          "floating actions/checkout@v4 replaced by the dispatcher's SHA-pinned checkout",
+          "floating actions/setup-python@v5 replaced by the dispatcher's SHA-pinned setup-python",
+          "job matrix expanded: one catalog group per include row; ${{ matrix.* }} substituted in step env"
+        ]
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Fetch the contract pin and the evaluated commit read-only",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/01-fetch-the-contract-pin-and-the-evaluated-commit-.sh",
+          "run_sha256": "c7d572831eeeb3d8604d2c4aa20879873ff4a544ed8b3db574f116ff1af54139",
+          "env": {
+            "EVALUATION": "NWI-S0-StegVerse-Labs-978b8880"
+          }
+        },
+        {
+          "name": "Evaluate the committed subject again and compare every byte",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/02-evaluate-the-committed-subject-again-and-compare.sh",
+          "run_sha256": "28d8c62a2b9f50b8710f9b53e579b165eea6f103facda4e50f0ae85ec0197bfa",
+          "env": {
+            "EVALUATION": "NWI-S0-StegVerse-Labs-978b8880"
+          }
+        },
+        {
+          "name": "Both sides name the contract-pinned manifest (manifest_source CONTRACT_PINS, NWI-S0 20b37917, contract-pins 317aef68)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/03-both-sides-name-the-contract-pinned-manifest-man.sh",
+          "run_sha256": "36cf5e3a27aed9db43d0aea2b8601eaedb08ee9677a4a111adb5b6ec11a374ba"
+        },
+        {
+          "name": "Issue derivation from the committed evaluations (pure, simulated append in memory; nothing appended)",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/04-issue-derivation-from-the-committed-evaluations-.sh",
+          "run_sha256": "9d3a7baaa0be5e4759123831b09befe1ed45c3725f14825405de40385f97c210"
+        },
+        {
+          "name": "Gate negatives (subject, epoch, declaration, failing producer) against the fetched P1 tree",
+          "run_file": "tools/tasks/steps/s1-hop-head-verifier.rederive-stage-evaluation/05-gate-negatives-subject-epoch-declaration-failing.sh",
+          "run_sha256": "82eae8bf546f78e3ee4b5b2be7256f5c8409e46a61d017e5de4785880e017371"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360,
+        "python_version": "3.13"
+      }
+    },
+    {
+      "id": "sandbox-registration.validate",
+      "source": {
+        "workflow": ".github/workflows/sandbox-registration.yml",
+        "workflow_name": "Validate Sandbox Entity Registration",
+        "job": "validate",
+        "job_name": null,
+        "commit": "3d8754da1f86f4fb29abfc85d8bf89a24e7d3116",
+        "triggers_before": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        }
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "steps": [
+        {
+          "name": "Sandbox registration predicates",
+          "run_file": "tools/tasks/steps/sandbox-registration.validate/01-sandbox-registration-predicates.sh",
+          "run_sha256": "ecbfa20a48ccb29027254085fec58561f561efa31f474854d3372d5aec7932b7"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "intr-path-transfer-validation.unit",
+      "source": {
+        "workflow": ".github/workflows/intr-path-transfer-validation.yml",
+        "workflow_name": "Validate InTr Mesh Path Transfer",
+        "job": "unit",
+        "job_name": null,
+        "commit": "c0444fbcd6793d09c2b8e46311b57225408b81ae",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "installed_by": "SV-LLM/.github#50 (Lane B, laneb/intr-mesh-path) @c0444fbc"
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {
+        "LEDGER_REF": "refs/stegverse/organization-ledger",
+        "DRY_RUN_REF": "refs/dry-run/organization-ledger"
+      },
+      "steps": [
+        {
+          "name": "Fetch the ledger ref read-only (the fixtures pin a commit on it)",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.unit/01-fetch-the-ledger-ref-read-only-the-fixtures-pin-.sh",
+          "run_sha256": "23d3ba4d4667391d4c731e9630fbf7fda623b69e7164369665c88cf283b947cc"
+        },
+        {
+          "name": "Declared paths, append, two-half verify, refusals (temp ledgers from the pinned tip)",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.unit/02-declared-paths-append-two-half-verify-refusals-t.sh",
+          "run_sha256": "0f0b28a1e08f534b19a6e74dffe6dfe6a18fbb2b9261e5f4118802af44b7c952"
+        },
+        {
+          "name": "Destination carrier, ingress append, link and end-to-end checks (synthetic source receipts, temp ledgers)",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.unit/03-destination-carrier-ingress-append-link-and-end-.sh",
+          "run_sha256": "c4e0e9ab634dfdb4a905a999ff13a486474827dfe7a9b7d994dad0fc53fcef95"
+        },
+        {
+          "name": "Cross-organization pair check through TV/TVC (TVC#528 fixture receipts; no token; real state FAIL_CLOSED at the TVC transition)",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.unit/04-cross-organization-pair-check-through-tv-tvc-tvc.sh",
+          "run_sha256": "be7f7e67312319d91344228dbc9de1ec5434724a49a6fa3ee06e819fe4bfd18e"
+        },
+        {
+          "name": "Public-ledger route of the cross-org read (E0, no credential); inbound rows dry-run end to end on a scratch ref",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.unit/05-public-ledger-route-of-the-cross-org-read-e0-no-.sh",
+          "run_sha256": "15779fc4996462d5255ec566c7abbde2d2e838f745ba0bd039de83f25bc00108"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "0",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "intr-path-transfer-validation.dry-run",
+      "source": {
+        "workflow": ".github/workflows/intr-path-transfer-validation.yml",
+        "workflow_name": "Validate InTr Mesh Path Transfer",
+        "job": "dry-run",
+        "job_name": null,
+        "commit": "c0444fbcd6793d09c2b8e46311b57225408b81ae",
+        "triggers_before": [
+          "pull_request",
+          "push"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "installed_by": "SV-LLM/.github#50 (Lane B, laneb/intr-mesh-path) @c0444fbc"
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {
+        "LEDGER_REF": "refs/stegverse/organization-ledger",
+        "DRY_RUN_REF": "refs/dry-run/organization-ledger"
+      },
+      "steps": [
+        {
+          "name": "Copy the published ledger to a scratch ref",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.dry-run/01-copy-the-published-ledger-to-a-scratch-ref.sh",
+          "run_sha256": "3127ce8dcd732fe6e0a4e52018ab4e8fd862af9b57113ce7357fb6c95d982233"
+        },
+        {
+          "name": "Real state, read-only: inspect actual source halves without assuming absent receipts",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.dry-run/02-real-state-read-only-inspect-actual-source-halve.sh",
+          "run_sha256": "72bdb9f0d84a8da48033238a8fda8faf39495a81a22b2b956f972079fff47cb8"
+        },
+        {
+          "name": "The writer's append on the scratch ref, linked to the last ledgered main merge",
+          "run_file": "tools/tasks/steps/intr-path-transfer-validation.dry-run/03-the-writer-s-append-on-the-scratch-ref-linked-to.sh",
+          "run_sha256": "cd95b6f2106d85cfebe9ea7e38e2895806fb3d41816b8395a4faef08dfbc86c0"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "0",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "organization-ledger-merge-transfer-validation.unit",
+      "source": {
+        "workflow": ".github/workflows/organization-ledger-merge-transfer-validation.yml",
+        "workflow_name": "Validate Main Merge Transfer",
+        "job": "unit",
+        "job_name": null,
+        "commit": "c0444fbcd6793d09c2b8e46311b57225408b81ae",
+        "triggers_before": [
+          "pull_request"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "installed_by": "SV-LLM/.github#50 (Lane B, laneb/intr-mesh-path) @c0444fbc"
+      },
+      "events": [
+        "pull_request"
+      ],
+      "env": {
+        "LEDGER_REF": "refs/stegverse/organization-ledger",
+        "DRY_RUN_REF": "refs/dry-run/organization-ledger"
+      },
+      "steps": [
+        {
+          "name": "Fetch the ledger ref read-only (the fixtures pin a commit on it)",
+          "run_file": "tools/tasks/steps/organization-ledger-merge-transfer-validation.unit/01-fetch-the-ledger-ref-read-only-the-fixtures-pin-.sh",
+          "run_sha256": "23d3ba4d4667391d4c731e9630fbf7fda623b69e7164369665c88cf283b947cc"
+        },
+        {
+          "name": "Append, verify, refuse (temp ledgers from the pinned tip)",
+          "run_file": "tools/tasks/steps/organization-ledger-merge-transfer-validation.unit/02-append-verify-refuse-temp-ledgers-from-the-pinne.sh",
+          "run_sha256": "60f3fab5860bde40252bef7a4e6b120645870fc9419f78cacbec76dbdcda8280"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "0",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "organization-ledger-merge-transfer-validation.dry-run",
+      "source": {
+        "workflow": ".github/workflows/organization-ledger-merge-transfer-validation.yml",
+        "workflow_name": "Validate Main Merge Transfer",
+        "job": "dry-run",
+        "job_name": null,
+        "commit": "c0444fbcd6793d09c2b8e46311b57225408b81ae",
+        "triggers_before": [
+          "pull_request"
+        ],
+        "permissions_before": {
+          "contents": "read"
+        },
+        "installed_by": "SV-LLM/.github#50 (Lane B, laneb/intr-mesh-path) @c0444fbc"
+      },
+      "events": [
+        "pull_request"
+      ],
+      "env": {
+        "LEDGER_REF": "refs/stegverse/organization-ledger",
+        "DRY_RUN_REF": "refs/dry-run/organization-ledger",
+        "BASE_SHA": "${{ github.event.pull_request.base.sha }}"
+      },
+      "steps": [
+        {
+          "name": "Copy the published ledger to a scratch ref",
+          "run_file": "tools/tasks/steps/organization-ledger-merge-transfer-validation.dry-run/01-copy-the-published-ledger-to-a-scratch-ref.sh",
+          "run_sha256": "ead7f1adff7c08fc22142b1c70d7b328c3bd82a19684b2444bfe977f4e27d6b6"
+        },
+        {
+          "name": "Real state, read-only: each selected merge is VERIFIED or FAIL_CLOSED with six fields, never DENY",
+          "run_file": "tools/tasks/steps/organization-ledger-merge-transfer-validation.dry-run/02-real-state-read-only-each-selected-merge-is-veri.sh",
+          "run_sha256": "ebf7eba1aa182ad1b73ce3d245c359250e4fa5f4cea84d5d7d0dadff17f24bc7"
+        },
+        {
+          "name": "The writer's append on the scratch ref, then VERIFIED, then an idempotent replay",
+          "run_file": "tools/tasks/steps/organization-ledger-merge-transfer-validation.dry-run/03-the-writer-s-append-on-the-scratch-ref-then-veri.sh",
+          "run_sha256": "118319636e322c1fc36b2aa8d429f629987a11952eb24f3e63094bc5525173db"
+        }
+      ],
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "0",
+        "persist_credentials": "false",
+        "timeout_minutes": 360
+      }
+    },
+    {
+      "id": "workflow-surface-registry.validate",
+      "source": {
+        "added_by": "G17 consolidation",
+        "note": "G17: enforces the registry (replaces per-workflow existence and count pins); body byte-identical to StegVerse-org/.github#238 @70ce02af",
+        "name": "Workflow surface registry"
+      },
+      "events": [
+        "pull_request",
+        "push"
+      ],
+      "env": {},
+      "artifacts": [],
+      "runner": {
+        "fetch_depth": "1",
+        "persist_credentials": "false",
+        "timeout_minutes": 15
+      },
+      "steps": [
+        {
+          "name": "Registry, catalog and writer plan hold",
+          "run_file": "tools/tasks/steps/workflow-surface-registry.validate/01-registry,-catalog-and-writer-plan-hold.sh",
+          "run_sha256": "8cbb935889183200c1eeace944a53fbdf3f3922156106d15a40eec038dc49dde"
+        }
+      ]
+    }
+  ]
+}

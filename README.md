@@ -252,6 +252,7 @@ SV-LLM reuses and does not supersede:
 - **StegVerse SDK** — manifest construction/validation and SDK-side contracts;
 - **LLM-adapter** — provider-neutral access, provider transport, distributed workload and contribution provenance;
 - **TV/TVC** — credential/provider-operation and applicable route authority;
+- **SKAP Vault** (`KV/_Vault/SKAP`) — the only storage place of PII and credentials for every user, the StegVerse Ecosystem's own included; TV/TVC is the authority over them, never their storage place (Rigel 2026-10-24T17:52Z/17:54Z; HST path@sha pending, StegVerse-org/.github#163 issuecomment-6387655436);
 - **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master Records;
 - **Publisher** — governed publication/output continuation where applicable.
 

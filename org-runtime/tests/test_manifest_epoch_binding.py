@@ -12,10 +12,13 @@ Source validation only; no authority effect is claimed.
 """
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests"))
+from workflow_surface import dispatch_record  # noqa: E402  (G17: removed dispatchers are records + FAIL_CLOSED pending)
 INTERLOCK = json.loads((ROOT / "org-runtime/interlock-intr.json").read_text())
 ACTIVATION = json.loads((ROOT / "org-runtime/activation.json").read_text())
 
@@ -58,7 +61,7 @@ class ManifestEpochBinding(unittest.TestCase):
                 if source["from"] != "dispatch_input":
                     continue
                 with self.subTest(operation=path):
-                    workflow = (ROOT / source["dispatcher"]).read_text()
+                    workflow = dispatch_record(source["dispatcher"])
                     self.assertRegex(workflow, r"\n      " + re.escape(source["input"]) + r":\n")
                     self.assertRegex(workflow, r"\n  workflow_dispatch:\n")
                     self.assertRegex(workflow, re.escape("python " + op["operation"])
@@ -77,7 +80,8 @@ class ManifestEpochBinding(unittest.TestCase):
                 dispatchers = [s["dispatcher"] for s in binding["sources"] if s["from"] == "dispatch_input"]
                 self.assertTrue(dispatchers, "MANIFEST_DISPATCHER_NOT_IN_TREE: " + path)
                 for dispatcher in dispatchers:
-                    self.assertTrue((ROOT / dispatcher).is_file(), dispatcher)
+                    # in tree, or (G17) its verbatim record with a FAIL_CLOSED pending row
+                    self.assertTrue(dispatch_record(dispatcher), dispatcher)
 
     def test_the_activation_crossing_surface_is_a_bound_operation(self):
         surface = ACTIVATION["crossing_surface"]
