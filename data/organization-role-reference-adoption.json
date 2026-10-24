@@ -481,8 +481,9 @@
     "import_path": "PYTHONPATH=<checkout> (not installed; see adapted .github/workflows/organization-ledger-writer.yml job ledger-transition)"
   },
   "adapted": {
-    ".github/workflows/organization-ledger-writer.yml": {
+    ".github/workflows/organization-ledger-transition.yml": {
       "rule": "adapted_not_byte_identical",
+      "local_path": ".github/workflows/organization-ledger-writer.yml",
       "folded_by_g17": {
         "job": "ledger-transition",
         "pre_fold_record": "tools/tasks/folded/organization-ledger-transition.yml",

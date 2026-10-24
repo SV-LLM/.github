@@ -95,8 +95,12 @@ def verify(root: Path = ROOT, record: dict | None = None, reference_root: Path |
         if reference_root is not None and digest((reference_root / path).read_bytes()) != entry["reference_sha256"]:
             problems.append(path + ": recorded digest is not the reference commit's")
     for path, entry in record.get("adapted", {}).items():
-        if not (root / path).is_file():
-            problems.append(path + ": missing")
+        # `local_path` names where the adaptation lives here when it is not the
+        # reference path (G17 folded the adapted workflow into another file);
+        # the reference digest is always checked at the reference path.
+        local = entry.get("local_path", path)
+        if not (root / local).is_file():
+            problems.append(local + ": missing")
         if reference_root is not None and digest((reference_root / path).read_bytes()) != entry["reference_sha256"]:
             problems.append(path + ": recorded digest is not the reference commit's")
     for path, entry in record["contracts"].items():
