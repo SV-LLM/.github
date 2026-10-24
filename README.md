@@ -6,6 +6,7 @@
 SV-LLM/
 ├── .github/              organization architecture, topology and shared policy documentation
 ├── schemas/              provider-neutral machine-readable SV-LLM contracts
+├── tools/                sandbox tools
 ├── sandbox/              provider-neutral multi-entity collaboration plane
 ├── StegVerse_AI/         StegVerse ecosystem orchestration/evidence-matching entity
 ├── Ecosystem_Chat/       Ecosystem Chat participant entity
