@@ -1,0 +1,48 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "addressed_service": "sv-llm.intr-destination",
+    "communication_id": "intr-path-v1:Admissible-Existence->SV-LLM",
+    "disposition": "ALLOW",
+    "message": {
+      "body": {
+        "path_id": "Admissible-Existence->SV-LLM:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "30fd53251d92904ffe485e7aca4268b1e5bca840"
+      },
+      "communication_id": "intr-path-v1:Admissible-Existence->SV-LLM",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:8fc876b038c51961121caaca3e6169cc7fa4bea13f1752075b7ec1681d8b1f81",
+    "path_id": "Admissible-Existence->SV-LLM:intr-destination",
+    "payload_sha256": "sha256:be6928048ee5c49df9ed63f9b199b828bab68c21a2a8b2d1a6bcf1d6f229c241",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-ingress-evidence/v1",
+    "source_inclusion": {
+      "source_ledger_tip": "d852f4260200a51acbfe485f3fd0b1798d2a8818",
+      "state": "VERIFIED_BY_ANONYMOUS_PUBLIC_LEDGER_READ",
+      "tvc_read_receipt": null
+    },
+    "source_organization_receipt_sha256": "sha256:f99de429ddef43774739cf3ff7a9ff6f63c9c2eb6ac51124ad5816d21970ca82",
+    "source_repository": "Admissible-Existence/.github",
+    "source_repository_receipt_sha256": "sha256:89d820f2a0ab1517447d58be57ec6fbe079a752d83c2b735db6368848bd93e71"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:be6928048ee5c49df9ed63f9b199b828bab68c21a2a8b2d1a6bcf1d6f229c241",
+  "previous_receipt_sha256": "sha256:bd6287c1970844361319f1bbcccabbd945ae02a85cd8e78fcaa2946db568f430",
+  "receipt_sha256": "sha256:d90b7b9f646f6b3369ec66d338b0d57f98cf93ad4bfa5f4ccc7bb79c89eacefe",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:070e42077601a5c1f18809ff169da48c0fdc3e6f72efe7629bd5304dd82eccc8",
+  "transition_class": "INTR_MESH_PATH_INGRESS",
+  "transition_id": "INTR_MESH_PATH_INGRESS:Admissible-Existence->SV-LLM:intr-destination@intr-path-v1:Admissible-Existence->SV-LLM"
+}
