@@ -38,7 +38,27 @@
       "execution_authority_constraint": "CONSTRAINT_VARIABLE",
       "time_constraint": "CONSTRAINT_VARIABLE",
       "disposition_role": "TRANSITION_EVIDENCE_ONLY",
-      "environment_selected_ingress": false
+      "environment_selected_ingress": false,
+      "hb_epoch_binding": {
+        "required": true,
+        "clock_default": false,
+        "unsupplied_disposition": "FAIL_CLOSED",
+        "unsupplied_failure_code": "HB_EPOCH_NOT_SUPPLIED",
+        "rule": "org-kernel/kernel.py::supplied_epoch_failure",
+        "sources": [
+          {
+            "from": "dispatch_input",
+            "dispatcher": ".github/workflows/organization-crossing-dispatch.yml",
+            "input": "hb_epoch",
+            "invocation": "org-runtime/crossing.py ingress --hb-epoch \"$HB_EPOCH\""
+          },
+          {
+            "from": "SUPPLIED_BY_MATERIALIZER_AS_hb_epoch",
+            "invocation": "org-runtime/crossing.py ingress --hb-epoch"
+          }
+        ],
+        "frame_epoch": "a frame lends its epoch only when SUPPLIED or a verified CARRIED claim, and it must equal the supplied one (HB_EPOCH_CONFLICT); a clock-flagged frame lends none"
+      }
     },
     "capability_endpoint_bindings": [
       {
@@ -75,7 +95,27 @@
           "admission_authority_constraint": "CONSTRAINT_VARIABLE",
           "execution_authority_constraint": "CONSTRAINT_VARIABLE",
           "time_constraint": "CONSTRAINT_VARIABLE",
-          "disposition_role": "TRANSITION_EVIDENCE_ONLY"
+          "disposition_role": "TRANSITION_EVIDENCE_ONLY",
+          "hb_epoch_binding": {
+            "required": true,
+            "clock_default": false,
+            "unsupplied_disposition": "FAIL_CLOSED",
+            "unsupplied_failure_code": "HB_EPOCH_NOT_SUPPLIED",
+            "rule": "org-kernel/kernel.py::supplied_epoch_failure",
+            "sources": [
+              {
+                "from": "dispatch_input",
+                "dispatcher": ".github/workflows/organization-ledger-transition.yml",
+                "input": "hb_epoch",
+                "invocation": "resident-runtime/organization_manifest_ingress.py --hb-epoch \"$HB_EPOCH\""
+              },
+              {
+                "from": "CARRIED_FRAME",
+                "via": "org-kernel/kernel.py::dispatch",
+                "detail": "the consumed frame's epoch, admitted by kernel.ingest_epoch"
+              }
+            ]
+          }
         },
         "binding_role": "ORGANIZATION_RECEIVING_OPERATION_RESOLUTION",
         "authority_effect": "NONE_BINDING_ONLY",
@@ -120,7 +160,27 @@
           "admission_authority_constraint": "CONSTRAINT_VARIABLE",
           "execution_authority_constraint": "CONSTRAINT_VARIABLE",
           "time_constraint": "CONSTRAINT_VARIABLE",
-          "disposition_role": "TRANSITION_EVIDENCE_ONLY"
+          "disposition_role": "TRANSITION_EVIDENCE_ONLY",
+          "hb_epoch_binding": {
+            "required": true,
+            "clock_default": false,
+            "unsupplied_disposition": "FAIL_CLOSED",
+            "unsupplied_failure_code": "HB_EPOCH_NOT_SUPPLIED",
+            "rule": "org-kernel/kernel.py::supplied_epoch_failure",
+            "sources": [
+              {
+                "from": "dispatch_input",
+                "dispatcher": ".github/workflows/organization-ledger-transition.yml",
+                "input": "hb_epoch",
+                "invocation": "resident-runtime/intr_destination_ingress.py --hb-epoch \"$HB_EPOCH\""
+              },
+              {
+                "from": "CARRIED_FRAME",
+                "via": "org-kernel/kernel.py::dispatch",
+                "detail": "the consumed frame's epoch, admitted by kernel.ingest_epoch"
+              }
+            ]
+          }
         },
         "binding_role": "ORGANIZATION_RECEIVING_OPERATION_RESOLUTION",
         "authority_effect": "NONE_BINDING_ONLY",
@@ -176,7 +236,26 @@
       "disposition_role": "TRANSITION_EVIDENCE_ONLY",
       "environment_selected_ingress": false,
       "origin_attestation_state": "NOT_PROVEN",
-      "origin_is_verified_by_this_boundary": false
+      "origin_is_verified_by_this_boundary": false,
+      "hb_epoch_binding": {
+        "required": true,
+        "clock_default": false,
+        "unsupplied_disposition": "FAIL_CLOSED",
+        "unsupplied_failure_code": "HB_EPOCH_NOT_SUPPLIED",
+        "rule": "org-kernel/kernel.py::supplied_epoch_failure",
+        "sources": [
+          {
+            "from": "dispatch_input",
+            "dispatcher": ".github/workflows/organization-crossing-dispatch.yml",
+            "input": "hb_epoch",
+            "invocation": "org-runtime/crossing.py egress --hb-epoch \"$HB_EPOCH\""
+          },
+          {
+            "from": "SUPPLIED_BY_MATERIALIZER_AS_hb_epoch",
+            "invocation": "org-runtime/crossing.py egress --hb-epoch"
+          }
+        ]
+      }
     },
     "peer_capability_resolution": {
       "address_form": "ORGANIZATION_SLUG_DOT_CAPABILITY_PROFILE_ID",

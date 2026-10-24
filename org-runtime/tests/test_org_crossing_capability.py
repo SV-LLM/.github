@@ -28,13 +28,13 @@ with tempfile.TemporaryDirectory() as td:
     os.environ["STEGVERSE_REPO_LEDGER_ROOT"]=str(base/"repo-ledger"); os.environ["STEGVERSE_ORG_LEDGER_ROOT"]=str(base/"org-ledger")
     mesh=base/"mesh"
     c=load("crossing",root/"org-runtime/crossing.py"); k=c.kernel
-    c.open_organization_ledger(root=root)
+    c.open_organization_ledger(root=root, hb_epoch=32)
 
     # A reply declaring the sdk-manifest-ingress capability reaches that service with the SDK manifest payload.
     carried={"manifest_id":"sdk-governance-1","kind":"sdk-manifest-builder.governance","body":{"decision":"requested"}}
     reply={"manifest_id":"reply-sdk-1","destination":{"organization":PEER,"capability":"sdk-manifest-ingress",
            "surface":"SDK-MANIFEST-ECOSYSTEM-TRANSITION"},"payload":{"manifest":carried}}
-    out=c.egress(reply,standing=STANDING,mesh_root=mesh,root=root)
+    out=c.egress(reply,standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
     assert out["transition_class"]=="ORGANIZATION_EGRESS_EMITTED" and out["disposition"]=="ALLOW", out
     assert out["destination_service"]=="stegverse-org.sdk-manifest-ingress", out
     packet=k.recover_packet(json.loads(Path(out["spool_path"]).read_text()))
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # Without a capability the reply is addressed to the peer's org-control service, carrying the whole manifest.
     plain={"manifest_id":"reply-plain-1","destination":{"organization":PEER},"payload":{"manifest":carried}}
-    out=c.egress(plain,standing=STANDING,mesh_root=mesh,root=root)
+    out=c.egress(plain,standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
     assert out["transition_class"]=="ORGANIZATION_EGRESS_EMITTED" and out["destination_service"]=="stegverse-org.org-control", out
     packet=k.recover_packet(json.loads(Path(out["spool_path"]).read_text()))
     assert packet["destination"]["service"]=="stegverse-org.org-control" and packet["payload"]=={"manifest":plain}
@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory() as td:
     )
     for manifest,predicate in refusals:
         before=frames(mesh)
-        out=c.egress(manifest,standing=STANDING,mesh_root=mesh,root=root)
+        out=c.egress(manifest,standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
         assert out["transition_class"]=="ORGANIZATION_EGRESS_REFUSED" and out["disposition"]=="DENY", out
         assert out["failed_predicate"]==predicate and out["org_receipt_sha256"], (manifest["manifest_id"],out)
         assert frames(mesh)==before, "a refused capability egress published a frame"

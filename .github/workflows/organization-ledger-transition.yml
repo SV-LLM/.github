@@ -30,11 +30,11 @@ name: Organization Ledger Transition
 # An existing chain is extended. The published ref is never force-updated.
 # Authority and time are constraint variables. The disposition is transition
 # evidence only.
+#
+# There is no push trigger (B-P36n): a push carries no epoch, so it could only
+# refuse. A committed request is received when dispatched with mode=request and
+# hb_epoch; a request already recorded is answered from the ledger.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.stegverse/transition-requests/**'
   workflow_dispatch:
     inputs:
       mode:
@@ -56,7 +56,7 @@ on:
         default: ''
         type: string
       hb_epoch:
-        description: 'supplied heartbeat epoch the self-closure receipts carry (mode=self-closure; non-negative integer); no clock is read for it'
+        description: 'supplied heartbeat epoch the receipts carry (mode=self-closure or mode=request; ASCII digits, value >= 32); no clock is read for it'
         required: false
         default: ''
         type: string
@@ -81,12 +81,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LEDGER_REF: refs/stegverse/organization-ledger
-      # A push runs the committed-request mode. A dispatch names its mode.
-      MODE: ${{ github.event_name == 'push' && 'request' || github.event.inputs.mode || 'self-closure' }}
+      # A dispatch names its mode; without one it is a self-closure.
+      MODE: ${{ github.event.inputs.mode || 'self-closure' }}
       HB_EPOCH: ${{ github.event.inputs.hb_epoch }}
     steps:
       - name: Checkout organization boundary
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 0
 
@@ -96,7 +96,7 @@ jobs:
       # put on PYTHONPATH and nothing is downloaded from a package index.
       - name: Checkout exact merged SDK manifest state-transition runtime
         if: env.MODE == 'request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           repository: StegVerse-org/StegVerse-SDK
           ref: 74d9b473aa415b06a9d550c28b2779a691b4ba32
@@ -252,9 +252,18 @@ jobs:
                 "$recorded" "$canonical" "$out/ingress.json"
               continue
             fi
+            # Time is supplied with the dispatch. It is not sampled from a clock,
+            # so a request that would append without one, or with an invalid one,
+            # fails closed here with the kernel's six-field refusal and nothing is
+            # received, appended or published (B-P31). A push carries no input, and
+            # a dispatch string input cannot tell "" from absent, so both are
+            # HB_EPOCH_NOT_SUPPLIED; any other text is the kernel rule's to decide,
+            # so a dispatched "+33" is HB_EPOCH_INVALID (B-P36d).
+            python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=request with hb_epoch)" || exit 1
             # A refusal is recorded too; the publish step carries it, and the
             # readback step fails the run on a receipt it cannot find.
             python resident-runtime/organization_manifest_ingress.py \
+              --hb-epoch "$HB_EPOCH" \
               --registry org-boundary/registry/services.json \
               --manifest "$out/manifest.json" --standing "$out/standing.json" \
               --packet-id "$name" --out "$out/ingress.json" || true
@@ -283,11 +292,11 @@ jobs:
             packet_id="intr-destination-self-closure-${GITHUB_RUN_ID}"
           fi
           # Time is supplied with the dispatch. It is not sampled from a clock.
-          case "$HB_EPOCH" in
-            ''|*[!0-9]*)
-              echo '{"disposition":"FAIL_CLOSED","failure_code":"DISPATCH_HB_EPOCH_INVALID","failed_predicate":"HB_EPOCH_IS_SUPPLIED_AS_A_NON_NEGATIVE_INTEGER","retry_entrypoint":".github/workflows/organization-ledger-transition.yml","consequence_committed":false}'
-              exit 1 ;;
-          esac
+          # An absent or invalid epoch fails closed with the kernel's six-field
+          # refusal and nothing is appended (B-P36c). A dispatched "" cannot be told
+          # from an absent input and is HB_EPOCH_NOT_SUPPLIED; any other text is the
+          # kernel rule's to decide (B-P36d).
+          python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-transition.yml (dispatch mode=self-closure with hb_epoch)" || exit 1
           python resident-runtime/intr_destination_ingress.py \
             --self-close \
             --hb-epoch "$HB_EPOCH" \

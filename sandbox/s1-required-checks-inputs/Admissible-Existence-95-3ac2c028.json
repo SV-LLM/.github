@@ -1,0 +1,7 @@
+{
+  "head_sha": "3ac2c028794c6a95d11aa0eed1127e0bec2c4e3a",
+  "pull_request": 95,
+  "repository": "Admissible-Existence/.github",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}

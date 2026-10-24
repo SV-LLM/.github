@@ -1,0 +1,684 @@
+{
+  "$id": "stegverse.sv_change.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_mode": {
+            "const": "NATIVE"
+          }
+        },
+        "required": [
+          "record_mode"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "unknown_fields"
+                  ]
+                },
+                {
+                  "required": [
+                    "migration_provenance"
+                  ]
+                },
+                {
+                  "required": [
+                    "migration_flags"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "properties": {
+              "hb_epoch": {
+                "pattern": "^0*(?:3[2-9]|[4-9][0-9]|[1-9][0-9]{2,})$",
+                "type": "string"
+              },
+              "owning_goal": {
+                "not": {
+                  "const": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+                }
+              },
+              "required_checks_ref": {
+                "properties": {
+                  "blob_sha": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  }
+                }
+              },
+              "resolves": {
+                "minItems": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_mode": {
+            "const": "MIGRATED_HISTORICAL"
+          }
+        },
+        "required": [
+          "record_mode"
+        ]
+      },
+      "then": {
+        "required": [
+          "unknown_fields",
+          "migration_provenance"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_mode": {
+            "const": "MIGRATED_HISTORICAL"
+          },
+          "resolves": {
+            "not": {
+              "minItems": 1
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "record_mode",
+          "resolves"
+        ]
+      },
+      "then": {
+        "properties": {
+          "migration_flags": {
+            "items": {
+              "const": "RESOLVES_NOT_RECORDED"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "migration_flags"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "admission_order_slot": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "applied": {
+      "type": "object"
+    },
+    "base_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "ledger_head": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "registry_generation": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tree_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "registry_generation",
+        "ledger_head"
+      ],
+      "type": "object"
+    },
+    "change_id": {
+      "description": "Content-addressed change identity. Canonical serialization (pinned, x-canonical-serialization): JSON with sort_keys, separators (',',':'), UTF-8, ensure_ascii false, no trailing newline; i.e. json.dumps(v, sort_keys=True, separators=(',',':'), ensure_ascii=False).encode('utf-8') (sv_work_items.canon). Known-answer vector: tests/test_sv_record_modes.py::test_change_id_known_answer.",
+      "pattern": "^svc:[0-9a-f]{64}$",
+      "type": "string",
+      "x-canonical-serialization": {
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "format": "JSON",
+        "separators": [
+          ",",
+          ":"
+        ],
+        "sort_keys": true,
+        "trailing_newline": false
+      },
+      "x-derivation": "svc: + lowercase hex sha256 over the canonical serialization of {target_repository, base_ref, content}. base_ref is hashed as recorded and must keep registry_generation and ledger_head. content = [{path, blob_digest, deleted}] sorted by path, deleted a boolean (default false), blob_digest null when deleted. writer_session is evidence, not identity. Helper: sv_work_items.change_identity (SF-2)."
+    },
+    "co_author_grants": {
+      "items": {
+        "required": [
+          "session",
+          "receipt_ref"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "content": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "deleted": {
+                  "const": true
+                }
+              },
+              "required": [
+                "deleted"
+              ]
+            },
+            "then": {
+              "properties": {
+                "blob_digest": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "deleted": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "deleted"
+                ]
+              }
+            },
+            "then": {
+              "properties": {
+                "blob_digest": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "blob_digest": {
+            "description": "sha256 of the new blob; null exactly when deleted is true",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deleted": {
+            "description": "required (TVC#519); true exactly when blob_digest is null. Migration derives it as (blob_digest is null) when the history records none.",
+            "type": "boolean"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "writer_session": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "evidence_class": {
+                      "const": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "session": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "evidence_class": {
+                      "enum": [
+                        "DECLARED",
+                        "OBSERVED_COMMIT_TRAILER"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "session": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            ],
+            "description": "SF-6. UNKNOWN_NOT_AUTHENTICALLY_OBSERVED (session null) fails BRANCH_WRITER_IS_BRANCH_OWNER (BRANCH_WRITER_UNOBSERVED). DECLARED is the declaring session's statement; neither class is an authenticated identity (JDQ Q-WRITER-IDENTITY).",
+            "properties": {
+              "evidence_class": {
+                "enum": [
+                  "DECLARED",
+                  "OBSERVED_COMMIT_TRAILER",
+                  "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+                ]
+              },
+              "session": {
+                "minLength": 1,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "session",
+              "evidence_class"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path",
+          "blob_digest",
+          "deleted",
+          "writer_session"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "declared_session": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "governance_decision_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hb_epoch": {
+      "anyOf": [
+        {
+          "pattern": "^0*(?:3[2-9]|[4-9][0-9]|[1-9][0-9]{2,})$",
+          "type": "string"
+        },
+        {
+          "const": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+        }
+      ],
+      "description": "supplied; ASCII digits with value >= 32, leading zeros allowed, compared by integer value (the shared rule org-kernel/kernel.py::supplied_epoch_failure, 726248a5); SF-1: UNKNOWN_NOT_AUTHENTICALLY_OBSERVED only in MIGRATED_HISTORICAL. Schema invalidity carries no disposition: validate_change refuses a NATIVE hb_epoch that is absent, null, '', 'null' or the sentinel with FAIL_CLOSED (never DENY), and admission with FAIL_CLOSED HB_EPOCH_SOURCE_UNOBSERVED"
+    },
+    "head": {
+      "additionalProperties": false,
+      "properties": {
+        "change_digest": {
+          "description": "sha256: + lowercase hex sha256 over the same canonical bytes as change_id (x-canonical-serialization of {target_repository, base_ref, content}); change_digest[7:] equals change_id[4:]. Helper: sv_work_items.change_digest.",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string",
+          "x-derivation": "identical bytes to change_id; see /properties/change_id/x-derivation"
+        }
+      },
+      "required": [
+        "change_digest"
+      ],
+      "type": "object"
+    },
+    "lifecycle_state": {
+      "enum": [
+        "PROPOSED",
+        "VERIFIED",
+        "ADMITTED",
+        "DENIED",
+        "FAIL_CLOSED",
+        "APPLIED",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ]
+    },
+    "migration_flags": {
+      "description": "SF-4: RESOLVES_NOT_RECORDED exactly when resolves is empty",
+      "items": {
+        "enum": [
+          "RESOLVES_NOT_RECORDED"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "migration_provenance": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "original_base_observed": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "original_base_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "original_base_observed": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "original_base_ref": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ],
+      "description": "SF-10. migrated_at_base equals base_ref (the base the migration was observed at); original_base_ref is null iff original_base_observed is false.",
+      "properties": {
+        "migrated_at_base": {
+          "additionalProperties": false,
+          "properties": {
+            "ledger_head": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "registry_generation": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tree_sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "registry_generation",
+            "ledger_head"
+          ],
+          "type": "object"
+        },
+        "original_base_observed": {
+          "type": "boolean"
+        },
+        "original_base_ref": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "ledger_head": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                },
+                "registry_generation": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tree_sha": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "registry_generation",
+                "ledger_head"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "original_base_observed",
+        "original_base_ref",
+        "migrated_at_base"
+      ],
+      "type": "object"
+    },
+    "owning_goal": {
+      "description": "SF-8: UNKNOWN_NOT_AUTHENTICALLY_OBSERVED only in MIGRATED_HISTORICAL",
+      "minLength": 1,
+      "type": "string"
+    },
+    "projection": {
+      "description": "one-way GitHub projection; never authority",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "record_mode": {
+      "description": "NATIVE: every field observed; no unknown_fields/migration_provenance/migration_flags. MIGRATED_HISTORICAL: history recorded before the native path; UNKNOWN_NOT_AUTHENTICALLY_OBSERVED is permitted only at the pointers in x-migrated-unknown-allowed and each one must be listed in unknown_fields (enforced by sv_work_items.mode_check); never admissible (ADMIT -> FAIL_CLOSED HISTORICAL_RECORD_NOT_ADMISSIBLE); it becomes NATIVE only through a superseding NATIVE record (SV_*_SUPERSEDE) with observed values.",
+      "enum": [
+        "NATIVE",
+        "MIGRATED_HISTORICAL"
+      ]
+    },
+    "request_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "required_checks_ref": {
+      "properties": {
+        "blob_sha": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            {
+              "const": "UNKNOWN_NOT_AUTHENTICALLY_OBSERVED"
+            }
+          ],
+          "description": "the 40-hex git blob of the required-checks row file as committed; anything else is FAIL_CLOSED REQUIRED_CHECKS_ROW_NOT_PINNED. UNKNOWN_NOT_AUTHENTICALLY_OBSERVED only in MIGRATED_HISTORICAL (a recorded placeholder such as WORKTREE is not a blob)."
+        },
+        "file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "row_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "blob_sha",
+        "row_id"
+      ],
+      "type": "object"
+    },
+    "resolves": {
+      "description": "SF-4: minItems 1 for NATIVE; MIGRATED_HISTORICAL may be empty and is then flagged RESOLVES_NOT_RECORDED",
+      "items": {
+        "pattern": "^svi:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schema": {
+      "const": "stegverse.sv_change.v1"
+    },
+    "signoffs": {
+      "description": "{role, session, receipt_ref}; receipt_ref is the receipt_sha256 of a sealed sign-off receipt (schemas/sv-change-signoff-receipt.v0.1.schema.json) for this change_digest by that role and session; fixture_only receipts count only in fixture_mode.",
+      "items": {
+        "required": [
+          "role",
+          "session",
+          "receipt_ref"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "superseded_by": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "supersedes": {
+      "description": "predecessor request_digest",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target_repository": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "touched_paths": {
+      "description": "Equals the set of content[].path, no duplicates (SV_CHANGE_TOUCHED_PATHS_MISMATCH).",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "unknown_fields": {
+      "items": {
+        "pattern": "^(/hb_epoch|/owning_goal|/required_checks_ref/blob_sha)$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "validation_receipts": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "evidence_class": {
+                  "const": "LEDGER_RECEIPT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "ref": {
+                  "pattern": "^refs/"
+                }
+              }
+            }
+          }
+        ],
+        "description": "SF-5. Only LEDGER_RECEIPT (ref under refs/) counts toward VERIFIED; OBSERVED_ARTIFACT is cited evidence and leaves the check unobserved.",
+        "properties": {
+          "change_digest": {
+            "description": "must equal head.change_digest of the change it validates; otherwise CHECK_SKIPPED_OR_UNOBSERVED with failed check RECEIPT_CHANGE_DIGEST_EQUALS_HEAD (TVC#519)",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "check_id": {
+            "description": "one of the ids in data/sv-work-items/required-checks.json#checks (emitted by the NWI-S1 verifier); any other is CHECK_ID_UNDECLARED",
+            "enum": [
+              "mutation-negative-suite",
+              "registry-generation-fence",
+              "schema-validate",
+              "supplied-epoch-binder-check",
+              "unit-tests",
+              "workflow-surface-registered"
+            ],
+            "minLength": 1,
+            "type": "string"
+          },
+          "digest": {
+            "description": "'sha256:' + lowercase hex sha256 of the canonical bytes of the receipt object stored at ref (the same canonical JSON pin as change_id: sort_keys, separators (',',':'), UTF-8, ensure_ascii false). Verified by a read of the ledger ref only (sv_work_items.verify_ledger_receipt_binding, a pure function over the supplied bytes): mismatch -> FAIL_CLOSED LEDGER_RECEIPT_DIGEST_MISMATCH; a ref that does not resolve -> FAIL_CLOSED LEDGER_RECEIPT_UNRESOLVED.",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "disposition": {
+            "enum": [
+              "ALLOW",
+              "DENY",
+              "FAIL_CLOSED"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "LEDGER_RECEIPT",
+              "OBSERVED_ARTIFACT"
+            ]
+          },
+          "ref": {
+            "description": "For evidence_class LEDGER_RECEIPT, names the ledger receipt the way the org-ledger readback addresses it (resident-runtime/ledger_store.py receipt_key on refs/stegverse/organization-ledger): refs/stegverse/organization-ledger@<commit 40-hex>:receipts/<receipt_sha256 hex>.json. A ref carrying '#fixture:' is a fixture and counts only in fixture_mode (scenario corpus/tests), never on the real admission path.",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "disposition",
+          "change_digest",
+          "evidence_class",
+          "ref",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "base_ref",
+    "change_id",
+    "content",
+    "declared_session",
+    "hb_epoch",
+    "head",
+    "lifecycle_state",
+    "owning_goal",
+    "record_mode",
+    "request_digest",
+    "required_checks_ref",
+    "resolves",
+    "schema",
+    "signoffs",
+    "target_repository",
+    "touched_paths",
+    "validation_receipts"
+  ],
+  "title": "SV_CHANGE (Lane C consumer schema + B1-B7)",
+  "type": "object",
+  "x-migrated-unknown-allowed": [
+    "/hb_epoch",
+    "/owning_goal",
+    "/required_checks_ref/blob_sha"
+  ]
+}

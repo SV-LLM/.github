@@ -43,14 +43,14 @@ with tempfile.TemporaryDirectory() as td:
     # The organization chain is opened by a declared genesis transition, never by an empty ledger.
     try:
         c.egress({"manifest_id":"before-genesis","destination":{"organization":"Not-An-Org"}},
-                 standing=STANDING,mesh_root=mesh,root=root)
+                 standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
         raise AssertionError("an undeclared genesis was accepted")
     except SystemExit as refused:
         assert getattr(refused,"failed_predicate",None)=="ORG_LEDGER_GENESIS_NOT_DECLARED", refused
-    opened=c.open_organization_ledger(root=root)
+    opened=c.open_organization_ledger(root=root, hb_epoch=32)
     assert opened["transition_class"]=="ORGANIZATION_LEDGER_OPENED" and opened["org_receipt_sha256"]
     try:
-        c.open_organization_ledger(root=root)
+        c.open_organization_ledger(root=root, hb_epoch=32)
         raise AssertionError("a second genesis was accepted")
     except SystemExit as refused:
         assert refused.failed_predicate=="ORG_LEDGER_GENESIS_ON_NON_EMPTY_LEDGER" and refused.disposition=="DENY"
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as td:
     # EGRESS to every peer. No peer root exists yet: the transition succeeds at egress, nothing waits.
     for org in peers:
         out=c.egress({"manifest_id":"egress-"+org,"destination":{"organization":org},"payload":{"probe":"egress"}},
-                     standing=STANDING,mesh_root=mesh,root=root)
+                     standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
         assert out["transition_class"]=="ORGANIZATION_EGRESS_EMITTED" and out["disposition"]=="ALLOW" and out["awaits_receiver"] is False
         assert Path(out["spool_path"]).exists()
     nodes={org:peer(base,org,k,rows[org]) for org in peers}
@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory() as td:
     for manifest,predicate in (({"manifest_id":"x","destination":{"organization":"Not-An-Org"}},"DESTINATION_NOT_IN_FEDERATION_DIRECTORY"),
                                ({"manifest_id":"y","destination":{"organization":"SV-LLM"}},"DESTINATION_IS_THIS_ORGANIZATION"),
                                ({"destination":{"organization":"StegVerse-Labs"}},"MANIFEST_ID_MISSING")):
-        out=c.egress(manifest,standing=STANDING,mesh_root=mesh,root=root)
+        out=c.egress(manifest,standing=STANDING,mesh_root=mesh,root=root, hb_epoch=32)
         assert out["transition_class"]=="ORGANIZATION_EGRESS_REFUSED" and out["failed_predicate"]==predicate and out["org_receipt_sha256"]
     print("SV_LLM_EGRESS_REFUSAL_RECORDED_PASS")
 
@@ -80,13 +80,13 @@ with tempfile.TemporaryDirectory() as td:
     labs=nodes["StegVerse-Labs"]
     def send(pid,payload,service="sv-llm.org-control"):
         labs.publish(labs.kernel.build_packet(origin_org="StegVerse-Labs",origin_service="stegverse-labs.org-control",destination_org="SV-LLM",
-                     destination_service=service,payload=payload,standing=STANDING,packet_id=pid),mesh_root=mesh)
+                     destination_service=service,payload=payload,standing=STANDING,packet_id=pid),mesh_root=mesh,epoch=32)
     send("in-sandbox",{"manifest":{"manifest_id":"m-sandbox","destination":{"organization":"SV-LLM","repository":"sandbox"},"payload":{"work":"w"}}})
     send("in-missing-repo",{"manifest":{"manifest_id":"m-missing","destination":{"organization":"SV-LLM","repository":"does-not-exist"}}})
     send("in-wrong-org",{"manifest":{"manifest_id":"m-wrong","destination":{"organization":"AaCT-E","repository":"sandbox"}}})
     send("in-control",{"message_class":"ecosystem.monitor.request","subject":"probe"})
     send("in-unregistered",{"probe":1},service="sv-llm.unregistered")
-    results={r["packet_id"]:r for r in c.ingress(mesh_root=mesh,node_state_root=node_state,root=root)}
+    results={r["packet_id"]:r for r in c.ingress(mesh_root=mesh,node_state_root=node_state,root=root, hb_epoch=32)}
     assert results["in-sandbox"]["transition_class"]=="ORGANIZATION_INGRESS_MATERIALIZED"
     assert results["in-sandbox"]["destination_repository"]=="SV-LLM/sandbox" and Path(results["in-sandbox"]["materialization_path"]).exists()
     # Materialized once, in the supplied node state, never under the checkout.
@@ -100,15 +100,16 @@ with tempfile.TemporaryDirectory() as td:
     assert results["in-control"]["transition_class"]=="ORGANIZATION_INGRESS_CONSUMED"
     assert results["in-unregistered"]["failed_predicate"]=="BOUNDARY_DISPATCH_REFUSED"
     assert all(r["org_receipt_sha256"] for r in results.values())
-    assert c.ingress(mesh_root=mesh,node_state_root=node_state,root=root)==[]   # consumed once; an empty spool records nothing
+    assert c.ingress(mesh_root=mesh,node_state_root=node_state,root=root, hb_epoch=32)==[]   # consumed once; an empty spool records nothing
     print("SV_LLM_INGRESS_PASS")
 
     # Every disposition is on both ledgers, in one unbroken chain each.
     repo_chain=chain(base/"repo-ledger"); org_chain=chain(base/"org-ledger")
     expected=len(peers)+3+5+1   # +1: the declared genesis
-    # The refused pre-genesis attempt and the refused second genesis wrote one repository receipt each
-    # (the repository ledger records the attempt) and no organization receipt.
-    assert len(repo_chain)==expected+2 and len(org_chain)==expected
+    # The refused pre-genesis attempt wrote one repository receipt (the repository ledger records
+    # the attempt) and no organization receipt. The refused second genesis writes nothing: it is
+    # refused before its repository receipt (B-P36q).
+    assert len(repo_chain)==expected+1 and len(org_chain)==expected
     assert org_chain[0]["org_transition_class"]=="ORGANIZATION_LEDGER_OPENED" and org_chain[0]["chain_genesis"] is True
     assert all(r["repository"]=="SV-LLM/.github" for r in repo_chain)
     org_sources=[o["repo_receipt_sha256"] for o in org_chain]

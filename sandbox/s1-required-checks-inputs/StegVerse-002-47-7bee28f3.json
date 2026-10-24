@@ -1,0 +1,7 @@
+{
+  "head_sha": "7bee28f36b63dfc6d886f7e5f581cf38154245d2",
+  "pull_request": 47,
+  "repository": "StegVerse-002/.github",
+  "schema": "stegverse.sv-llm.s1-required-checks-input/v2",
+  "type": "PULL_REQUEST_HEAD"
+}

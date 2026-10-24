@@ -15,6 +15,10 @@ on:
       - '.stegverse/**'
       - 'data/organization-role-*.json'
       - 'tests/test_organization_manifest_ingress.py'
+      - 'org-runtime/tests/test_cli_supplied_epoch.py'
+      - 'org-runtime/tests/test_writer_epoch_refusal_order.py'
+      - 'org-runtime/tests/fault_injection.py'
+      - 'org-kernel/**'
       - '.github/workflows/organization-ledger-transition.yml'
       - '.github/workflows/organization-manifest-ingress-validation.yml'
   push:
@@ -26,6 +30,10 @@ on:
       - '.stegverse/**'
       - 'data/organization-role-*.json'
       - 'tests/test_organization_manifest_ingress.py'
+      - 'org-runtime/tests/test_cli_supplied_epoch.py'
+      - 'org-runtime/tests/test_writer_epoch_refusal_order.py'
+      - 'org-runtime/tests/fault_injection.py'
+      - 'org-kernel/**'
       - '.github/workflows/organization-ledger-transition.yml'
       - '.github/workflows/organization-manifest-ingress-validation.yml'
   workflow_dispatch:
@@ -38,14 +46,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout organization boundary
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
 
       # The same pin as organization-ledger-transition.yml. Checked out and put
       # on the import path; nothing is installed.
       - name: Checkout exact merged SDK manifest state-transition runtime
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           repository: StegVerse-org/StegVerse-SDK
           ref: 74d9b473aa415b06a9d550c28b2779a691b4ba32
@@ -57,6 +65,18 @@ jobs:
           STEGVERSE_SDK_ROOT: ${{ github.workspace }}/sdk
           STEGVERSE_SDK_REQUIRED: '1'
         run: python -B tests/test_organization_manifest_ingress.py -v
+
+      - name: Validate the manifest ingress command line refuses its epoch through the kernel rule (B-P36c)
+        env:
+          STEGVERSE_SDK_ROOT: ${{ github.workspace }}/sdk
+          STEGVERSE_SDK_REQUIRED: '1'
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_cli_supplied_epoch.py' -v
+
+      - name: Validate the manifest ingress command line prints six fields for bad input and own-write faults (F-INPUT-TRACE, F-WRITER-TRACE)
+        env:
+          STEGVERSE_SDK_ROOT: ${{ github.workspace }}/sdk
+          STEGVERSE_SDK_REQUIRED: '1'
+        run: python -B -m unittest discover -s org-runtime/tests -p 'test_writer_epoch_refusal_order.py' -k manifest_ingress_cli -v
 
       - name: Reference adoption parity (offline)
         run: python -B resident-runtime/reference_adoption.py verify

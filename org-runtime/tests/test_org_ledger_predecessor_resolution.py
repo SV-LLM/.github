@@ -28,7 +28,7 @@ STATE_AFTER = "sha256:" + "b" * 64
 
 def repo_receipt(number):
     body = {"schema": "stegverse.repo-transition-receipt/v1", "repository": "SV-LLM/sandbox",
-            "transition_id": "resolution-" + str(number)}
+            "transition_id": "resolution-" + str(number), "hb_reference": module.kernel.hb_reference(epoch=32)}
     return {**body, "receipt_sha256": module.sha(body)}
 
 
@@ -39,7 +39,7 @@ def documents(root):
 def worker(root, number, predecessor, results):
     os.environ["STEGVERSE_ORG_LEDGER_ROOT"] = root
     try:
-        receipt = module.append(repo_receipt(number), "REPO_STATE_PROPAGATION", predecessor, STATE_AFTER, {}, "NONE")
+        receipt = module.append(repo_receipt(number), "REPO_STATE_PROPAGATION", predecessor, STATE_AFTER, {}, "NONE", hb_epoch=32)
         results.put(("ALLOW", receipt["receipt_sha256"]))
     except module.OrgLedgerAppendRefused as refused:
         results.put((refused.disposition, refused.failed_predicate))
@@ -77,7 +77,7 @@ class Genesis(unittest.TestCase):
         self.store = ledger.PosixLedgerStore(self.root)
 
     def append(self, number, predecessor):
-        return module.append(repo_receipt(number), "REPO_STATE_PROPAGATION", predecessor, STATE_AFTER, {}, "NONE",
+        return module.append(repo_receipt(number), "REPO_STATE_PROPAGATION", predecessor, STATE_AFTER, {}, "NONE", hb_epoch=32,
                              store=self.store)
 
     def test_T8_from_head_on_empty_ledger_fails_closed_and_writes_nothing(self):
@@ -125,14 +125,14 @@ class Retention(unittest.TestCase):
 
     def test_T3_T4_exact_source_and_organization_receipt_readback(self):
         source = repo_receipt(1)
-        receipt = module.append(source, "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", store=self.store)
+        receipt = module.append(source, "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", hb_epoch=32, store=self.store)
         retained = self.store.get(ledger.source_key(receipt["source_transition_sha256"]))
         self.assertEqual(retained, source)
         self.assertEqual(module.verify_source(retained)["source_transition_sha256"], receipt["source_transition_sha256"])
         self.assertEqual(self.store.get(ledger.receipt_key(receipt["receipt_sha256"])), receipt)
 
     def test_T2_lost_comparison_or_collision_writes_nothing(self):
-        module.append(repo_receipt(1), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", store=self.store)
+        module.append(repo_receipt(1), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", hb_epoch=32, store=self.store)
         before = documents(self.root)
         stale = {"organization": "SV-LLM", "receipt_sha256": "sha256:" + "0" * 64}
         immutable = {ledger.source_key("sha256:" + "1" * 64): {"x": 1}}
@@ -148,10 +148,10 @@ class Retention(unittest.TestCase):
         self.assertEqual(documents(self.root), before)
 
     def test_orphan_source_copy_requires_recovery(self):
-        module.append(repo_receipt(1), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", store=self.store)
+        module.append(repo_receipt(1), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", hb_epoch=32, store=self.store)
         self.store.put(ledger.source_key("sha256:" + "9" * 64), {"stray": True})
         with self.assertRaisesRegex(SystemExit, "ORG_LEDGER_ORPHAN_SOURCE_RECEIPTS_RECOVERY_REQUIRED"):
-            module.append(repo_receipt(2), "REPO_STATE_PROPAGATION", module.FROM_HEAD, STATE_AFTER, {}, "NONE",
+            module.append(repo_receipt(2), "REPO_STATE_PROPAGATION", module.FROM_HEAD, STATE_AFTER, {}, "NONE", hb_epoch=32,
                           store=self.store)
 
 
@@ -159,7 +159,7 @@ class Concurrency(unittest.TestCase):
     def test_T1_concurrent_from_head_binds_the_receipt_each_append_follows(self):
         with tempfile.TemporaryDirectory() as root:
             os.environ["STEGVERSE_ORG_LEDGER_ROOT"] = root
-            module.append(repo_receipt(0), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE")
+            module.append(repo_receipt(0), "REPO_STATE_PROPAGATION", module.GENESIS, STATE_AFTER, {}, "NONE", hb_epoch=32)
             results = run_concurrently(root, range(1, 13), module.FROM_HEAD)
             self.assertEqual(sorted(r[0] for r in results), ["ALLOW"] * 12, results)
             receipts = chain(root)

@@ -297,20 +297,41 @@ def recorded(store, head, source_transition_sha256):
 
 
 def append(source_receipt, org_transition_class, predecessor_state, successor_state,
-           boundary_evidence, authority_effect, hb_epoch=None, store=None, idempotent=False):
+           boundary_evidence, authority_effect, hb_epoch=None, store=None, idempotent=False, hb_provenance=None):
+    if hb_provenance is not None:
+        # A CARRIED provenance is verified before admission, so an unverified one is
+        # six-field CARRIED_PROVENANCE_UNVERIFIED rather than a later bare exit.
+        kernel.carried_hb_reference(
+            hb_epoch, hb_provenance, store=store or open_store(ledger_root()), head_key=HEAD_KEY,
+            receipt_key=receipt_key, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)")
     # Admission is decided before the append lock is taken; an inadmissible
     # source receipt never contends for the organization ledger.
     source = verify_source(source_receipt)
+    if source["source_receipt_schema"] == "stegverse.repo-transition-receipt/v1":
+        kernel.require_supplied_source(source_receipt, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append")
     if predecessor_state not in (FROM_HEAD, GENESIS):
         require_state_digest("predecessor_org_state_sha256", predecessor_state)
     require_state_digest("successor_org_state_sha256", successor_state)
     retained = {source_key(source["source_transition_sha256"]): source_receipt}
-    # Ordering is a heartbeat count, not a clock reading. A supplied tick keeps
-    # the receipt reproducible; deriving one from the host clock is permitted
-    # but marks itself so the two can be told apart.
-    heartbeat = kernel.hb_reference(epoch=hb_epoch) if hb_epoch is not None else kernel.hb_reference()
+    # Ordering is a heartbeat count, not a clock reading. The caller supplies
+    # the tick; an absent or invalid one raises kernel.SuppliedEpochRefused
+    # (six fields) before the store is opened, and no clock is read.
+    heartbeat = kernel.supplied_hb_reference(
+        hb_epoch, retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_epoch=, or --hb-epoch)")
     target = store or open_store(ledger_root())
+    if hb_provenance is not None:
+        # A CARRIED epoch is verified against this ledger's own head before anything is written.
+        heartbeat = kernel.carried_hb_reference(
+            hb_epoch, hb_provenance, store=target, head_key=HEAD_KEY, receipt_key=receipt_key,
+            retry_entrypoint="resident-runtime/aggregate_repo_transition.py::append (hb_provenance=)")
     target.initialize()
+    # SV-LLM declared substitution (F-POST-HEAD): a retry of the consumption the
+    # store just finished after a fault returns that receipt, never a second one.
+    recovered = getattr(target, "recovered_receipt", None)
+    if (isinstance(recovered, dict)
+            and recovered.get("source_transition_sha256") == source["source_transition_sha256"]
+            and recovered.get("org_transition_class") == org_transition_class):
+        return recovered
     # The storage substrate owns serialization. A lost comparison writes
     # nothing, so a retry cannot strand an orphan receipt.
     for _attempt in range(128):
@@ -327,7 +348,7 @@ def append(source_receipt, org_transition_class, predecessor_state, successor_st
                 prior = recorded(target, expected_head, source["source_transition_sha256"])
                 if prior is not None:
                     if prior.get("org_transition_class") != org_transition_class:
-                        raise ValueError("ledger_receipt_collision")
+                        raise kernel.TransitionContentCollision("ledger_receipt_collision")
                     return prior
             # Resolved against the HEAD this attempt will compare against, so a
             # retry after a lost comparison re-resolves rather than reusing it.
@@ -374,7 +395,7 @@ STATE_DIGEST_RULE = "SV_LLM_LEGACY_RECEIPT_CHAIN"
 def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TRANSITION",
                          predecessor_org_state_sha256=None, successor_org_state_sha256=None,
                          boundary_evidence=None, authority_effect="NONE", genesis=False,
-                         hb_epoch=None, store=None):
+                         hb_epoch=None, store=None, idempotent=False, hb_provenance=None):
     """SV-LLM's existing caller shape over the reference append(); temporary.
 
     It preserves SV-LLM's legacy state-digest rule until callers pass explicit
@@ -413,7 +434,7 @@ def aggregate_transition(receipt, *, org_transition_class="ORGANIZATION_STATE_TR
         evidence["state_digest_rule"] = STATE_DIGEST_RULE
         evidence["state_digest_rule_fields"] = applied
     return append(receipt, org_transition_class, predecessor, successor, evidence, authority_effect,
-                  hb_epoch=hb_epoch, store=store)
+                  hb_epoch=hb_epoch, store=store, idempotent=idempotent, hb_provenance=hb_provenance)
 
 
 def main():
@@ -426,26 +447,39 @@ def main():
     parser.add_argument("--successor-org-state-sha256", required=True)
     parser.add_argument("--boundary-evidence-json", default="{}")
     parser.add_argument("--authority-effect", default="NONE")
-    parser.add_argument("--hb-epoch", type=int, default=None,
-                        help="heartbeat epoch; derived from the host clock, and marked as derived, when absent")
+    parser.add_argument("--hb-epoch", default=None,
+                        help="heartbeat epoch from the carrier tick; required, never derived from the host clock")
     args = parser.parse_args()
+    # The raw text goes to the kernel rule; an int() here would admit '+33'.
+    refusal = kernel.writer_epoch_refusal(
+        args.hb_epoch, retry_entrypoint="resident-runtime/aggregate_repo_transition.py --hb-epoch")
+    if refusal is not None:
+        print(json.dumps(refusal, sort_keys=True))
+        raise SystemExit(1)
     source_path = args.transition_receipt or args.repo_receipt
     if not source_path:
         raise SystemExit("transition receipt required")
-    receipt = load(source_path)
+    receipt = kernel.read_cli_json(source_path, argument="--repo-receipt/--transition-receipt",
+                                   retry_entrypoint="resident-runtime/aggregate_repo_transition.py --repo-receipt")
     default_class = ("REPO_STATE_PROPAGATION"
                      if receipt.get("schema") == "stegverse.repo-transition-receipt/v1"
                      else "ORGANIZATION_STATE_TRANSITION")
     try:
         result = append(receipt, args.org_transition_class or default_class,
                         args.predecessor_org_state_sha256, args.successor_org_state_sha256,
-                        json.loads(args.boundary_evidence_json), args.authority_effect,
-                        hb_epoch=args.hb_epoch)
+                        kernel.parse_cli_json(args.boundary_evidence_json, argument="--boundary-evidence-json",
+                                              retry_entrypoint="resident-runtime/aggregate_repo_transition.py "
+                                                               "--boundary-evidence-json"), args.authority_effect,
+                        hb_epoch=int(args.hb_epoch))
     except LedgerLocationRequired as exc:
         print(json.dumps(location_refusal(exc), sort_keys=True))
+        raise SystemExit(1)
+    except kernel.SuppliedEpochRefused as exc:
+        print(json.dumps(exc.refusal, sort_keys=True))
         raise SystemExit(1)
     print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(kernel.run_cli(main, retry_entrypoint="resident-runtime/aggregate_repo_transition.py "
+                                                            "(the same command again)"))

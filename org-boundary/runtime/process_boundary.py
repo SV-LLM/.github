@@ -21,6 +21,22 @@ KINDS=["INGRESS_ACCEPTED","DISPATCHED","CONSUMED","RESULT_BOUND","EGRESS_EMITTED
 def canon(v): return json.dumps(v,sort_keys=True,separators=(",",":")).encode()
 def hid(prefix,v): return prefix+"-"+hashlib.sha256(canon(v)).hexdigest()[:24]
 def load(path): return json.loads(Path(path).read_text())
+# SV-LLM declared substitution (PB-EXIT-SPLIT): the caller tells an own write fault
+# (exit 75, non-terminal) from a bad input (exit 65, terminal); every other exit is terminal.
+WRITE_FAULT_EXIT=75; INPUT_FAULT_EXIT=65
+class BoundaryFault(Exception):
+ def __init__(self,code,failure_code,predicate,detail,repair,next_attempt,terminal):
+  super().__init__(detail); self.code=code
+  self.record={"disposition":"FAIL_CLOSED","failure_code":failure_code,"failed_predicate":predicate,"detail":detail,"required_evidence_or_repair":repair,"retry_entrypoint":"org-boundary/runtime/process_boundary.py","owning_existing_goal":"INTERLOCK-INTR-RUNTIME-INDEPENDENT-PROTOCOL-001","next_attempt":next_attempt,"terminal":terminal}
+def load_input(path,argument):
+ try:
+  value=load(path)
+  if not isinstance(value,dict): raise TypeError("expected a JSON object")
+  return value
+ except (OSError,UnicodeDecodeError,ValueError,TypeError,RecursionError,MemoryError) as exc:  # a deeply nested document too (F-SCAN-RECURSION)
+  raise BoundaryFault(INPUT_FAULT_EXIT,"PROCESS_BOUNDARY_INPUT_FAULT","PROCESS_BOUNDARY_INPUT_IS_A_JSON_OBJECT",argument+": "+type(exc).__name__+": "+str(exc)[-200:],"pass "+argument+" a readable JSON object","none for this input; nothing was written",True) from None
+def write_fault(exc):
+ return BoundaryFault(WRITE_FAULT_EXIT,"PROCESS_BOUNDARY_WRITE_FAULT","PROCESS_BOUNDARY_OUTPUT_IS_WRITABLE",type(exc).__name__+": "+str(exc)[-200:],"the --out location is writable","run the same crossing again; nothing durable was written",False)
 
 def resolve_adapter(svc):
     """Resolve only an adapter the capability map explicitly admits.
@@ -69,16 +85,16 @@ def endpoint_result(env,svc,envelope_path,node_state_root=None):
                 detail=(completed.stderr or completed.stdout or "").strip().splitlines()
                 raise SystemExit("endpoint-adapter-execution-failed"
                                  + (": "+detail[-1] if detail else ""))
-            result=load(out)
-            if not isinstance(result,dict):
-                raise SystemExit("endpoint-adapter-result-invalid")
+            # SV-LLM declared substitution (F-SCAN-RECURSION): an unparsable or deeply
+            # nested adapter result is a terminal input fault (exit 65), never a traceback.
+            result=load_input(out,"endpoint adapter result")
             return result
     if role=="BOUNDARY_LOCAL_DIAGNOSTIC":
         return {"echo":env["payload"]}
     raise SystemExit("endpoint-adapter-not-installed")
 def main():
  ap=argparse.ArgumentParser(); ap.add_argument("--envelope",required=True); ap.add_argument("--registry",required=True); ap.add_argument("--out",required=True); ap.add_argument("--node-state-root",default=None); a=ap.parse_args()
- env=load(a.envelope); reg=load(a.registry)
+ env=load_input(a.envelope,"--envelope"); reg=load_input(a.registry,"--registry")
  req=["schema_version","packet_id","direction","origin","destination","carrier","intr_profile","transition","payload","evidence"]; miss=[k for k in req if k not in env]
  if miss: raise SystemExit("missing:"+",".join(miss))
  if env["destination"]["org"]!=reg["organization"]: raise SystemExit("wrong-destination-org")
@@ -97,5 +113,11 @@ def main():
   subject={**base,"kind":kind,"previous_receipt_id":prev}; rid=hid(kind.lower(),subject); receipts.append({"kind":kind,"receipt_id":rid,"subject":svc["service_id"],"evidence_hash":hashlib.sha256(canon(subject)).hexdigest(),"previous_receipt_id":prev}); prev=rid
  application_result=endpoint_result(env,svc,a.envelope,a.node_state_root)
  result={"schema_version":reg["organization"].lower().replace(" ","-")+".boundary-execution.v1","packet_id":env["packet_id"],"organization":reg["organization"],"service_id":svc["service_id"],"consumed":True,"application_result":application_result,"authority_effect":env["transition"]["authority_effect"],**selected,**standing,"receipts":receipts,"reconstruction":{"same_execution_required":True,"status":"RECONSTRUCTED","terminal_receipt_id":prev}}
- Path(a.out).parent.mkdir(parents=True,exist_ok=True); Path(a.out).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n"); print(json.dumps({"status":"PASS","terminal_receipt_id":prev}))
-if __name__=="__main__": main()
+ try: Path(a.out).parent.mkdir(parents=True,exist_ok=True); Path(a.out).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
+ except OSError as exc: raise write_fault(exc) from None
+ print(json.dumps({"status":"PASS","terminal_receipt_id":prev}))
+def run():
+ try: main(); return 0
+ except BoundaryFault as fault: print(json.dumps(fault.record,sort_keys=True)); return fault.code
+ except OSError as exc: fault=write_fault(exc); print(json.dumps(fault.record,sort_keys=True)); return fault.code
+if __name__=="__main__": raise SystemExit(run())
