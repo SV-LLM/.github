@@ -1,0 +1,1 @@
+python3 -B tests/s1_binder_parity.py "$RUNNER_TEMP/p1"

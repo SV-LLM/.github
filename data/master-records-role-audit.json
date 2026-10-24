@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 51,
+      "PROPER": 80,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 31,
-      "TOTAL": 85
+      "NAMING_ONLY": 33,
+      "TOTAL": 116
     }
   },
   "not_changed_with_reason": {
@@ -433,6 +433,76 @@
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 288,
+      "text": "\"destination_organization\": \"master-records\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 289,
+      "text": "\"destination_repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 292,
+      "text": "\"destination_service_dispatched_by\": \"master-records/.github org-kernel/kernel.py::dispatch\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 294,
+      "text": "\"emitting_operation\": \"resident-runtime/submit_org_transition_to_master_records.py::build_released_batch_packet\",",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 301,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 301,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 301,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 301,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 301,
+      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
+      "file": "org-runtime/interlock-intr.json",
+      "line": 305,
+      "text": "\"master_records_in_path\": true,",
+      "classification": "PROPER",
+      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+    },
+    {
       "file": "org-runtime/tests/test_kernel_crossing_parity.py",
       "line": 475,
       "text": "def test_the_master_records_release_needs_a_mesh_and_publishes_one_frame_per_released_batch(self):",
@@ -685,74 +755,221 @@
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 280,
-      "text": "\"destination_organization\": \"master-records\",",
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-Labs.interlock-intr.json",
+      "line": 240,
+      "text": "\"master_records_in_path\": false,",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of StegVerse-Labs/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 281,
-      "text": "\"destination_repository\": \"master-records/.github\",",
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-org.interlock-intr.json",
+      "line": 240,
+      "text": "\"master_records_in_path\": false,",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of StegVerse-org/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 284,
-      "text": "\"destination_service_dispatched_by\": \"master-records/.github org-kernel/kernel.py::dispatch\",",
+      "file": "tests/fixtures/intr-protocol/destinations/StegVerse-org.interlock-intr.json",
+      "line": 262,
+      "text": "\"master_records_in_path\": false,",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of StegVerse-org/.github org-runtime/interlock-intr.json, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that binding's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 286,
-      "text": "\"emitting_operation\": \"resident-runtime/submit_org_transition_to_master_records.py::build_released_batch_packet\",",
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 310,
+      "text": "\"organization\": \"master-records\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 293,
-      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 311,
+      "text": "\"repository\": \"master-records/.github\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 293,
-      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 315,
+      "text": "\"file\": \"master-records.interlock-intr.json\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 293,
-      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 320,
+      "text": "\"file\": \"master-records.services.json\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 293,
-      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 3,
+      "text": "\"organization\": \"master-records\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 293,
-      "text": "\"master-records/.github@a5f82152 docs/ORG_TO_MASTER_RECORDS_TRANSITION_HANDOFF.md:11 master-records/.github -> InTr -> master-records/.github -> organization.ecosystem-transition-ledger -> master-records/orchestration\"",
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 4,
+      "text": "\"owner_repository\": \"master-records/.github\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
-      "file": "org-runtime/interlock-intr.json",
-      "line": 297,
-      "text": "\"master_records_in_path\": true,",
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": null,
+      "text": "<path>",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 2,
+      "text": "\"schema_version\": \"master-records.service-registry.v1\",",
       "classification": "PROPER",
-      "rationale": "Sender-side capability_destination_binding to the released-batch recorder (organization.ecosystem-transition-ledger), authority_effect NONE_BINDING_ONLY, awaited_by_organization false; routed by the federation-directory owner in StegVerse-org/.github#163 c6387335336. Destination identifiers and their quoted sources; non-authorizing and non-gating."
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 3,
+      "text": "\"organization\": \"master-records\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 6,
+      "text": "\"service_id\": \"master-records.org-control\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 7,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 18,
+      "text": "\"service_id\": \"master-records.boundary-diagnostic\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 19,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 25,
+      "text": "\"service_id\": \"master-records.orchestration\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 26,
+      "text": "\"repository\": \"master-records/orchestration\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 34,
+      "text": "\"master-records.ecosystem-transition-ledger\"",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 36,
+      "text": "\"legacy_reference\": \"MASTER-RECORDS-BULK-SEMANTIC-REMEDIATION-002\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 37,
+      "text": "\"repository\": \"master-records/orchestration\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 54,
+      "text": "\"service_id\": \"master-records.monitoring\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 55,
+      "text": "\"repository\": \"master-records/monitoring\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 61,
+      "text": "\"service_id\": \"master-records.core-lite\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 62,
+      "text": "\"repository\": \"master-records/core-lite\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 68,
+      "text": "\"service_id\": \"master-records.telemetry\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 69,
+      "text": "\"repository\": \"master-records/telemetry\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 75,
+      "text": "\"service_id\": \"master-records.sv002-self-characterization-reconstruction\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 76,
+      "text": "\"repository\": \"master-records/orchestration\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 93,
+      "text": "\"boundary_rule\": \"Cross-organization ingress/egress semantics are defined by the organization boundary; endpoint authority remains transition-governed. Master Records records released organization bat",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": null,
+      "text": "<path>",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
       "file": "tests/test_intr_destination_capability.py",
@@ -861,7 +1078,7 @@
     },
     {
       "file": "tests/test_organization_manifest_ingress.py",
-      "line": 169,
+      "line": 182,
       "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
       "classification": "PROPER",
       "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."

@@ -34,7 +34,20 @@ ROOT = Path(__file__).resolve().parents[1]
 SDK_PIN = "74d9b473aa415b06a9d550c28b2779a691b4ba32"
 REFERENCE_COMMIT = "10d141041fd0fa3b8bd696f6c6236bef199845b8"
 REQUEST = ".stegverse/transition-requests/SV-LLM-W04-MANIFEST-DIRECTED-APPEND-001.json"
-WORKFLOW = ROOT / ".github/workflows/organization-ledger-transition.yml"
+sys.path.insert(0, str(ROOT / "tests"))
+from workflow_surface import catalog_groups, writer_job  # noqa: E402
+
+
+class _FoldedLedgerTransition:
+    """G17 (P1, StegVerse-org/.github#163): organization-ledger-transition.yml is the
+    ledger-transition job of organization-ledger-writer.yml, steps unchanged; this is
+    the writer header plus that job, the text this test read before the fold."""
+
+    def read_text(self, encoding="utf-8"):
+        return writer_job("ledger-transition")
+
+
+WORKFLOW = _FoldedLedgerTransition()
 LEDGER_REF = "refs/stegverse/organization-ledger"
 BOUNDARY = json.loads((ROOT / "org-runtime/interlock-intr.json").read_text(encoding="utf-8"))
 REGISTRY = json.loads((ROOT / "org-boundary/registry/services.json").read_text(encoding="utf-8"))
@@ -186,8 +199,9 @@ class ContractBinding(unittest.TestCase):
         entry = record["files"]["resident-runtime/organization_manifest_ingress.py"]
         self.assertEqual(entry["rule"], "declared_substitutions")
         self.assertEqual(sum(s["count"] for s in entry["substitutions"]), 28)
-        boundary_ci = (ROOT / ".github/workflows/org-runtime-boundary.yml").read_text()
-        self.assertIn("ref: " + REFERENCE_COMMIT, boundary_ci)
+        # G17: org-runtime-boundary.yml is catalog group(s) whose second checkout pins the reference
+        boundary_ci = json.dumps([g["runner"] for g in catalog_groups("org-runtime-boundary.yml")])
+        self.assertIn('"x_ref": "' + REFERENCE_COMMIT + '"', boundary_ci)
 
     @needs_sdk
     def test_the_identity_is_read_from_this_organizations_boundary(self):
@@ -643,15 +657,25 @@ class DispatchGuards(unittest.TestCase):
         self.assertEqual((refusal["failure_code"], refusal["failed_predicate"]),
                          ("HB_EPOCH_INVALID", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
 
-    def test_no_push_trigger_and_a_bare_dispatch_is_a_self_closure(self):
-        # B-P36n: a push carries no epoch, so the workflow has no push trigger; a
-        # committed request is received only when dispatched with mode=request.
+    def test_push_runs_request_mode_and_the_epoch_gate_still_refuses_it(self):
+        # B-P36n kept: a push carries no epoch, so nothing is received without one.
+        # G17 (P1, StegVerse-org/.github#163) removed workflow_dispatch: the job runs on
+        # a push to main that changes .stegverse/transition-requests/**, its MODE
+        # defaults to request, and the kernel gate refuses HB_EPOCH_NOT_SUPPLIED on
+        # push before anything is received (registry fail_closed_pending). Self-closure
+        # is FAIL_CLOSED DISPATCH_TRIGGER_REMOVED_BY_G17.
         text = WORKFLOW.read_text()
-        self.assertIn("MODE: ${{ github.event.inputs.mode || 'self-closure' }}", text)
+        self.assertIn("MODE: ${{ github.event.inputs.mode || 'request' }}", text)
         trigger = text[text.index("\non:\n"):text.index("\npermissions:")]
-        self.assertNotIn("  push:", trigger)
+        self.assertIn("  push:", trigger)
         self.assertNotIn("  schedule:", trigger)
-        self.assertIn("  workflow_dispatch:", trigger)
+        self.assertNotIn("  workflow_dispatch:", trigger)
+        self.assertIn('if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None', text)
+        registry = json.loads((ROOT / "control/workflow-surface-registry.json").read_text())
+        codes = {row["failure_code"] for row in registry["fail_closed_pending"]}
+        self.assertTrue({"HB_EPOCH_NOT_SUPPLIED", "DISPATCH_TRIGGER_REMOVED_BY_G17"} <= codes)
+        job, = [j for j in registry["writer_jobs"] if j["job"] == "ledger-transition"]
+        self.assertEqual(job["paths"], [".stegverse/transition-requests/**"])
 
 
 @needs_sdk
@@ -773,7 +797,7 @@ class ExemptionStaysUntilAReceiptIsReadBack(unittest.TestCase):
         self.assertNotEqual(exemption["disposition"], "ALLOW")
         self.assertIn("resident-runtime/organization_manifest_ingress.py", exemption["surface"])
         self.assertIn(REQUEST, exemption["required_evidence_or_repair"])
-        self.assertIn(".github/workflows/organization-ledger-transition.yml", exemption["retry_entrypoint"])
+        self.assertIn(".github/workflows/organization-ledger-writer.yml", exemption["retry_entrypoint"])
         for justification in register["prohibited_justifications"]:
             self.assertNotIn(justification, json.dumps(exemption))
 

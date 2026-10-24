@@ -23,8 +23,12 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS = sorted([*(ROOT / ".github/workflows").glob("organization-ledger-transition*.yml"),
-                    ROOT / ".github/workflows/organization-crossing-dispatch.yml"])
+# G17 (SV-LLM/.github, P1 #163): the ledger-transition job is folded into
+# organization-ledger-writer.yml with its steps unchanged; the dispatch-only
+# crossing workflow is retired and kept verbatim as a non-executing record whose
+# gates still hold (registry fail_closed_pending DISPATCH_ONLY_WRITER_RETIRED_BY_G17).
+WORKFLOWS = [ROOT / ".github/workflows/organization-ledger-writer.yml",
+             ROOT / "tools/tasks/retired/organization-crossing-dispatch.yml"]
 INVALID = ("+33", " 33", "３３", "٣٣", "33.0", "31", "abc")
 SIX_FIELDS = ("failure_code", "failed_predicate", "required_evidence_or_repair",
               "retry_entrypoint", "owning_existing_goal", "next_attempt")
@@ -32,6 +36,7 @@ GATE = re.compile(r"^\s*(python -B -c '.*writer_epoch_refusal.*) \|\| exit 1\s*$
 
 
 STEP = re.compile(r"^\s*- name: (.*)$")
+JOB = re.compile(r"^  [A-Za-z0-9_-]+:\s*$")
 
 
 def steps():
@@ -39,6 +44,11 @@ def steps():
     for workflow in WORKFLOWS:
         name, lines = None, []
         for line in workflow.read_text().splitlines() + ["- name: <end>"]:
+            if JOB.match(line):  # a job key ends the step before it (several jobs share one file)
+                if name is not None:
+                    yield workflow.name, name, "\n".join(lines)
+                name, lines = None, []
+                continue
             match = STEP.match(line)
             if match:
                 if name is not None:
