@@ -1,0 +1,48 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "addressed_service": "sv-llm.intr-destination",
+    "communication_id": "intr-path-v1:AaCT-E->SV-LLM",
+    "disposition": "ALLOW",
+    "message": {
+      "body": {
+        "path_id": "AaCT-E->SV-LLM:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "95626c47ec5ef7fd9719323ffef3b4b00b9ad61f"
+      },
+      "communication_id": "intr-path-v1:AaCT-E->SV-LLM",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:7cfc2b2bb54c8dd27c085586b91910822f7e6eba781bd2f8a3861ce7534de326",
+    "path_id": "AaCT-E->SV-LLM:intr-destination",
+    "payload_sha256": "sha256:57d2ffb306cd2092bf6e73f35571987fc2f8891484bda25d066feb2e844d8d16",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-ingress-evidence/v1",
+    "source_inclusion": {
+      "source_ledger_tip": "242e7966b32768b877d1b427658aea3ff82b28ce",
+      "state": "VERIFIED_BY_ANONYMOUS_PUBLIC_LEDGER_READ",
+      "tvc_read_receipt": null
+    },
+    "source_organization_receipt_sha256": "sha256:d648a1cfce4daa3731c8a9e63b6282812cdc86ec877d0709845dee56554adacc",
+    "source_repository": "AaCT-E/.github",
+    "source_repository_receipt_sha256": "sha256:07228fdcdb836dbc0d97ef7f9d286f91ac937b974626b5e4778701d812b29e9f"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:57d2ffb306cd2092bf6e73f35571987fc2f8891484bda25d066feb2e844d8d16",
+  "previous_receipt_sha256": "sha256:03b8d66c3277b6a4ea77e709797e4bccbd5ed2d9d5917e04dedad920ab54e5fa",
+  "receipt_sha256": "sha256:bd6287c1970844361319f1bbcccabbd945ae02a85cd8e78fcaa2946db568f430",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:f41748787e4aa72fbe91e986dae63b3d6672ee7d46a2d1d29e4c229d28bcb8ce",
+  "transition_class": "INTR_MESH_PATH_INGRESS",
+  "transition_id": "INTR_MESH_PATH_INGRESS:AaCT-E->SV-LLM:intr-destination@intr-path-v1:AaCT-E->SV-LLM"
+}
