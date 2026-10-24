@@ -154,7 +154,7 @@
         {
           "name": "Validate every epoch-taking writer refuses before it writes or publishes (B-P36b)",
           "run_file": "tools/tasks/steps/org-runtime-boundary.validate/15-validate-every-epoch-taking-writer-refuses-befor.sh",
-          "run_sha256": "ee953dbd13bb34874b7cfccbae33d68b26973736284cb59cdc2bc15370d45c71"
+          "run_sha256": "b96af134706bc2a50d400c0e3e6c502f04b4bfdfb67f5a2fb7086dedf21a853a"
         },
         {
           "name": "Validate every inline hb_epoch gate in the ledger workflow is the kernel rule (B-P36d)",
