@@ -1,0 +1,38 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "communication_id": "intr-path-v1:AdmittedCode->SV-LLM",
+    "disposition": "ALLOW",
+    "operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "path_id": "AdmittedCode->SV-LLM:intr-destination",
+    "profile_id": "intr-destination",
+    "source_organization_receipt_sha256": "sha256:29768f0906d103d0a243ff4b0cf1d1f5e753a2f89e16277d775e02d8e803cce8",
+    "source_repository": "AdmittedCode/.github",
+    "source_repository_receipt_sha256": "sha256:1289af50399793e7984ce6b990dab1343c4ed4905a41c0627f841320b687b13e"
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "org_transition_class": "REPO_STATE_PROPAGATION",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:bdd6117ac73ca7d921bd966b1522a95578efd867da31d8715f0aa724b1d22609",
+  "previous_receipt_sha256": "sha256:06ee279fb7eb8a095ceac57d57dcda1eb776d0a1e7d95ccdd741836121feb432",
+  "receipt_sha256": "sha256:2ee4082a57a43b46779f9de6fd59d29238699156f71f7d90e543f89fbac79e4a",
+  "repo_receipt_sha256": "sha256:a21144bd816e9ea7c1b6ac27197fcbf924d24dcae14cf2efc6f857206079d7b0",
+  "repo_transition_id": "INTR_MESH_PATH_INGRESS:AdmittedCode->SV-LLM:intr-destination@intr-path-v1:AdmittedCode->SV-LLM",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/.github",
+  "source_transition_id": "INTR_MESH_PATH_INGRESS:AdmittedCode->SV-LLM:intr-destination@intr-path-v1:AdmittedCode->SV-LLM",
+  "source_transition_sha256": "sha256:a21144bd816e9ea7c1b6ac27197fcbf924d24dcae14cf2efc6f857206079d7b0",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:f7e3bf311614874203e7e334774e2ab1cd62eaba2e238cbd29dcacc3af855db7"
+}
