@@ -1,0 +1,45 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "capability": "intr-destination",
+    "communication_id": "intr-path-v1:SV-LLM->Data-Continuation",
+    "destination_address": "data-continuation.intr-destination",
+    "destination_organization": "Data-Continuation",
+    "disposition": "ALLOW",
+    "merge_transfer_organization_receipt_sha256": "sha256:283b320e2b692473ea5cb28834b0450f95a0c054604c08b2ea5e0495335652c2",
+    "message": {
+      "body": {
+        "path_id": "SV-LLM->Data-Continuation:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "792b5a3b3d4d5c0724f9ec847b995c1efe2213c8"
+      },
+      "communication_id": "intr-path-v1:SV-LLM->Data-Continuation",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:5a25f3739b8b7914a3d3da0b302fe901916f18747238cb344ab28aac3f051120",
+    "path_id": "SV-LLM->Data-Continuation:intr-destination",
+    "payload_sha256": "sha256:fd10f3714c10717ebe94cf0735cfb5be64d0cd6bd5d2c113bbc71fa2bd280cd8",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-transfer-evidence/v1",
+    "source_organization": "SV-LLM",
+    "transfer_commit": "792b5a3b3d4d5c0724f9ec847b995c1efe2213c8"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:fd10f3714c10717ebe94cf0735cfb5be64d0cd6bd5d2c113bbc71fa2bd280cd8",
+  "previous_receipt_sha256": "sha256:74dae089ecbd66335cf9a9ac3261100942c41d6c206c305151f416fd5247362e",
+  "receipt_sha256": "sha256:894a25682d50168a52834351b8066df9dae638cc84a601c3f3124856f5f39427",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:1ae8e95855733ea72ab1b09dcdfb6b99982ac43e96a6a5074d7b44b89a65c7cc",
+  "transition_class": "INTR_MESH_PATH_TRANSFER",
+  "transition_id": "INTR_MESH_PATH_TRANSFER:SV-LLM->Data-Continuation:intr-destination@intr-path-v1:SV-LLM->Data-Continuation"
+}
