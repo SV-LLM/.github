@@ -127,6 +127,7 @@ The topology below is derived from the repositories actually enumerated in the c
 
 - `.github` — organization architecture, topology, policy documentation and handoffs;
 - `schemas` — shared provider-neutral machine-readable contracts;
+- `tools` — sandbox tool implementations invoked through `manifested_request.tool_invocations[]`; no sandbox runtime and no authority;
 - `sandbox` — provider-neutral multi-entity collaboration;
 - `StegVerse_AI` — StegVerse ecosystem orchestration/evidence-matching entity;
 - `Ecosystem_Chat` — Ecosystem Chat participant entity (declared capabilities, Sandbox participation, SDK return path);

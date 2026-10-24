@@ -14,6 +14,12 @@
       "role": "Provider-neutral machine-readable contracts for work, capabilities, contributions, provenance, epistemic state, Inference Window and governance handoff."
     },
     {
+      "name": "tools",
+      "class": "TOOL_IMPLEMENTATIONS",
+      "role": "Tool implementations the Sandbox invokes through manifested_request.tool_invocations[]; no sandbox runtime and no authority (StegVerse-org/.github#163 comment 6375774399 L8).",
+      "authority_effect": "NONE"
+    },
+    {
       "name": "sandbox",
       "class": "COLLABORATION_PLANE",
       "role": "Provider-neutral bounded multi-entity collaboration and attributable synthesis/handoff."
@@ -248,7 +254,7 @@
     "Existing StegVerse Task Registry, WorkerCoordinator, Interlock/InTr, LLM-adapter, TV/TVC, Publisher and SDK authorities, and Master Records organization records and reconstruction, are not duplicated in SV-LLM."
   ],
   "completeness_assessment": {
-    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eighteen provider capability surfaces.",
+    "organizational_decomposition": "The currently enumerated repositories cover organization coordination, shared schemas, sandbox tool implementations, provider-neutral collaboration, StegVerse_AI ecosystem intelligence, Ecosystem_Chat external-ecosystem interaction, and eighteen provider capability surfaces.",
     "implementation_state": "Repository existence does not establish implementation or integration completeness. Empty/uninitialized repositories require their role contracts and implementations to be established before runtime completeness can be claimed."
   }
 }
