@@ -478,11 +478,16 @@
     "repository": "StegVerse-org/StegVerse-SDK",
     "commit": "74d9b473aa415b06a9d550c28b2779a691b4ba32",
     "pinned_by": "StegVerse-org/.github#179 (StegVerse-SDK#530, after #520 removed requests)",
-    "import_path": "PYTHONPATH=<checkout> (not installed; see adapted .github/workflows/organization-ledger-transition.yml)"
+    "import_path": "PYTHONPATH=<checkout> (not installed; see adapted .github/workflows/organization-ledger-writer.yml job ledger-transition)"
   },
   "adapted": {
-    ".github/workflows/organization-ledger-transition.yml": {
+    ".github/workflows/organization-ledger-writer.yml": {
       "rule": "adapted_not_byte_identical",
+      "folded_by_g17": {
+        "job": "ledger-transition",
+        "pre_fold_record": "tools/tasks/folded/organization-ledger-transition.yml",
+        "change": "G17 (StegVerse-Labs/.github#167/#168; P1 StegVerse-org/.github#163): the adapted workflow is the ledger-transition job of organization-ledger-writer.yml, steps unchanged; its workflow_dispatch trigger is removed and the job runs on a push to main that changes .stegverse/transition-requests/** (control/workflow-surface-registry.json writer_jobs); MODE defaults to request instead of self-closure; a push carries no epoch, so the kernel gate still refuses HB_EPOCH_NOT_SUPPLIED before anything is received (registry fail_closed_pending), and self-closure is FAIL_CLOSED DISPATCH_TRIGGER_REMOVED_BY_G17"
+      },
       "reference_sha256": "sha256:93bf9f379133e633f735ea84b40c7f813bd65a8b9b031d0119828e46a2fc7086",
       "kept": [
         "committed-request selection and dispatch guards",

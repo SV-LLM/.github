@@ -695,13 +695,18 @@ class LedgerWriterWorkflowTests(unittest.TestCase):
     """
 
     def text(self):
-        return (ROOT / ".github/workflows/organization-ledger-transition.yml").read_text(
-            encoding="utf-8")
+        # G17 (P1, StegVerse-org/.github#163): the ledger-transition job of the writer
+        import sys
+        sys.path.insert(0, str(ROOT / "tests"))
+        from workflow_surface import writer_job
+        return writer_job("ledger-transition")
 
     def test_the_dispatch_appends_pushes_and_reads_the_designated_ref_back(self):
         text = self.text()
-        self.assertIn("workflow_dispatch:", text)
-        self.assertIn("communication_id:", text)
+        # workflow_dispatch was removed by G17; the dispatch-only self-closure steps stay
+        # in place, unreachable on push (registry DISPATCH_TRIGGER_REMOVED_BY_G17).
+        self.assertNotIn("workflow_dispatch:", text)
+        self.assertIn("github.event.inputs.communication_id", text)
         self.assertIn("refs/stegverse/organization-ledger", text)
         self.assertIn("group: organization-ledger", text)
         self.assertIn("cancel-in-progress: false", text)

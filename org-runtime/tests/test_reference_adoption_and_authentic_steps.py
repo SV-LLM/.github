@@ -62,7 +62,8 @@ class ReferenceAdoption(unittest.TestCase):
                                                 "org-boundary/runtime/intr_transport.py",
                                                 "org-boundary/runtime/capability_ingress.py",
                                                 "org-boundary/runtime/node_standing.py"})
-        self.assertEqual(set(record["adapted"]), {".github/workflows/organization-ledger-transition.yml"})
+        # G17: the adapted workflow is the ledger-transition job of the writer
+        self.assertEqual(set(record["adapted"]), {".github/workflows/organization-ledger-writer.yml"})
         rules = {entry["rule"] for entry in record["files"].values()}
         self.assertEqual(rules, {"byte_identical", "declared_insertion", "declared_substitutions"})
         self.assertEqual(set(record["contracts"]), {".stegverse/transition-ledger/org-contract.json",
