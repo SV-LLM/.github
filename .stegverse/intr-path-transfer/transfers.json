@@ -4,8 +4,24 @@
   "rule": "Each row declares one InTr transfer over a declared mesh path whose source is this organization. Landing a row on main is the transition: after that push's main-merge transfer is ledgered, .github/workflows/intr-path-transfer.yml appends the path's source receipt, linked to that main-merge transfer receipt. A row already ledgered is answered from the ledger. No dispatch.",
   "transfers": [
     {
+      "path_id": "SV-LLM->AaCT-E:intr-destination",
+      "communication_id": "intr-path-v1:SV-LLM->AaCT-E"
+    },
+    {
       "path_id": "SV-LLM->Admissible-Existence:intr-destination",
       "communication_id": "intr-path-v1:SV-LLM->Admissible-Existence"
+    },
+    {
+      "path_id": "SV-LLM->AdmittedCode:intr-destination",
+      "communication_id": "intr-path-v1:SV-LLM->AdmittedCode"
+    },
+    {
+      "path_id": "SV-LLM->Data-Continuation:intr-destination",
+      "communication_id": "intr-path-v1:SV-LLM->Data-Continuation"
+    },
+    {
+      "path_id": "SV-LLM->ECAT-ICAT-Formal:intr-destination",
+      "communication_id": "intr-path-v1:SV-LLM->ECAT-ICAT-Formal"
     },
     {
       "path_id": "SV-LLM->GCAT-BCAT-Engine:intr-destination",
@@ -30,6 +46,10 @@
     {
       "path_id": "SV-LLM->StegVerse-org:intr-destination",
       "communication_id": "intr-path-v1:SV-LLM->StegVerse-org"
+    },
+    {
+      "path_id": "SV-LLM->Triad-Test:intr-destination",
+      "communication_id": "intr-path-v1:SV-LLM->Triad-Test"
     }
   ]
 }
