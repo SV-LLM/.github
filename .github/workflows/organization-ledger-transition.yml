@@ -397,10 +397,20 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Retain the run's evidence
+      - name: Record the run's evidence in the job summary
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
-        with:
-          name: organization-ledger-transition
-          path: ${{ runner.temp }}/results
-          if-no-files-found: ignore
+        run: |
+          set -uo pipefail
+          # The ledger ref holds the durable receipts; this keeps every result
+          # file, including a non-ALLOW six-field record, on the run page
+          # without a third-party artifact action.
+          [ -d "$RUNNER_TEMP/results" ] || exit 0
+          find "$RUNNER_TEMP/results" -type f -name '*.json' | sort | while read -r f; do
+            {
+              echo "### ${f#"$RUNNER_TEMP/results/"}"
+              echo '```json'
+              cat "$f"
+              echo
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done

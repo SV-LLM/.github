@@ -498,6 +498,7 @@
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; there is no push trigger: a push carries no epoch, so a committed request is received only when dispatched with mode=request and hb_epoch (B-P36n)",
         "identity checks name SV-LLM/.github",
+        "run evidence is written to the job summary instead of actions/upload-artifact; the durable receipts are on the ledger ref, and no third-party action beyond checkout is used",
         "a request is received only at a supplied hb_epoch: one that would append without one (HB_EPOCH_NOT_SUPPLIED) or with an invalid one (HB_EPOCH_INVALID) fails closed with kernel.writer_epoch_refusal's six fields before it is received (B-P31, B-P36), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
       ]
     }
