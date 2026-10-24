@@ -554,40 +554,14 @@ def verify_closure(resolved: Mapping[str, Any], packet_id: str,
     return findings
 
 
-def supplied_epoch_failure(hb_epoch: Any, reference: Any = None) -> tuple[str, str] | None:
-    """The shared supplied-epoch rule (SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH).
-
-    Ported from StegVerse-org/.github#186 (the same rule as org#185 and
-    StegVerse-Labs/.github#3212 and #3213). `hb_epoch` absent (None) is
-    HB_EPOCH_NOT_SUPPLIED. Otherwise it must be ASCII [0-9]+ only -- an int is
-    read as its decimal text; a bool, a float or anything coerced ('+33',
-    ' 33', '3_3', '33.0') is refused -- with integer value >= 32 (the HB32
-    anchor). `reference`, the carrier frame's heartbeat reference when there is
-    one, must be an object, and a `derived_from_clock` it carries must be
-    exactly false. Any failure is HB_EPOCH_INVALID. Returns (failure_code,
-    detail), or None when the epoch is supplied. No clock is read.
-    """
-    if reference is not None and not isinstance(reference, dict):
-        return "HB_EPOCH_INVALID", "the carrier's heartbeat reference is not an object"
-    if hb_epoch is None:
-        return "HB_EPOCH_NOT_SUPPLIED", "no hb_epoch was supplied and no clock is read"
-    if isinstance(hb_epoch, bool):
-        text = None
-    elif isinstance(hb_epoch, int):
-        text = str(hb_epoch)
-    elif isinstance(hb_epoch, str):
-        text = hb_epoch
-    else:
-        text = None
-    if text is None or not text.isascii() or not text.isdigit():
-        return "HB_EPOCH_INVALID", "hb_epoch " + repr(hb_epoch) + " is not ASCII [0-9]+"
-    if int(text) < 32:
-        return "HB_EPOCH_INVALID", "hb_epoch " + text + " is below the HB32 anchor (32)"
-    if reference is not None and "derived_from_clock" in reference \
-            and reference["derived_from_clock"] is not False:
-        return "HB_EPOCH_INVALID", ("the carrier's derived_from_clock is not exactly false; "
-                                    "a clock-derived epoch is not a supplied one")
-    return None
+# The shared supplied-epoch rule (SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH) is
+# org-kernel/kernel.py::supplied_epoch_failure, byte-pinned there as
+# kernel.SHARED_VALIDATOR_SHA256 (StegVerse-Labs/.github#3282 FINAL). This module
+# carried its own copy of the earlier text; it now binds the pinned segment, so
+# there is one supplied-epoch guard in this repository (C8,
+# DUPLICATE_GUARD_IMPLEMENTATION / ONE_SUPPLIED_EPOCH_GUARD_PER_REPO). close()
+# passes no heartbeat reference, so its dispositions are unchanged.
+supplied_epoch_failure = kernel.supplied_epoch_failure
 
 
 def epoch_refusal(hb_epoch: Any, entrypoint: str) -> dict[str, Any] | None:
