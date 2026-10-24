@@ -1,0 +1,48 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "addressed_service": "sv-llm.intr-destination",
+    "communication_id": "intr-path-v1:StegGhost->SV-LLM",
+    "disposition": "ALLOW",
+    "message": {
+      "body": {
+        "path_id": "StegGhost->SV-LLM:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "79a0ea88a3054244a9f3cbcfb4a13a6ce9f9971d"
+      },
+      "communication_id": "intr-path-v1:StegGhost->SV-LLM",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:cd9af3b7b7aff5e06f7b46dbf94d9bf7cedd99d4fc580a87698d3cae9d68983b",
+    "path_id": "StegGhost->SV-LLM:intr-destination",
+    "payload_sha256": "sha256:f585e027000746848120e2c83deb94efa7270e72e7039ee963b162b7b71e3db5",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-ingress-evidence/v1",
+    "source_inclusion": {
+      "source_ledger_tip": "2ea7430ad4e583220227e43a42ac7052d8c56a94",
+      "state": "VERIFIED_BY_ANONYMOUS_PUBLIC_LEDGER_READ",
+      "tvc_read_receipt": null
+    },
+    "source_organization_receipt_sha256": "sha256:66de5d69a55bfc8b9943dd12f7664fb66756c7be01ce8121f181e9d5c1e5ddc4",
+    "source_repository": "StegGhost/.github",
+    "source_repository_receipt_sha256": "sha256:5a4272dc3ac072ab9f1c1055067420334e3d0ad5fdba5da723ecbaa1a28c7a19"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:f585e027000746848120e2c83deb94efa7270e72e7039ee963b162b7b71e3db5",
+  "previous_receipt_sha256": "sha256:dffa7bbb75155fd58ec1ddd3a17f95e844777e8692eb56fdd2905ab4d983fbf6",
+  "receipt_sha256": "sha256:f3511ad6ce48d242fe3e2a5ad0e04e69fb0acf284681c08f4ac2cd8121932a51",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:83f1c29c793daeb56133e979a579fbbffeff3cf62e04c1392f1aee3ba3ebeaaa",
+  "transition_class": "INTR_MESH_PATH_INGRESS",
+  "transition_id": "INTR_MESH_PATH_INGRESS:StegGhost->SV-LLM:intr-destination@intr-path-v1:StegGhost->SV-LLM"
+}
