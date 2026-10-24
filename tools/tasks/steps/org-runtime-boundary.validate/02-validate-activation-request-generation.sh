@@ -1,0 +1,2 @@
+python org-runtime/runtime_boundary.py activation-request --runtime-id validation-resident | tee /tmp/activation.json
+python -c 'import json; x=json.load(open("/tmp/activation.json")); assert x["state"]=="REQUESTED"; assert x["request_authority_constraint"]=="CONSTRAINT_VARIABLE"; assert x["time_constraint"]=="CONSTRAINT_VARIABLE"; assert x["disposition_role"]=="TRANSITION_EVIDENCE_ONLY"; assert x["github_token_runtime_authority"]=="NONE"'

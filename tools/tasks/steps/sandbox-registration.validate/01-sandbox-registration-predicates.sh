@@ -1,0 +1,1 @@
+python -B org-runtime/tests/test_sandbox_registration.py

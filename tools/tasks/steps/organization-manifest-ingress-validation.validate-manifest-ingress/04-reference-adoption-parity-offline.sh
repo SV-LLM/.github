@@ -1,0 +1,1 @@
+python -B resident-runtime/reference_adoption.py verify

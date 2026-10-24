@@ -1,0 +1,1 @@
+python -B org-runtime/tests/test_org_crossing_capability.py
