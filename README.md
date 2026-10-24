@@ -36,6 +36,7 @@ SV-LLM/
 | --- | --- | --- |
 | `.github` | Organization coordination | Canonical organization tree, architecture, authority boundaries, profile, handoffs and shared policy documentation. |
 | `schemas` | Shared contract | Provider-neutral schemas for work objects, capability declarations, contributions, provenance, epistemic state, Inference Window projections and governance handoff references. |
+| `tools` | Tool implementations | Tools only: tool implementations the Sandbox invokes through `manifested_request.tool_invocations[]`, on the Sandbox's `sandbox-work-cycle` / `sv-llm.sandbox.work-cycle.v1` route. No sandbox runtime, no authority, no credentials and no sensitive user data. |
 | `sandbox` | Collaboration plane | Provider-neutral bounded multi-entity sessions; preserves attributable contributions, disagreement, refusal, uncertainty, synthesis lineage and handoff packaging. |
 | `StegVerse_AI` | Ecosystem entity | Reconstructs ecosystem purpose, matches evidence against receipted history, recognizes capability gaps and orchestrates intelligence requests without becoming governance authority. |
 | `Ecosystem_Chat` | Ecosystem entity | Ecosystem Chat participant: declared capabilities, Sandbox participation and the SDK return path; its implementation lives outside SV-LLM. |
@@ -69,6 +70,9 @@ SV-LLM/
               /         |          \
              v          v           v
       StegVerse_AI   sandbox    provider repos
+                        |
+                      tools
+          (invoked by sandbox; no authority)
              \          |        / / / /
               \         |       / / / /
                +---------+------+
@@ -82,7 +86,7 @@ SV-LLM/
               authorized consequence path
 ```
 
-Provider repositories are peers under the shared contract; none owns organization governance. `sandbox` is provider-neutral. `schemas` prevents common wire/work contracts from becoming implicitly owned by `.github`, `sandbox`, or any provider. `StegVerse_AI` is a distinct ecosystem entity, not a provider alias.
+Provider repositories are peers under the shared contract; none owns organization governance. `sandbox` is provider-neutral. `tools` holds only the tool implementations `sandbox` invokes; it runs no sandbox and decides nothing. `schemas` prevents common wire/work contracts from becoming implicitly owned by `.github`, `sandbox`, or any provider. `StegVerse_AI` is a distinct ecosystem entity, not a provider alias.
 
 SV-LLM is **not** a second governance authority, Task Registry, WorkerCoordinator, provider broker, credential authority, Publisher, custody system, or execution authority.
 

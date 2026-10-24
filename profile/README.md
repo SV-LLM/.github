@@ -8,6 +8,7 @@ SV-LLM is the StegVerse organization for coordinated, attributable intelligence 
 SV-LLM/
 ├── .github/        organization architecture and policy
 ├── schemas/        provider-neutral machine-readable contracts
+├── tools/          sandbox tool implementations (no authority)
 ├── sandbox/        multi-entity collaboration plane
 ├── StegVerse_AI/   ecosystem orchestration/evidence-matching entity
 ├── Ecosystem_Chat/ Ecosystem Chat participant entity
@@ -31,7 +32,7 @@ SV-LLM/
 └── AI21_Labs/
 ```
 
-The eighteen provider repositories are peer capability surfaces. `schemas` owns shared provider-neutral contracts; `sandbox` owns collaboration/session structure; `StegVerse_AI` owns its distinct ecosystem-entity capability surface; `.github` documents organization architecture and boundaries.
+The eighteen provider repositories are peer capability surfaces. `schemas` owns shared provider-neutral contracts; `sandbox` owns collaboration/session structure; `tools` holds the tool implementations `sandbox` invokes, with no authority; `StegVerse_AI` owns its distinct ecosystem-entity capability surface; `.github` documents organization architecture and boundaries.
 
 Knowledge, inference, governance and execution remain distinct. Canonical ecosystem truth remains in its authoritative StegVerse repositories and is resolved through InTr as relevant context rather than duplicated here.
 
