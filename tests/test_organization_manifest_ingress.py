@@ -179,7 +179,11 @@ class ContractBinding(unittest.TestCase):
         self.assertEqual(named, submit)
         rows = [r for r in REGISTRY["services"] if r.get("capability_profile_id") == "sdk-manifest-ingress"]
         self.assertEqual([r["service_id"] for r in rows], [ADDRESS])
-        self.assertNotIn("capability_destination_bindings", BOUNDARY["egress"])
+        # The only outbound binding is the master-records ledger binding (#163 c6387335336);
+        # it carries no disposition binding_role, so NON-ALLOW delivery is unchanged.
+        bindings = BOUNDARY["egress"].get("capability_destination_bindings") or []
+        self.assertEqual([b["profile_id"] for b in bindings], ["organization-record"])
+        self.assertTrue(all("binding_role" not in b for b in bindings))
 
     def test_the_ledger_contracts_bind_this_organization_and_one_ref(self):
         self.assertEqual(ORG_CONTRACT["organization_ledger_repository"], BOUNDARY["owner_repository"])
