@@ -203,8 +203,8 @@ class Append(unittest.TestCase):
 
     def test_contradicted_path_receipts_are_denied(self):
         cases = {
-            "path": lambda e: e.update(destination_organization="master-records"),
-            "address": lambda e: e.update(destination_address="master-records.intr-destination"),
+            "path": lambda e: e.update(destination_organization="Undeclared-Org"),
+            "address": lambda e: e.update(destination_address="undeclared-org.intr-destination"),
             "transfer": lambda e: e.update(transfer_commit=UNLEDGERED),
             "message": lambda e: e["message"].update(communication_id="other"),
         }
