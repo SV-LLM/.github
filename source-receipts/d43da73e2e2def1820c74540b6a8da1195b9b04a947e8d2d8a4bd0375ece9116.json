@@ -1,0 +1,45 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "capability": "intr-destination",
+    "communication_id": "intr-path-v1:SV-LLM->Admissible-Existence",
+    "destination_address": "admissible-existence.intr-destination",
+    "destination_organization": "Admissible-Existence",
+    "disposition": "ALLOW",
+    "merge_transfer_organization_receipt_sha256": "sha256:717a7e9f0a4b28459aa79c79c7c694cfb364765c614e2d1c4c684ab0ab49cea6",
+    "message": {
+      "body": {
+        "path_id": "SV-LLM->Admissible-Existence:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "a6503e37c4ba554470446347f972972d5cbffbc2"
+      },
+      "communication_id": "intr-path-v1:SV-LLM->Admissible-Existence",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:076028a6e4425b97cc41070de545a86d267f6a180023b8c0a0a684bf1c86d3c0",
+    "path_id": "SV-LLM->Admissible-Existence:intr-destination",
+    "payload_sha256": "sha256:6c1d5c64ccb389c2238ffd27eead2a2b2e2a3a1e46192f30e9c83d09c8137896",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-transfer-evidence/v1",
+    "source_organization": "SV-LLM",
+    "transfer_commit": "a6503e37c4ba554470446347f972972d5cbffbc2"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:6c1d5c64ccb389c2238ffd27eead2a2b2e2a3a1e46192f30e9c83d09c8137896",
+  "previous_receipt_sha256": "sha256:ea36c2c0f6f643a58dcbcebc1481f06b48bde972fc86a41b152f9bdc53dbf5e5",
+  "receipt_sha256": "sha256:d43da73e2e2def1820c74540b6a8da1195b9b04a947e8d2d8a4bd0375ece9116",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:51432fd195df81921d9f57a00c22e0b94c18d3c975711d472a29be22fd9b269b",
+  "transition_class": "INTR_MESH_PATH_TRANSFER",
+  "transition_id": "INTR_MESH_PATH_TRANSFER:SV-LLM->Admissible-Existence:intr-destination@intr-path-v1:SV-LLM->Admissible-Existence"
+}
