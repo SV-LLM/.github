@@ -2644,6 +2644,11 @@
           "name": "Registry, catalog and writer plan hold",
           "run_file": "tools/tasks/steps/workflow-surface-registry.validate/01-registry,-catalog-and-writer-plan-hold.sh",
           "run_sha256": "8cbb935889183200c1eeace944a53fbdf3f3922156106d15a40eec038dc49dde"
+        },
+        {
+          "name": "InTr paths are between distinct organizations only (Rigel's rule 2026-10-25)",
+          "run_file": "tools/tasks/steps/workflow-surface-registry.validate/02-intr-paths-are-between-distinct-organizations-o.sh",
+          "run_sha256": "b7dd8de37c8944b9518b4cfa56916c6444ee964349be80291b1cbb87daf88555"
         }
       ]
     }
