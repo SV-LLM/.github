@@ -58,7 +58,8 @@ class InterOrganizationOnly(unittest.TestCase):
     def test_inbound_path_transfers_come_from_another_organization(self):
         decl = load(".stegverse/intr-path-transfer/inbound.json")
         for row in decl["transfers"]:
-            be = row["carried"]["source_organization_receipt"]["boundary_evidence"]
+            receipt = row["carried"]["source_organization_receipt"]
+            be = receipt.get("boundary_evidence", receipt.get("evidence"))  # either receipt generation (SV-011: evidence)
             src, dst = ends(be["path_id"])
             self.assertEqual(dst, ORG, six("INTR_PATH_DESTINATION_IS_NOT_THIS_ORGANIZATION", "INBOUND_DESTINATION_IS_THIS_ORGANIZATION",
                                            "carry only paths into this organization", be["path_id"]))
