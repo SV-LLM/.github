@@ -257,7 +257,7 @@ def conform_message(payload: Any, destination_organization: Any,
         if key in payload:
             return _refusal(contract, DENY, "INTR_PROTOCOL_ROUTE_CARRIES_HOST_OR_CREDENTIAL",
                             "ROUTE_IS_ADDRESS_NOT_HOST_OR_CREDENTIAL",
-                            f"remove {key!r}; routes are {contract['route']['address_form']} over INTERLOCK_INTR with TV/TVC credentials",
+                            f"remove {key!r}; routes are {contract['route']['address_form']} over INTERLOCK_INTR; credentials stay in the SKAP Vault (KV/_Vault/SKAP) under TV/TVC authority",
                             subject)
     checked.append("ROUTE_IS_ADDRESS_NOT_HOST_OR_CREDENTIAL")
     return _allow(contract, subject, checked)
