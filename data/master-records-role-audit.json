@@ -29,8 +29,8 @@
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 33,
-      "TOTAL": 116
+      "NAMING_ONLY": 36,
+      "TOTAL": 119
     }
   },
   "not_changed_with_reason": {
@@ -1082,6 +1082,27 @@
       "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
       "classification": "PROPER",
       "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."
+    },
+    {
+      "file": "tests/test_intr_inter_org_only.py",
+      "line": 78,
+      "text": "def test_master_records_binding_is_cross_organization(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Test name and the master-records organization/repository identifier; asserts only that the binding is cross-organization, no role."
+    },
+    {
+      "file": "tests/test_intr_inter_org_only.py",
+      "line": 81,
+      "text": "if b.get(\"destination_organization\") == \"master-records\"]",
+      "classification": "NAMING_ONLY",
+      "rationale": "Test name and the master-records organization/repository identifier; asserts only that the binding is cross-organization, no role."
+    },
+    {
+      "file": "tests/test_intr_inter_org_only.py",
+      "line": 83,
+      "text": "self.assertEqual(rows[0][\"destination_repository\"], \"master-records/.github\")",
+      "classification": "NAMING_ONLY",
+      "rationale": "Test name and the master-records organization/repository identifier; asserts only that the binding is cross-organization, no role."
     }
   ]
 }
