@@ -331,10 +331,11 @@
         "RETAIN_SUBMISSION_RESULT_AND_EVIDENCE"
       ],
       "canonical_receiving_owner": "StegVerse-org/LLM-adapter:llm_adapter/governed_manifest_ingress.py",
+      "canonical_receiving_owner_is_intr_destination": false,
       "processing_selector": "manifest.processing.capability + manifest.processing.route_id",
       "message_content_selects_processing": false,
       "direct_adapter_bypass_without_standing": "FAIL_CLOSED",
-      "interlock_intr": "INTERNAL_POST_SUBMISSION",
+      "interlock_intr": "NONE_POST_SUBMISSION_IS_NOT_AN_INTR_HOP",
       "external_interlock_intr": "DEFERRED_TO_SUCCESSOR_AFTER_TESTS_5_AND_6"
     },
     "EXTERNAL_FRAMEWORK_MANIFEST_CONTINUATION": {
@@ -353,7 +354,7 @@
       "framework_cli": "stegverse external-run",
       "enclosed_validation_flag": "--execute-enclosed",
       "enclosed_validation_is_canonical": false,
-      "interlock_intr": "INTERNAL_POST_SUBMISSION",
+      "interlock_intr": "NONE_POST_SUBMISSION_IS_NOT_AN_INTR_HOP",
       "external_interlock_intr": "DEFERRED_TO_SUCCESSOR_AFTER_TESTS_5_AND_6"
     },
     "no_new_endpoint_required": true,
@@ -370,12 +371,20 @@
       "pull_request": "https://github.com/StegVerse-org/StegVerse-SDK/pull/424"
     }
   },
+  "intr_classification": {
+    "rule": "Rigel's rule (2026-10-25): InTr paths exist only between distinct organizations; there is never an InTr hop inside one organization. LLM-adapter is not an InTr destination; its only InTr use is that an external machine that has established itself as a healthy node may become an InTr endpoint.",
+    "reclassified": "interlock_intr was INTERNAL_POST_SUBMISSION. An InTr leg cannot be internal to one organization, so the post-submission leg is not an InTr hop: NONE_POST_SUBMISSION_IS_NOT_AN_INTR_HOP.",
+    "llm_adapter_role": "external ingress for an external machine (healthy node at the ecosystem's edge to StegVerse-SDK); never an InTr destination and never an org-internal InTr hop",
+    "intr_endpoint": "an external machine that has established canonical node standing (a healthy node) may become an InTr endpoint; external_interlock_intr stays DEFERRED_TO_SUCCESSOR_AFTER_TESTS_5_AND_6",
+    "owner": "Lane B InTr path (SV-LLM/.github#50; StegVerse-org/.github#162); handoff SV-LLM/.github#50 c6391795592 (P1, StegVerse-org/.github#163)",
+    "authority_effect": "NONE"
+  },
   "test_5_6_external_boundary": {
     "terminal_steps": [
       "SUBMIT_CANONICAL_MANIFEST",
       "RETAIN_SUBMISSION_RESULT_AND_EVIDENCE"
     ],
-    "interlock_intr": "INTERNAL_POST_SUBMISSION",
+    "interlock_intr": "NONE_POST_SUBMISSION_IS_NOT_AN_INTR_HOP",
     "external_interlock_intr": "DEFERRED_TO_SUCCESSOR_AFTER_TESTS_5_AND_6",
     "source_submission_tests_are_runtime_evidence": false,
     "sdk_local_handoff_is_observed_receiver_submission": false,

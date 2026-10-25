@@ -90,8 +90,11 @@ class WorkflowEpochGate(unittest.TestCase):
 
     def test_each_appending_lane_has_one_kernel_gate(self):
         lanes = {name for _, name, _ in gates()}
-        self.assertEqual(len(gates()), 3, gates())
-        self.assertEqual(len(lanes), 3, lanes)
+        # Two lanes: committed requests and the retired crossing record. The
+        # self-closure lane is removed: an InTr hop inside one organization
+        # (Rigel's rule 2026-10-25; SV-LLM/.github#59).
+        self.assertEqual(len(gates()), 2, gates())
+        self.assertEqual(len(lanes), 2, lanes)
 
     def test_no_other_check_reads_the_epoch(self):
         for workflow, name, run in steps():

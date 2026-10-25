@@ -496,13 +496,13 @@
         "--recorded-for answer from the ledger",
         "organization_manifest_ingress receive",
         "fast-forward-only publish",
-        "fresh-fetch readback with organization_ledger_readback",
-        "self-closure mode"
+        "fresh-fetch readback with organization_ledger_readback"
       ],
       "deviations": [
         "SDK on PYTHONPATH from its pinned checkout instead of pip install -e (an editable install downloads setuptools and wheel; this repository installs nothing)",
         "no mesh lane: a committed request declaring mesh_root is refused (MESH_LANE_NOT_ADOPTED) before it is received; SV-LLM declares no outbound destination binding, so no request is deferred",
         "a dispatch without a mode is a self-closure, keeping this repository's existing dispatch interface; there is no push trigger: a push carries no epoch, so a committed request is received only when dispatched with mode=request and hb_epoch (B-P36n)",
+        "self-closure mode removed: addressing this organization's own intr-destination is an InTr hop inside one organization, and InTr paths exist only between distinct organizations (Rigel's rule 2026-10-25; registry row retired by SV-LLM/.github#59; the steps and the CLI path were removed by Lane B)",
         "identity checks name SV-LLM/.github",
         "a request is received only at a supplied hb_epoch: one that would append without one (HB_EPOCH_NOT_SUPPLIED) or with an invalid one (HB_EPOCH_INVALID) fails closed with kernel.writer_epoch_refusal's six fields before it is received (B-P31, B-P36), so a push appends nothing until the request is dispatched with hb_epoch; a request already recorded is still answered from the ledger"
       ]

@@ -532,10 +532,8 @@ BIND = "Bind the designated organization ledger ref and the repository ledger su
 SDK_PATH = "Put the pinned SDK on the import path"
 SELECT = "Select committed transition requests"
 RECEIVE = "Receive each request and append to the repository and organization ledgers"
-CLOSE = "Close an intr-destination diagnostic against this organization"
 PUBLISH = "Publish the ledger ref (fast-forward only)"
 READBACK = "Read the organization and repository ledgers back from a fresh fetch"
-CLOSURE_READBACK = "Read the intr-destination self-closure back from a fresh fetch"
 
 
 class Workspace:
@@ -648,22 +646,13 @@ class DispatchGuards(unittest.TestCase):
         self.assertFalse((self.space.temp / "results/MESH-001").exists())
         self.assertIsNone(self.space.git("for-each-ref", LEDGER_REF) or None)
 
-    def test_a_self_closure_needs_a_supplied_integer_epoch(self):
-        env = self.space.job("self-closure", GITHUB_EVENT_NAME="workflow_dispatch", HB_EPOCH="soon")
-        env["REPO_LEDGER_NAMESPACE"] = REPO_LOCATION["namespace"]
-        done = self.space.step(CLOSE, env, INPUT_COMMUNICATION_ID="c", INPUT_PACKET_ID="")
-        self.assertNotEqual(done.returncode, 0)
-        refusal = json.loads(done.stdout)
-        self.assertEqual((refusal["failure_code"], refusal["failed_predicate"]),
-                         ("HB_EPOCH_INVALID", "SUBMISSION_CARRIES_THE_SUPPLIED_HB_EPOCH"))
-
     def test_push_runs_request_mode_and_the_epoch_gate_still_refuses_it(self):
         # B-P36n kept: a push carries no epoch, so nothing is received without one.
         # G17 (P1, StegVerse-org/.github#163) removed workflow_dispatch: the job runs on
         # a push to main that changes .stegverse/transition-requests/**, its MODE
         # defaults to request, and the kernel gate refuses HB_EPOCH_NOT_SUPPLIED on
         # push before anything is received (registry fail_closed_pending). Self-closure
-        # is FAIL_CLOSED DISPATCH_TRIGGER_REMOVED_BY_G17.
+        # is retired by Rigel's rule (2026-10-25): an InTr hop inside one organization.
         text = WORKFLOW.read_text()
         self.assertIn("MODE: ${{ github.event.inputs.mode || 'request' }}", text)
         trigger = text[text.index("\non:\n"):text.index("\npermissions:")]
@@ -682,7 +671,9 @@ class DispatchGuards(unittest.TestCase):
 class EndToEndDryRun(unittest.TestCase):
     """The workflow's steps against a temporary bare origin, with the real SDK.
 
-    A self-closure opens the ledger first, then the committed request is
+    A peer organization's intr-destination diagnostic opens the ledger first
+    (there is no self-closure: InTr paths run only between distinct
+    organizations), then the committed request is
     received on top of it, published fast-forward and read back from a fresh
     fetch. A second run answers the request from the ledger. Every ref written
     is in a temporary directory.
@@ -709,14 +700,25 @@ class EndToEndDryRun(unittest.TestCase):
 
     def test_dispatch_on_an_existing_chain_appends_publishes_and_reads_back(self):
         space = Workspace(self)
-        closure_env = space.job("self-closure", GITHUB_EVENT_NAME="workflow_dispatch", HB_EPOCH="40")
+        opener_env = space.job("request", GITHUB_EVENT_NAME="workflow_dispatch", HB_EPOCH="40")
         for name in (VALIDATE, BIND):
-            self.assertEqual(space.step(name, closure_env).returncode, 0, name)
-        closed = space.step(CLOSE, closure_env, INPUT_COMMUNICATION_ID="w04-dry-run", INPUT_PACKET_ID="")
-        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
-        self.assertEqual(space.step(PUBLISH, closure_env).returncode, 0)
-        verified = space.step(CLOSURE_READBACK, closure_env)
-        self.assertEqual(verified.returncode, 0, verified.stdout + verified.stderr)
+            self.assertEqual(space.step(name, opener_env).returncode, 0, name)
+        # A diagnostic another organization addresses to this one opens the chain.
+        payload = space.temp / "peer-diagnostic.json"
+        payload.write_text(json.dumps({
+            "message_class": "ecosystem.communication", "communication_id": "w04-dry-run",
+            "subject": "purpose-neutral intr-destination diagnostic from a peer organization",
+            "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "diagnostic",
+                     "addressed_service": "sv-llm.intr-destination", "source_organization": "StegVerse-org"}}))
+        namespace = opener_env["REPO_LEDGER_NAMESPACE"]
+        received = subprocess.run(
+            [sys.executable, "-B", "resident-runtime/intr_destination_ingress.py", "--hb-epoch", "40",
+             "--registry", "org-boundary/registry/services.json", "--payload", str(payload),
+             "--packet-id", "w04-dry-run-opener"], cwd=space.ws, capture_output=True, text=True,
+            env={**opener_env, "STEGVERSE_ORG_LEDGER_ROOT": f"git+{space.ws}#{LEDGER_REF}",
+                 "STEGVERSE_REPO_LEDGER_ROOT": f"git+{space.ws}#{LEDGER_REF}:{namespace}"})
+        self.assertEqual(received.returncode, 0, received.stdout + received.stderr)
+        self.assertEqual(space.step(PUBLISH, opener_env).returncode, 0)
         tip_before = space.published()
         self.assertTrue(tip_before)
 

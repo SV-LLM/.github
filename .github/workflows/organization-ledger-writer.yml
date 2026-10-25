@@ -27,8 +27,9 @@ name: Organization Ledger Writer
 # file, and ledger-transition's MODE defaults to the committed-request mode.
 #
 # workflow_dispatch is removed (ACTION_BY_MANIFEST). The dispatch-only
-# self-closure mode is FAIL_CLOSED pending in the registry; its steps stay in
-# place and are unreachable on push, where github.event.inputs is empty.
+# self-closure mode is retired by Rigel's rule (2026-10-25): InTr paths exist only
+# between distinct organizations, so its steps and the self-close CLI path are removed
+# (SV-LLM/.github#59 retired the registry row; Lane B removed the code).
 # Source validation and merge confer no runtime authority: runtime counts only
 # when a manifest-directed transition appends a receipt on the ledger ref.
 on:
@@ -343,7 +344,7 @@ jobs:
   # only, and read back. On push the kernel epoch rule refuses a request that
   # carries no supplied epoch (HB_EPOCH_NOT_SUPPLIED, six fields) before anything
   # is received, exactly as the dispatch-only workflow refused a push-shaped run.
-  # mode=self-closure is dispatch-only and unreachable here (FAIL_CLOSED pending).
+  # mode=self-closure is retired (an InTr hop inside one organization); its steps are removed.
   ledger-transition:
     needs: [plan, merge-transfer, path-transfer, path-ingress]
     if: ${{ !cancelled() && needs.plan.outputs.ledger-transition == 'true' }}
@@ -542,41 +543,6 @@ jobs:
             python -c 'import json,sys; x=json.load(open(sys.argv[1])); print("ingress disposition:", x["disposition"], x.get("failed_predicate"), x.get("organization_receipt_sha256"))' "$out/ingress.json"
           done < "$RUNNER_TEMP/requests.txt"
 
-      # mode=self-closure: this organization's own intr-destination, at the
-      # supplied epoch. No peer is named; the address is derived from this
-      # organization's own name.
-      - name: Close an intr-destination diagnostic against this organization
-        if: env.MODE == 'self-closure'
-        env:
-          INPUT_COMMUNICATION_ID: ${{ github.event.inputs.communication_id }}
-          INPUT_PACKET_ID: ${{ github.event.inputs.packet_id }}
-        run: |
-          set -euo pipefail
-          export STEGVERSE_ORG_LEDGER_ROOT="git+$GITHUB_WORKSPACE#$LEDGER_REF"
-          # Same ref, own subtree: the repository chain is published by the same
-          # fast-forward push below (contract.json repository_ledger_location).
-          export STEGVERSE_REPO_LEDGER_ROOT="git+$GITHUB_WORKSPACE#$LEDGER_REF:$REPO_LEDGER_NAMESPACE"
-          mkdir -p "$RUNNER_TEMP/results/self-closure"
-          out="$RUNNER_TEMP/results/self-closure"
-          packet_id="$INPUT_PACKET_ID"
-          if [ -z "$packet_id" ]; then
-            packet_id="intr-destination-self-closure-${GITHUB_RUN_ID}"
-          fi
-          # Time is supplied with the dispatch. It is not sampled from a clock.
-          # An absent or invalid epoch fails closed with the kernel's six-field
-          # refusal and nothing is appended (B-P36c). A dispatched "" cannot be told
-          # from an absent input and is HB_EPOCH_NOT_SUPPLIED; any other text is the
-          # kernel rule's to decide (B-P36d).
-          python -B -c 'import importlib.util,json,os,sys; s=importlib.util.spec_from_file_location("kernel","org-kernel/kernel.py"); k=importlib.util.module_from_spec(s); s.loader.exec_module(k); v=(os.environ.get("HB_EPOCH") or None) if os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch" else None; r=k.writer_epoch_refusal(v,retry_entrypoint=sys.argv[1]); r is None or print(json.dumps(r,sort_keys=True)); sys.exit(0 if r is None else 1)' ".github/workflows/organization-ledger-writer.yml (dispatch mode=self-closure with hb_epoch)" || exit 1
-          python resident-runtime/intr_destination_ingress.py \
-            --self-close \
-            --hb-epoch "$HB_EPOCH" \
-            --registry org-boundary/registry/services.json \
-            --communication-id "$INPUT_COMMUNICATION_ID" \
-            --packet-id "$packet_id" \
-            --out "$out/closure.json"
-          python -c 'import json,sys; x=json.load(open(sys.argv[1])); print("closure disposition:", x["disposition"], x.get("communication_id"), x.get("organization_receipt_sha256"))' "$out/closure.json"
-
       # Every receipt this run appended is published. A lost compare-and-swap
       # publishes nothing. The push refspec has no leading +, so a push that
       # is not a fast-forward is refused.
@@ -633,40 +599,6 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           done
           exit $status
-
-      - name: Read the intr-destination self-closure back from a fresh fetch
-        if: always() && env.MODE == 'self-closure'
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/results/self-closure"
-          if [ ! -f "$out/closure.json" ]; then
-            echo "no closure result to read back"
-            exit 0
-          fi
-          if [ -z "${LEDGER_REF:-}" ] || [ -z "${REPO_LEDGER_NAMESPACE:-}" ]; then
-            echo "ledger ref was not bound"
-            exit 1
-          fi
-          fresh="$RUNNER_TEMP/self-closure-readback.git"
-          git init -q --bare "$fresh"
-          auth_header=$(git config --local --get http.https://github.com/.extraheader || true)
-          if [ -z "$auth_header" ]; then
-            echo '{"disposition":"FAIL_CLOSED","failure_code":"AUTHENTICATED_LEDGER_READBACK_UNAVAILABLE","failed_predicate":"FRESH_FETCH_AUTHENTICATED","required_evidence_or_repair":"checkout credentials unavailable for independent sovereign ref fetch","retry_entrypoint":".github/workflows/organization-ledger-writer.yml","owning_existing_goal":"LLMA-DECLARED-PATH-CONFORMANCE-368","next_attempt":"retry with authorized existing repository contents token"}'
-            exit 1
-          fi
-          git --git-dir="$fresh" -c http.https://github.com/.extraheader="$auth_header" fetch -q "$(git remote get-url origin)" "+$LEDGER_REF:$LEDGER_REF"
-          python resident-runtime/intr_destination_ingress.py \
-            --verify-self-closure \
-            --location "git+$fresh#$LEDGER_REF" \
-            --repository-namespace "$REPO_LEDGER_NAMESPACE" \
-            --closure "$out/closure.json" \
-            --out "$out/readback.json"
-          {
-            echo "### intr-destination self-closure"
-            echo '```json'
-            cat "$out/readback.json"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Retain the run's evidence
         if: always()
