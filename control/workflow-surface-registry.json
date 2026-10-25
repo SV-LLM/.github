@@ -452,11 +452,12 @@
       "now": ".github/workflows/organization-ledger-writer.yml job ledger-transition (steps retained, unreachable on push)",
       "disposition": "FAIL_CLOSED",
       "failure_code": "DISPATCH_TRIGGER_REMOVED_BY_G17",
-      "failed_predicate": "SELF_CLOSURE_IS_A_COMMITTED_TRANSITION_REQUEST",
-      "required_evidence_or_repair": "carry self-closure as a committed request under .stegverse/transition-requests/ (manifest) so the push path selects it; the dispatch inputs no longer exist",
+      "failed_predicate": "INTR_HOP_IS_BETWEEN_DISTINCT_ORGANIZATIONS",
+      "required_evidence_or_repair": "none that re-enables it: an intr-destination self-closure addresses this organization's own InTr destination, an InTr hop inside one organization, which Rigel's rule (2026-10-25, relayed by Coordination): InTr paths exist only between distinct organizations; there is never an InTr hop inside one organization. LLM-adapter is not an InTr destination; its only InTr use is that an external machine that has established itself as a healthy node may become an InTr endpoint. The retained dispatch-only steps, the --self-close CLI and their tests are removed by the InTr path owner (Lane B, SV-LLM/.github#50); they are never carried as a committed request.",
       "retry_entrypoint": ".github/workflows/organization-ledger-writer.yml (job ledger-transition)",
       "owning_existing_goal": "G17-WORKFLOW-SURFACE-MINIMIZATION (StegVerse-Labs/.github#167/#168); owner P1 StegVerse-org/.github#163",
-      "next_attempt": "owner decision recorded on StegVerse-org/.github#163; until then self-closure does not run"
+      "next_attempt": "none: retired by Rigel's rule (2026-10-25); unreachable on push and never to be selected",
+      "retired_by_owner_rule": "Rigel's rule (2026-10-25, relayed by Coordination): InTr paths exist only between distinct organizations; there is never an InTr hop inside one organization. LLM-adapter is not an InTr destination; its only InTr use is that an external machine that has established itself as a healthy node may become an InTr endpoint."
     },
     {
       "surface": "organization-ledger-transition.yml mode=request on push without a supplied hb_epoch",
@@ -494,7 +495,7 @@
   ],
   "transfer_pending": [],
   "open_decisions": [
-    "dispatch-only writer modes (self-closure) and the retired crossing dispatch",
+    "retired crossing dispatch (dispatch-only self-closure is retired by Rigel's rule of 2026-10-25, not an open decision)",
     "merge of this draft (owner-only)"
   ],
   "catalog_additions": [
