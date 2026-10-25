@@ -60,7 +60,7 @@ python org-boundary/runtime/federation_projection.py verify [--canonical <canoni
 
 SV-LLM-specific: `org-runtime/{activation.json, interlock-intr.json, runtime_boundary.py, crossing.py}`, `org-boundary/registry/services.json`, `org-boundary/runtime/federation_projection.py`, `.stegverse/transition-ledger/{contract.json, org-contract.json}`, `data/organization-role-runtime-reality-deployment.json`, `data/organization-role-exemption-register.json`, `org-runtime/tests/test_org_crossing.py`.
 
-Vendored unchanged from `StegVerse-Labs/.github@c4ed8de7f567ac16117a17cd05a118c6a52a440d`: `org-boundary/runtime/node_standing.py`, `docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json`. `org-boundary/runtime/intr_transport.py` (vendored from the same commit) was referenced by no code, workflow or contract and minted packet ids from `uuid4` and timestamps from the wall clock; it is removed.
+Vendored from `StegVerse-Labs/.github@c4ed8de7f567ac16117a17cd05a118c6a52a440d`: `org-boundary/runtime/node_standing.py` (unchanged) and `docs/CANONICAL_NODE_INGRESS_CONTRACT_001.json`. The contract's one local change (2026-10-25, Lane B) reclassifies `interlock_intr` from `INTERNAL_POST_SUBMISSION` to `NONE_POST_SUBMISSION_IS_NOT_AN_INTR_HOP` and adds `intr_classification`, under Rigel's rule that InTr paths exist only between distinct organizations. `node_standing.py` reads neither field. `org-boundary/runtime/intr_transport.py` (vendored from the same commit) was referenced by no code, workflow or contract and minted packet ids from `uuid4` and timestamps from the wall clock; it is removed.
 
 Ported from `StegVerse-org/.github@66749948a6535bc097fc257a7bbf3d18193282e6`: `org-boundary/runtime/manifest_selection.py` (code unchanged; docstring rewritten for SV-LLM).
 

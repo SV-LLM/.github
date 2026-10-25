@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -541,120 +542,30 @@ class AddressedAndClosedTests(RedirectedLedgers):
                                       "stegverse.organization-transition-receipt/v1"))
 
 
-class DiagnosticSelfClosureTests(RedirectedLedgers):
-    """A self-closure records both receipts on supplied temporary ledgers.
+class NoSelfClosureTests(unittest.TestCase):
+    """There is no self-closure: InTr paths run only between distinct organizations.
 
-    Nothing in this class is an authentic production receipt, and nothing here
-    is a live peer. The temporary chain only shows that the closure appends
-    and that a readback can see ``communication_id``.
+    Rigel's rule (2026-10-25). SV-LLM/.github#59 retired the dispatch-only mode;
+    the CLI and the workflow steps are gone, so nothing can address this
+    organization's own intr-destination as an InTr hop.
     """
 
-    def test_a_self_closure_records_communication_id_on_both_receipts(self):
-        before = (ROOT / "org-boundary/registry/federation.json").read_bytes()
-        result = ingress.closure(
-            "self-close-comm-001", registry=REGISTRY, packet_id="self-close-packet-001",
-            hb_epoch=32)
-        self.assertEqual((ROOT / "org-boundary/registry/federation.json").read_bytes(), before)
-        self.assertEqual(result["schema"], ingress.CLOSURE_SCHEMA)
-        self.assertEqual(result["disposition"], "ALLOW", result.get("detail"))
-        self.assertIs(result["self_closure"], True)
-        self.assertIs(result["peer_enumerated"], False)
-        self.assertEqual(result["addressed_service"], ADDRESS)
-        self.assertEqual(result["communication_id"], "self-close-comm-001")
-        self.assertIs(result["communication_acknowledged"], True)
-        assert_constraints(self, result)
-        repository, = self.receipts(
-            "STEGVERSE_REPO_LEDGER_ROOT", "stegverse.repo-transition-receipt/v1", OPERATION_ID)
-        self.assertEqual(repository["evidence"]["communication_id"], "self-close-comm-001")
-        matched = [record for record in self.receipts(
-            "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1")
-            if record.get("repo_receipt_sha256") == repository["receipt_sha256"]]
-        self.assertEqual(len(matched), 1)
-        self.assertEqual(matched[0]["boundary_evidence"]["communication_id"], "self-close-comm-001")
+    def test_the_operation_offers_no_self_closure(self):
+        for name in ("closure", "verify_closure", "SelfClosureRefused", "CLOSURE_SCHEMA"):
+            self.assertFalse(hasattr(ingress, name), name)
+        text = (ROOT / "resident-runtime/intr_destination_ingress.py").read_text(encoding="utf-8")
+        self.assertNotIn("--self-close", text)
+        self.assertNotIn("--verify-self-closure", text)
 
-    def test_a_replay_of_the_same_self_closure_does_not_mint_a_second_pair(self):
-        first = ingress.closure(
-            "self-close-replay", registry=REGISTRY, packet_id="self-close-replay-packet",
-            hb_epoch=32)
-        second = ingress.closure(
-            "self-close-replay", registry=REGISTRY, packet_id="self-close-replay-packet",
-            hb_epoch=99)
-        self.assertIs(second["transition_replayed"], True)
-        self.assertEqual(first["organization_receipt_sha256"], second["organization_receipt_sha256"])
-        self.assertEqual(len(self.receipts(
-            "STEGVERSE_REPO_LEDGER_ROOT", "stegverse.repo-transition-receipt/v1", OPERATION_ID)), 1)
-
-    def test_a_blank_communication_id_writes_nothing(self):
-        with self.assertRaises(ingress.SelfClosureRefused) as refused:
-            ingress.closure(" ", registry=REGISTRY, packet_id="self-close-blank", hb_epoch=32)
-        self.assertEqual(refused.exception.failed_predicate, "COMMUNICATION_ID_REQUIRED")
-        self.assertEqual(self.receipts(
-            "STEGVERSE_REPO_LEDGER_ROOT", "stegverse.repo-transition-receipt/v1"), [])
-        self.assertEqual(self.receipts(
-            "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1"), [])
-
-    def test_a_registry_that_does_not_serve_the_address_writes_nothing(self):
-        with self.assertRaises(ingress.SelfClosureRefused) as refused:
-            ingress.closure(
-                "self-close-unserved",
-                registry={"organization": "SV-LLM", "services": []},
-                packet_id="self-close-unserved", hb_epoch=32)
-        self.assertEqual(refused.exception.failed_predicate,
-                         "THIS_ORGANIZATION_SERVES_INTR_DESTINATION")
-        self.assertEqual(self.receipts(
-            "STEGVERSE_ORG_LEDGER_ROOT", "stegverse.organization-transition-receipt/v1"), [])
-
-    def test_self_closure_fast_forwards_an_existing_git_ledger_and_reads_back(self):
-        # Supplied temporary git ref. Not the published organization ledger,
-        # and not an authentic production receipt.
-        repo = Path(self._work.name) / "ledger"
-        subprocess.check_call(["git", "init", "-q", str(repo)])
-        ref = "refs/stegverse/organization-ledger"
-        namespace = "repository-ledger/SV-LLM/.github"
-        org_root = "git+" + str(repo) + "#" + ref
-        os.environ["STEGVERSE_ORG_LEDGER_ROOT"] = org_root
-        os.environ["STEGVERSE_REPO_LEDGER_ROOT"] = org_root + ":" + namespace
-        first = ingress.closure(
-            "git-close-001", registry=REGISTRY, packet_id="git-close-packet-001", hb_epoch=40)
-        tip_before = subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", ref], text=True).strip()
-        count_before = int(subprocess.check_output(
-            ["git", "-C", str(repo), "rev-list", "--count", ref], text=True))
-        second = ingress.closure(
-            "git-close-002", registry=REGISTRY, packet_id="git-close-packet-002", hb_epoch=41)
-        tip_after = subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", ref], text=True).strip()
-        count_after = int(subprocess.check_output(
-            ["git", "-C", str(repo), "rev-list", "--count", ref], text=True))
-        subprocess.check_call(
-            ["git", "-C", str(repo), "merge-base", "--is-ancestor", tip_before, tip_after])
-        self.assertGreater(count_after, count_before)
-        self.assertNotEqual(first["organization_receipt_sha256"],
-                            second["organization_receipt_sha256"])
-        replay = ingress.closure(
-            "git-close-002", registry=REGISTRY, packet_id="git-close-packet-002", hb_epoch=77)
-        self.assertIs(replay["transition_replayed"], True)
-        self.assertEqual(subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", ref], text=True).strip(), tip_after)
-        fresh = Path(self._work.name) / "readback.git"
-        subprocess.check_call(["git", "init", "-q", "--bare", str(fresh)])
-        subprocess.check_call(
-            ["git", "--git-dir", str(fresh), "fetch", "-q", str(repo), "+" + ref + ":" + ref])
-        verified = ingress.verify_closure(
-            "git+" + str(fresh) + "#" + ref, second, repository_namespace=namespace)
-        digests = [item["receipt_sha256"] for item in verified["chain"]]
-        self.assertIn(first["organization_receipt_sha256"], digests)
-        self.assertIn(second["organization_receipt_sha256"], digests)
-        self.assertEqual(verified["self_closure_communication_id"], "git-close-002")
-        self.assertIs(verified["communication_id_on_organization_receipt"], True)
-        self.assertIs(verified["communication_id_on_repository_receipt"], True)
-        self.assertIs(verified["self_closure_extends_published_chain"], True)
-        self.assertEqual(verified["head_receipt_sha256"], second["organization_receipt_sha256"])
-        fresh_tip = subprocess.check_output(
-            ["git", "--git-dir", str(fresh), "rev-parse", ref], text=True).strip()
-        self.assertEqual(fresh_tip, tip_after)
-        subprocess.check_call(
-            ["git", "--git-dir", str(fresh), "merge-base", "--is-ancestor", tip_before, fresh_tip])
+    def test_the_cli_without_inputs_fails_closed_with_six_fields_and_writes_nothing(self):
+        done = subprocess.run([sys.executable, "-B", str(ROOT / "resident-runtime/intr_destination_ingress.py"),
+                               "--hb-epoch", "40"], cwd=ROOT, capture_output=True, text=True)
+        self.assertNotEqual(done.returncode, 0)
+        refusal = json.loads(done.stdout.strip().splitlines()[-1])
+        self.assertEqual(refusal["failure_code"], "INTR_DESTINATION_INPUT_REFUSED")
+        self.assertEqual(refusal["failed_predicate"], "PAYLOAD_AND_REGISTRY_REQUIRED")
+        for field in ("required_evidence_or_repair", "retry_entrypoint", "owning_existing_goal", "next_attempt"):
+            self.assertTrue(refusal[field], field)
 
 
 class SuppliedEpochTests(RedirectedLedgers):
@@ -764,17 +675,16 @@ class LedgerWriterWorkflowTests(unittest.TestCase):
 
     def test_the_dispatch_appends_pushes_and_reads_the_designated_ref_back(self):
         text = self.text()
-        # workflow_dispatch was removed by G17; the dispatch-only self-closure steps stay
-        # in place, unreachable on push (registry DISPATCH_TRIGGER_REMOVED_BY_G17).
+        # workflow_dispatch was removed by G17; the dispatch-only self-closure steps are
+        # removed under Rigel's rule (2026-10-25): no InTr hop inside one organization.
         self.assertNotIn("workflow_dispatch:", text)
-        self.assertIn("github.event.inputs.communication_id", text)
+        self.assertNotIn("github.event.inputs.communication_id", text)
         self.assertIn("refs/stegverse/organization-ledger", text)
         self.assertIn("group: organization-ledger", text)
         self.assertIn("cancel-in-progress: false", text)
         self.assertIn("contents: write", text)
-        self.assertIn("--self-close", text)
-        self.assertIn("--verify-self-closure", text)
-        self.assertIn("resident-runtime/intr_destination_ingress.py", text)
+        self.assertNotIn("--self-close", text)
+        self.assertNotIn("--verify-self-closure", text)
         self.assertIn('git fetch --no-tags origin "+$LEDGER_REF:$LEDGER_REF"', text)
         self.assertNotIn("federation.json", text)
         self.assertNotIn("capability_destination_bindings", text)

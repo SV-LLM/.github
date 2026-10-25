@@ -1570,8 +1570,6 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                               "--hb-epoch", "32"], "--payload", "file-any"),
             ("intr receive", ["resident-runtime/intr_destination_ingress.py", "--payload", str(bad / "ok.json"),
                               "--hb-epoch", "32"], "--registry", "file"),
-            ("intr self-close", ["resident-runtime/intr_destination_ingress.py", "--self-close",
-                                 "--communication-id", "i", "--packet-id", "i", "--hb-epoch", "32"], "--registry", "file"),
             ("egress boundary", ["resident-runtime/organization_egress_boundary.py", "--destination-organization", PEER,
                                  "--standing", str(bad / "ok.json"), "--mesh-root", mesh, "--hb-epoch", "32"],
              "--payload", "file"),
@@ -1670,10 +1668,18 @@ class WriterEpochRefusalOrder(unittest.TestCase):
                                                           "--hb-epoch", "4096"], settle=2)
 
     def test_every_write_of_the_intr_destination_cli_prints_six_fields_and_resumes(self):
-        self.cli_sweep(self.open_ledger, ["resident-runtime/intr_destination_ingress.py", "--self-close",
+        # A diagnostic another organization addresses here (there is no self-closure:
+        # InTr paths run only between distinct organizations, Rigel's rule 2026-10-25).
+        payload = self.base.parent / (self.base.name + "-intr-diagnostic.json")
+        self.addCleanup(lambda: payload.unlink(missing_ok=True))
+        payload.write_text(json.dumps({
+            "message_class": "ecosystem.communication", "communication_id": "f-writer-trace",
+            "subject": "purpose-neutral intr-destination diagnostic from a peer organization",
+            "body": {"schema": "stegverse.org-intr-destination-diagnostic/v1", "probe": "diagnostic",
+                     "addressed_service": "sv-llm.intr-destination", "source_organization": PEER}}))
+        self.cli_sweep(self.open_ledger, ["resident-runtime/intr_destination_ingress.py", "--payload", str(payload),
                                           "--registry", "org-boundary/registry/services.json",
-                                          "--communication-id", "f-writer-trace", "--packet-id", "f-writer-trace",
-                                          "--hb-epoch", "32"], settle=2)
+                                          "--packet-id", "f-writer-trace", "--hb-epoch", "32"], settle=2)
 
     def test_every_write_of_the_egress_boundary_cli_prints_six_fields_and_resumes(self):
         files = self.base.parent / (self.base.name + "-egress")
