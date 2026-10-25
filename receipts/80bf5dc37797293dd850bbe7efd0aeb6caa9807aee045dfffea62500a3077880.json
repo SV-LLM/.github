@@ -1,0 +1,38 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "communication_id": "intr-path-v1:SV-011->SV-LLM",
+    "disposition": "ALLOW",
+    "operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "path_id": "SV-011->SV-LLM:intr-destination",
+    "profile_id": "intr-destination",
+    "source_organization_receipt_sha256": "sha256:fa03587b93ca5ed842cd52fad2f1859bb59b7c5b6427db6b3f5c283ba35aa9d2",
+    "source_repository": "SV-011/.github",
+    "source_repository_receipt_sha256": "sha256:bdb932ae5eb5f848e4171c0542010aa18baeb7d77b84d43d2c4d9ce7c39a289e"
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "org_transition_class": "REPO_STATE_PROPAGATION",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:7d83d99e8cd4e683572e46ebdbcb8f763c8dcbc68e23bd1a6233addd13e6acef",
+  "previous_receipt_sha256": "sha256:c34f340b824e4b86cf808f2fabc0160647276b592b2348504a5e2c0f9957c145",
+  "receipt_sha256": "sha256:80bf5dc37797293dd850bbe7efd0aeb6caa9807aee045dfffea62500a3077880",
+  "repo_receipt_sha256": "sha256:c85d759eb77dfa9d1acbce4e3b56398076cd7ec6853c36d11fe4dbf4afdeea79",
+  "repo_transition_id": "INTR_MESH_PATH_INGRESS:SV-011->SV-LLM:intr-destination@intr-path-v1:SV-011->SV-LLM",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/.github",
+  "source_transition_id": "INTR_MESH_PATH_INGRESS:SV-011->SV-LLM:intr-destination@intr-path-v1:SV-011->SV-LLM",
+  "source_transition_sha256": "sha256:c85d759eb77dfa9d1acbce4e3b56398076cd7ec6853c36d11fe4dbf4afdeea79",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:bddf770636a2395f25b0cac806af4b45c32b5addeb6a51cc12808732ed21a693"
+}
