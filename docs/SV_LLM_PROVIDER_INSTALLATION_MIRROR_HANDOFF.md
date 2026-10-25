@@ -53,7 +53,7 @@ Each package: `capability.json`, `README.md`, `tests/test_capability.py` (34 off
 
 ## Open predicates (non-ALLOW until satisfied)
 - Installation task / COSV: canonical Registry assignment; the Registry is not reachable from the executing session.
-- RUNTIME_OBSERVED: an admitted Sandbox tool run, credentials stored exclusively in the SKAP Vault (KV/_Vault/SKAP) under TV/TVC authority, accessed only through admitted InTr transitions, and admissible runtime evidence. None exist; none claimed. Runtime observation holds SV-LLM-EXEMPTION-004 (`data/organization-role-exemption-register.json`) until an organization receipt is read back.
+- RUNTIME_OBSERVED: an admitted Sandbox tool run, credentials stored exclusively in the SKAP Vault (KV/_Vault/SKAP) under TV/TVC authority, accessed only by admitted manifest transitions (an InTr transition only where the access crosses between two distinct organizations; never an InTr hop inside one organization, Rigel's rule 2026-10-25), and admissible runtime evidence. None exist; none claimed. Runtime observation holds SV-LLM-EXEMPTION-004 (`data/organization-role-exemption-register.json`) until an organization receipt is read back.
 - Binding terms pages (SV-LLM/.github#30 W3): OpenAI, Perplexity_AI and xAI answer automated retrieval with bot challenges (403). Bot checks are never bypassed and no headless browser is added. Disposition `OWNER_SAVED_COPIES_REQUIRED` (non-ALLOW): the owner saves each page (PDF or web archive) into that provider repository's `access-policy/`, recorded with its sha256. Retry entrypoint: StegVerse-org/.github#152.
 
 ## Evidence
