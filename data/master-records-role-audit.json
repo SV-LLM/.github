@@ -29,8 +29,8 @@
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 68,
-      "TOTAL": 159
+      "NAMING_ONLY": 88,
+      "TOTAL": 179
     }
   },
   "not_changed_with_reason": {
@@ -64,7 +64,7 @@
     {
       "file": "README.md",
       "line": 228,
-      "text": "- **Master Records** — organization records and reconstruction;",
+      "text": "- **Master Records** \u2014 organization records and reconstruction;",
       "classification": "IMPROPER_DOC",
       "rationale": "Listed under 'Existing authority boundaries', presenting Master Records as an authority.",
       "remediation": "Restated as not an authority, gate or custodian: the downstream recorder of released organization batch receipts."
@@ -122,7 +122,7 @@
     {
       "file": "docs/LLM_ORG_ARCHITECTURE.md",
       "line": 59,
-      "text": "├── receipt / Master Records organization-record references",
+      "text": "\u251c\u2500\u2500 receipt / Master Records organization-record references",
       "classification": "PROPER",
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
@@ -309,14 +309,14 @@
     {
       "file": "README.md",
       "line": 228,
-      "text": "- **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
+      "text": "- **Master Records** \u2014 not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
       "classification": "PROPER",
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
     {
       "file": "README.md",
       "line": 228,
-      "text": "- **Master Records** — not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
+      "text": "- **Master Records** \u2014 not an authority, gate or custodian: the downstream recorder of released organization batch receipts (organization records and reconstruction). Runtime reality stays with the Organization ledger; nothing awaits Master",
       "classification": "PROPER",
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
@@ -379,7 +379,7 @@
     {
       "file": "docs/LLM_ORG_ARCHITECTURE.md",
       "line": 60,
-      "text": "├── receipt / Master Records organization-record references",
+      "text": "\u251c\u2500\u2500 receipt / Master Records organization-record references",
       "classification": "PROPER",
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
@@ -1383,6 +1383,146 @@
       "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
       "classification": "PROPER",
       "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1266,
+      "text": "\"communication_id\": \"intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1270,
+      "text": "\"path_id\": \"master-records->SV-LLM:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1272,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1287,
+      "text": "\"organization\": \"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1292,
+      "text": "\"repo_transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1292,
+      "text": "\"repo_transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1295,
+      "text": "\"source_repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1296,
+      "text": "\"source_transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1296,
+      "text": "\"source_transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1305,
+      "text": "\"communication_id\": \"intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1312,
+      "text": "\"path_id\": \"master-records->SV-LLM:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1316,
+      "text": "\"communication_id\": \"intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1320,
+      "text": "\"path_id\": \"master-records->SV-LLM:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1322,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1324,
+      "text": "\"source_organization\": \"master-records\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1340,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1344,
+      "text": "\"transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1344,
+      "text": "\"transition_id\": \"INTR_MESH_PATH_TRANSFER:master-records->SV-LLM:intr-destination@intr-path-v1:master-records->SV-LLM\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1347,
+      "text": "\"communication_id\": \"intr-path-v1:master-records->SV-LLM\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/inbound.json",
+      "line": 1348,
+      "text": "\"path_id\": \"master-records->SV-LLM:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row for the sixteen-organization InTr mesh (StegVerse-org/.github#162); asserts no role."
     }
   ]
 }
