@@ -1,0 +1,45 @@
+{
+  "authority_effect": "NONE",
+  "evidence": {
+    "capability": "intr-destination",
+    "communication_id": "intr-path-v1:SV-LLM->formalism-tests",
+    "destination_address": "formalism-tests.intr-destination",
+    "destination_organization": "formalism-tests",
+    "disposition": "ALLOW",
+    "merge_transfer_organization_receipt_sha256": "sha256:5814ff5cb366e0fc17b6e9c17d6f0a07fae6ab38619c53331712788c4f5125e4",
+    "message": {
+      "body": {
+        "path_id": "SV-LLM->formalism-tests:intr-destination",
+        "schema": "stegverse.org-intr-destination-diagnostic/v1",
+        "transfer_commit": "fc08a9826c3f0edbc8fbd504c0931b90b83df14b"
+      },
+      "communication_id": "intr-path-v1:SV-LLM->formalism-tests",
+      "message_class": "ecosystem.communication"
+    },
+    "message_sha256": "sha256:36759b0cf3b1f2dc62da9aaae0ca5f0128d7affd28c07743095f31f4df550259",
+    "path_id": "SV-LLM->formalism-tests:intr-destination",
+    "payload_sha256": "sha256:e12319c6f69b8f6b3bed2b3046c2d4b41b044f85cdcdea41650cb1d088da2f1b",
+    "repository": "SV-LLM/.github",
+    "schema": "stegverse.intr-path-transfer-evidence/v1",
+    "source_organization": "SV-LLM",
+    "transfer_commit": "fc08a9826c3f0edbc8fbd504c0931b90b83df14b"
+  },
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "predecessor_state_sha256": "sha256:e12319c6f69b8f6b3bed2b3046c2d4b41b044f85cdcdea41650cb1d088da2f1b",
+  "previous_receipt_sha256": "sha256:355b249be3f03e2bdee5067e2f2998f94f5bcc321b02a565eafded4832b84156",
+  "receipt_sha256": "sha256:bb938d0921e9dd925653f1036853286e03854d6aa7f95a3e9b01b9a5bf2f687d",
+  "repository": "SV-LLM/.github",
+  "schema": "stegverse.repo-transition-receipt/v1",
+  "successor_state_sha256": "sha256:5e80fb991ac158cbb487590eaa08dfe9e7cd5a809657be4e88e2643c65777125",
+  "transition_class": "INTR_MESH_PATH_TRANSFER",
+  "transition_id": "INTR_MESH_PATH_TRANSFER:SV-LLM->formalism-tests:intr-destination@intr-path-v1:SV-LLM->formalism-tests"
+}
