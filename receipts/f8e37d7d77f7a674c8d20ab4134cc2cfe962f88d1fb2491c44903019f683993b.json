@@ -1,0 +1,38 @@
+{
+  "authority_effect": "NONE",
+  "boundary_evidence": {
+    "communication_id": "intr-path-v1:formalism-tests->SV-LLM",
+    "disposition": "ALLOW",
+    "operation": "ORGANIZATION_INTR_DESTINATION_INGRESS",
+    "path_id": "formalism-tests->SV-LLM:intr-destination",
+    "profile_id": "intr-destination",
+    "source_organization_receipt_sha256": "sha256:936b0dd2848221a5bb1462bcd27d2530991d0a500b3a31a7a2b0c9bd01257466",
+    "source_repository": "formalism-tests/.github",
+    "source_repository_receipt_sha256": "sha256:3a37b436639fa43b16e6c321c435c853ad182be07ee2dbdcc9c11ab6157e50f3"
+  },
+  "canonical_state_transition_receipt_sha256": null,
+  "hb_reference": {
+    "authority_effect": "NONE",
+    "derived_from_clock": false,
+    "epoch": 473555685,
+    "frequency_hz": 100,
+    "generation": 473555685,
+    "heartbeat_id": "HB:473555685",
+    "phase_offset_ns": 0,
+    "progression_dependency": "OSCILLATOR_ONLY"
+  },
+  "org_transition_class": "REPO_STATE_PROPAGATION",
+  "organization": "SV-LLM",
+  "predecessor_org_state_sha256": "sha256:17002970ff7a0d67962d94e30570cb5662b7b48df99fd795975bc10527f45417",
+  "previous_receipt_sha256": "sha256:f775439820fe44b4d7010c3436b7adae66c2798e48be62177f3b5f41d42e40da",
+  "receipt_sha256": "sha256:f8e37d7d77f7a674c8d20ab4134cc2cfe962f88d1fb2491c44903019f683993b",
+  "repo_receipt_sha256": "sha256:04790c2bf0256c791fa3259b87efe0c7fed896f5be538c5edb68e54c4a6f8c7d",
+  "repo_transition_id": "INTR_MESH_PATH_INGRESS:formalism-tests->SV-LLM:intr-destination@intr-path-v1:formalism-tests->SV-LLM",
+  "schema": "stegverse.organization-transition-receipt/v1",
+  "source_receipt_schema": "stegverse.repo-transition-receipt/v1",
+  "source_repository": "SV-LLM/.github",
+  "source_transition_id": "INTR_MESH_PATH_INGRESS:formalism-tests->SV-LLM:intr-destination@intr-path-v1:formalism-tests->SV-LLM",
+  "source_transition_sha256": "sha256:04790c2bf0256c791fa3259b87efe0c7fed896f5be538c5edb68e54c4a6f8c7d",
+  "subject_or_correlation_id": null,
+  "successor_org_state_sha256": "sha256:b1489cc160e389cf15d9a794b4c9ae6bfe7012e8728195fde614f4d04567de92"
+}
