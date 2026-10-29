@@ -25,12 +25,12 @@
       "TOTAL": 32
     },
     "after": {
-      "PROPER": 80,
+      "PROPER": 88,
       "IMPROPER_CODE": 0,
       "IMPROPER_DOC": 0,
       "HISTORICAL_EVIDENCE": 3,
-      "NAMING_ONLY": 36,
-      "TOTAL": 119
+      "NAMING_ONLY": 68,
+      "TOTAL": 159
     }
   },
   "not_changed_with_reason": {
@@ -271,6 +271,20 @@
     }
   ],
   "after": [
+    {
+      "file": ".stegverse/intr-path-transfer/transfers.json",
+      "line": 63,
+      "text": "\"path_id\": \"SV-LLM->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": ".stegverse/intr-path-transfer/transfers.json",
+      "line": 64,
+      "text": "\"communication_id\": \"intr-path-v1:SV-LLM->master-records\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
     {
       "file": ".stegverse/transition-ledger/org-contract.json",
       "line": 13,
@@ -566,6 +580,41 @@
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 36,
+      "text": "RELEASE_CLI = \"resident-runtime/submit_org_transition_to_master_records.py\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 178,
+      "text": "def test_the_master_records_release_refuses_a_head_receipt_without_a_supplied_epoch(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 197,
+      "text": "[sys.executable, \"-B\", str(self.root / \"resident-runtime/submit_org_transition_to_master_records.py\"),",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 212,
+      "text": "\"\"\"Run the Master Records release on a one-receipt segment; return the completed process.\"\"\"",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
+      "line": 1307,
+      "text": "def test_every_write_of_the_master_records_release_is_resumable(self):",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
       "file": "profile/README.md",
       "line": 64,
       "text": "Master Records relates only to organization records and reconstruction, and has no role in this protocol. Organization Records owns custody of the organization action and acquisition receipts. LLM-adapter remains provider transport only and",
@@ -573,9 +622,51 @@
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
     {
-      "file": "resident-runtime/submit_org_transition_to_master_records.py",
-      "line": null,
-      "text": "<path>",
+      "file": "resident-runtime/organization_ledger_readback.py",
+      "line": 118,
+      "text": "\"master_records_awaited\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted byte-identical from the StegVerse-org reference (10d14104; previously 2bacf5c9): the ledger readback states that Master Records is not awaited, non-authorizing and non-gating."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 76,
+      "text": "Records separately and does not claim a Master Records organization record it",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the receiving operation publishes its organization records separately and does not claim a Master Records record it has not seen; Master Records is not awaited and not runtime reality."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 512,
+      "text": "\"master_records_organization_record_observed\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the governance-request result reports that no Master Records organization record was observed; nothing awaits one."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 896,
+      "text": "# Organization records are published to Master Records separately and",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): organization records are published to Master Records separately and are not awaited (propagation_gates_organization_runtime_reality false)."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 900,
+      "text": "\"master_records_organization_record_observed\": False,",
+      "classification": "PROPER",
+      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the ALLOW result reports that no Master Records organization record was observed; nothing awaits one."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 901,
+      "text": "\"master_records_propagation_entrypoint\":",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "resident-runtime/organization_manifest_ingress.py",
+      "line": 902,
+      "text": "\"resident-runtime/submit_org_transition_to_master_records.py\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
@@ -671,86 +762,219 @@
       "rationale": "States Master Records as organization records/reconstruction or downstream released-batch recording, non-authorizing and non-gating."
     },
     {
-      "file": "resident-runtime/organization_ledger_readback.py",
-      "line": 118,
-      "text": "\"master_records_awaited\": False,",
-      "classification": "PROPER",
-      "rationale": "Adopted byte-identical from the StegVerse-org reference (10d14104; previously 2bacf5c9): the ledger readback states that Master Records is not awaited, non-authorizing and non-gating."
-    },
-    {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 76,
-      "text": "Records separately and does not claim a Master Records organization record it",
-      "classification": "PROPER",
-      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the receiving operation publishes its organization records separately and does not claim a Master Records record it has not seen; Master Records is not awaited and not runtime reality."
-    },
-    {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 512,
-      "text": "\"master_records_organization_record_observed\": False,",
-      "classification": "PROPER",
-      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the governance-request result reports that no Master Records organization record was observed; nothing awaits one."
-    },
-    {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 896,
-      "text": "# Organization records are published to Master Records separately and",
-      "classification": "PROPER",
-      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): organization records are published to Master Records separately and are not awaited (propagation_gates_organization_runtime_reality false)."
-    },
-    {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 900,
-      "text": "\"master_records_organization_record_observed\": False,",
-      "classification": "PROPER",
-      "rationale": "Adopted from the StegVerse-org reference (10d14104, declared substitutions only; data/organization-role-reference-adoption.json): the ALLOW result reports that no Master Records organization record was observed; nothing awaits one."
-    },
-    {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 901,
-      "text": "\"master_records_propagation_entrypoint\":",
+      "file": "resident-runtime/submit_org_transition_to_master_records.py",
+      "line": null,
+      "text": "<path>",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "resident-runtime/organization_manifest_ingress.py",
-      "line": 902,
-      "text": "\"resident-runtime/submit_org_transition_to_master_records.py\",",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 192,
+      "text": "\"path_id\": \"AaCT-E->master-records:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
-      "line": 36,
-      "text": "RELEASE_CLI = \"resident-runtime/submit_org_transition_to_master_records.py\"",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 372,
+      "text": "\"path_id\": \"Admissible-Existence->master-records:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
-      "line": 178,
-      "text": "def test_the_master_records_release_refuses_a_head_receipt_without_a_supplied_epoch(self):",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 552,
+      "text": "\"path_id\": \"AdmittedCode->master-records:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
-      "line": 197,
-      "text": "[sys.executable, \"-B\", str(self.root / \"resident-runtime/submit_org_transition_to_master_records.py\"),",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 732,
+      "text": "\"path_id\": \"Data-Continuation->master-records:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
-      "line": 212,
-      "text": "\"\"\"Run the Master Records release on a one-receipt segment; return the completed process.\"\"\"",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 912,
+      "text": "\"path_id\": \"ECAT-ICAT-Formal->master-records:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
     {
-      "file": "org-runtime/tests/test_writer_epoch_refusal_order.py",
-      "line": 1307,
-      "text": "def test_every_write_of_the_master_records_release_is_resumable(self):",
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1092,
+      "text": "\"path_id\": \"GCAT-BCAT-Engine->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1272,
+      "text": "\"path_id\": \"Infrastructure-Continuity-Ventures->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1452,
+      "text": "\"path_id\": \"SV-011->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1632,
+      "text": "\"path_id\": \"SV-LLM->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1812,
+      "text": "\"path_id\": \"StegGhost->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 1992,
+      "text": "\"path_id\": \"StegVerse-002->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2172,
+      "text": "\"path_id\": \"StegVerse-Labs->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2352,
+      "text": "\"path_id\": \"StegVerse-org->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2532,
+      "text": "\"path_id\": \"Triad-Test->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2712,
+      "text": "\"path_id\": \"formalism-tests->master-records:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2724,
+      "text": "\"path_id\": \"master-records->AaCT-E:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2736,
+      "text": "\"path_id\": \"master-records->Admissible-Existence:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2748,
+      "text": "\"path_id\": \"master-records->AdmittedCode:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2760,
+      "text": "\"path_id\": \"master-records->Data-Continuation:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2772,
+      "text": "\"path_id\": \"master-records->ECAT-ICAT-Formal:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2784,
+      "text": "\"path_id\": \"master-records->GCAT-BCAT-Engine:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2796,
+      "text": "\"path_id\": \"master-records->Infrastructure-Continuity-Ventures:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2808,
+      "text": "\"path_id\": \"master-records->SV-011:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2820,
+      "text": "\"path_id\": \"master-records->SV-LLM:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2832,
+      "text": "\"path_id\": \"master-records->StegGhost:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2844,
+      "text": "\"path_id\": \"master-records->StegVerse-002:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2856,
+      "text": "\"path_id\": \"master-records->StegVerse-Labs:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2868,
+      "text": "\"path_id\": \"master-records->StegVerse-org:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2880,
+      "text": "\"path_id\": \"master-records->Triad-Test:intr-destination\",",
+      "classification": "NAMING_ONLY",
+      "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
+    },
+    {
+      "file": "tests/fixtures/intr-path-transfer/expected-real-state.json",
+      "line": 2892,
+      "text": "\"path_id\": \"master-records->formalism-tests:intr-destination\",",
       "classification": "NAMING_ONLY",
       "rationale": "Identifier, path, peer registry row, failure code or test name; asserts no role."
     },
@@ -777,28 +1001,35 @@
     },
     {
       "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
-      "line": 310,
+      "line": 289,
       "text": "\"organization\": \"master-records\",",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
       "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
-      "line": 311,
+      "line": 290,
       "text": "\"repository\": \"master-records/.github\",",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
       "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
-      "line": 315,
+      "line": 292,
+      "text": "\"source_ref\": \"default branch (main) at source_commit (master-records/.github installed the receiving operation, ledger and intr-destination row; lane-b-91117956)\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
+      "line": 294,
       "text": "\"file\": \"master-records.interlock-intr.json\",",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
     {
       "file": "tests/fixtures/intr-protocol/destinations/manifest.json",
-      "line": 320,
+      "line": 299,
       "text": "\"file\": \"master-records.services.json\",",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
@@ -814,6 +1045,41 @@
       "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
       "line": 4,
       "text": "\"owner_repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 19,
+      "text": "\"capability_declaration_owner\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 20,
+      "text": "\"capability_binding_owner\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 22,
+      "text": "\"owner_repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 25,
+      "text": "\"addressed_service\": \"master-records.intr-destination\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.interlock-intr.json",
+      "line": 69,
+      "text": "\"proven_on_this_organization\": \"master-records.intr-destination\",",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
     },
@@ -960,6 +1226,20 @@
     {
       "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
       "line": 93,
+      "text": "\"service_id\": \"master-records.intr-destination\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 94,
+      "text": "\"repository\": \"master-records/.github\",",
+      "classification": "PROPER",
+      "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
+    },
+    {
+      "file": "tests/fixtures/intr-protocol/destinations/master-records.services.json",
+      "line": 110,
       "text": "\"boundary_rule\": \"Cross-organization ingress/egress semantics are defined by the organization boundary; endpoint authority remains transition-governed. Master Records records released organization bat",
       "classification": "PROPER",
       "rationale": "Byte snapshot of another organization's file, an InTr protocol v1 conformance fixture (StegVerse-org/.github#162); it repeats that file's declaration that Master Records is not in the path (downstream recorder of released organization batch receipts; non-gating)."
@@ -1077,13 +1357,6 @@
       "rationale": "Test of the sender-side released-batch recorder binding: asserts the destination identifiers, that the directory row is unchanged and that default crossings stay at the control service; asserts no role."
     },
     {
-      "file": "tests/test_organization_manifest_ingress.py",
-      "line": 182,
-      "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
-      "classification": "PROPER",
-      "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."
-    },
-    {
       "file": "tests/test_intr_inter_org_only.py",
       "line": 78,
       "text": "def test_master_records_binding_is_cross_organization(self):",
@@ -1103,6 +1376,13 @@
       "text": "self.assertEqual(rows[0][\"destination_repository\"], \"master-records/.github\")",
       "classification": "NAMING_ONLY",
       "rationale": "Test name and the master-records organization/repository identifier; asserts only that the binding is cross-organization, no role."
+    },
+    {
+      "file": "tests/test_organization_manifest_ingress.py",
+      "line": 182,
+      "text": "# The only outbound binding is the master-records ledger binding (#163 c6387335336);",
+      "classification": "PROPER",
+      "rationale": "Test comment naming the released-batch recorder binding; asserts it carries no disposition binding_role; asserts no role."
     }
   ]
 }
