@@ -26,7 +26,7 @@ network:            Base (eip155:8453)
 asset:              USDC on Base (contract 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, 6 decimals)
 payTo:              0x7721aB66161e60fCcA59CCe2A86817cbdd9b16Be — 8374's own address; settlement lands in the identity's own custody
 status:             OPERATING CONFIGURATION 2026-11-17 — the receptor settlement values are elected as tonight's operating configuration, revisable by a later principal determination
-settlement:         the endpoint verifies x402 payment authorizations cryptographically (EIP-3009 transferWithAuthorization) at the crossing; it does not broadcast settlement — authorization verified at crossing; settlement submission via facilitator is the remaining external step. Neither this entry nor the endpoint claims settlement occurred.
+settlement:         the endpoint verifies x402 payment authorizations cryptographically (EIP-3009 transferWithAuthorization) at the crossing, and settlement is submitted on Base by the service's own gas-only relayer (Gate 2, live 2026-11-17) — first settled crossings: PAIR-000020 SETTLED (tx 0x4b1dce827c08f19b3ea6aae606d5f6b473f8dcd1b055502f7c46a926e38f80b4, block 58730763) and PAIR-000023 SETTLED (tx 0x8bc78a009de95fd54b195f684f0f996c4b9cff97e5382e0ed9375edab25028c2, block 58739184).
 
 ## Fee schedule
 
