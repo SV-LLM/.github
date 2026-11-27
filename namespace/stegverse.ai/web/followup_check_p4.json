@@ -1,0 +1,308 @@
+{
+  "classification": "READ_ONLY_FOLLOWUP_NOT_COMPLETION",
+  "session_prompt_count": 4,
+  "known_qualifying_namespace_prompts": 3,
+  "registry": {
+    "generation": 326,
+    "exact_scope_goal_found": false,
+    "canonical_goal_id": null,
+    "cosv": null
+  },
+  "owner_returns": {
+    "registry_issue": "https://github.com/StegVerse-Labs/.github/issues/3195",
+    "comments_read": 232,
+    "new_owner_return": false,
+    "serving_issue": "https://github.com/SV-LLM/.github/issues/75"
+  },
+  "pr": {
+    "url": "https://github.com/SV-LLM/.github/pull/76",
+    "base": "main",
+    "head_read": "7410eb3b33fc5ae04d6b827cd846e0a860831d1a",
+    "state": "open",
+    "draft": true,
+    "merged": false
+  },
+  "live_check": {
+    "time": "2026-11-27T11:52:34.359961+00:00",
+    "onboard": {
+      "url": "https://onboard.stegverse.ai/",
+      "exit": 0,
+      "status": "200",
+      "relationship_line": false,
+      "editable_relationship": false,
+      "binding_separate": true,
+      "hostnames": [
+        "8374.stegverse.ai",
+        "chatgpt.stegverse.ai",
+        "claudechat.stegverse.ai",
+        "claudecode.stegverse.ai",
+        "codex.stegverse.ai",
+        "coordination.stegverse.ai",
+        "copilot.stegverse.ai",
+        "eos.stegverse.ai",
+        "gemini.stegverse.ai",
+        "grok.stegverse.ai",
+        "kimi.stegverse.ai",
+        "muse.stegverse.ai",
+        "perplexity.stegverse.ai",
+        "svai.stegverse.ai"
+      ]
+    },
+    "member8374": {
+      "url": "https://8374.stegverse.ai/",
+      "exit": 0,
+      "status": "200",
+      "relationship_line": false,
+      "editable_relationship": false,
+      "binding_separate": false,
+      "hostnames": [],
+      "followup": "A single retry returned HTTP 200; heading 0R10N15-8374 — governed crossings for machines; required relationship line absent."
+    }
+  },
+  "cloudflare": {
+    "time": "2026-11-27T11:53:28.728Z",
+    "version": 13,
+    "bindings": [
+      {
+        "name": "muse.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "codex.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "chatgpt.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "claudecode.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "claudechat.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "gemini.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "grok.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "coordination.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "kimi.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "perplexity.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "copilot.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "svai.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "eos.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "8374.stegverse.ai",
+        "services": [
+          "http://localhost:8796"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      },
+      {
+        "name": "onboard.stegverse.ai",
+        "services": [
+          "http://127.0.0.1:8815"
+        ],
+        "dns": [
+          {
+            "type": "CNAME",
+            "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+            "proxied": true
+          }
+        ]
+      }
+    ],
+    "mutation_performed": false
+  },
+  "form": {
+    "method": "POST",
+    "action": "/onboard/add",
+    "observed_fields": [
+      "presentation",
+      "key",
+      "kind",
+      "seat_holder",
+      "gate_token"
+    ],
+    "editable_relationship": false,
+    "automatic_binding_advertised": false
+  },
+  "source_search": {
+    "inspected_default_branch_trees": [
+      "SV-LLM/.github@6ffc27ebe60ff14e27e268a61ed203fa0087417b",
+      "StegVerse-Labs/StegSocials@63d664d6b5ba992d39f501ea7b28f049c777ddd9"
+    ],
+    "runtime_namespace_handler_found": false,
+    "scoped_code_searches": [
+      "SV-LLM PENDING_BINDING",
+      "StegVerse-Labs onboard/add"
+    ],
+    "source_custody_return_required": true
+  },
+  "runtime_access": {
+    "connected_remote_devices": 0,
+    "authorized_node_write_operation_identified": false,
+    "authorized_gate_release_operation_identified": false
+  },
+  "form_submit_performed": false,
+  "test_member_created": false,
+  "test_member_retired": false,
+  "tunnel_token_accessed": false,
+  "credentials_requested_from_user": false,
+  "cloudflare_writes": 0,
+  "required_serving_return": [
+    "Exact repository + commit + paths for existing 8815 namespace/form handler and directory/receipt storage",
+    "Exact repository + commit + renderer path for existing 8796 8374 service",
+    "Existing admitted node mutation/deployment invocation reference and expected receipt",
+    "Existing TVC/SKAP gate-use operation reference or authorized opaque handle; never raw gate value in an issue",
+    "Existing authorized Cloudflare composite operation reference for form submission",
+    "Authenticated test add and retirement route/receipt contract"
+  ]
+}

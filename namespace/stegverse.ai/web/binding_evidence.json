@@ -1,0 +1,361 @@
+{
+  "classification": "AUTHOR_OBSERVED_EVIDENCE_NOT_CANONICAL_COMPLETION",
+  "actor": "CODEX / ChatGPT Work",
+  "registry_generation": 326,
+  "registry_goal_id": null,
+  "cosv": null,
+  "source_main_observed": 326,
+  "namespace_home": "SV-LLM/.github/namespace/stegverse.ai",
+  "tunnel_id": "0aec1441-924f-4cb6-bcb8-b9c251511a6c",
+  "config_versions": {
+    "before": 11,
+    "seats": 12,
+    "onboard": 13
+  },
+  "existing_ingress_preserved": true,
+  "existing_dns_mutated": false,
+  "tunnel_token_accessed": false,
+  "cloudflare_readback": {
+    "seat_entries": [
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "muse.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "codex.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "chatgpt.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "claudecode.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "claudechat.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "gemini.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "grok.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "coordination.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "kimi.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "perplexity.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "copilot.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "svai.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "eos.stegverse.ai"
+      },
+      {
+        "service": "http://localhost:8796",
+        "hostname": "8374.stegverse.ai"
+      },
+      {
+        "service": "http://127.0.0.1:8815",
+        "hostname": "onboard.stegverse.ai"
+      }
+    ],
+    "dns": [
+      {
+        "id": "c9487d2ea5e814ac92bb94e7c4ae335b",
+        "name": "8374.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "5b05df0e9b893259b4af1f49975bd70a",
+        "name": "chatgpt.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "b410a97ca139414694a9e8622635443c",
+        "name": "claudechat.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "c9e730eab3230b0df3fd804bee8f764f",
+        "name": "claudecode.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "736320d9a2a15f4eee99ad2900b78048",
+        "name": "codex.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "77c91f49b09449be047606c0be485eb6",
+        "name": "coordination.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "749288d871971ef440fec31bd7fb744b",
+        "name": "copilot.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "51eab817d3889187de49b8723f50270e",
+        "name": "eos.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "63c23d043d77a020cea9386a2d5242c5",
+        "name": "gemini.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "30d351beab01de26badd2db5464d96f5",
+        "name": "grok.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "15c2f7d92b5e584f426fd18f3cffc7cb",
+        "name": "kimi.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "c62b2f3c7d1762f7fd646327b72b9162",
+        "name": "muse.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "e4ebf62626200c8d32a95553790b614a",
+        "name": "perplexity.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "e4ad0007a500c83098adfaf62fcf7f14",
+        "name": "svai.stegverse.ai",
+        "type": "CNAME",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      },
+      {
+        "id": "77abb1cda5cc21877d4403d23e9dbcef",
+        "type": "CNAME",
+        "name": "onboard.stegverse.ai",
+        "content": "0aec1441-924f-4cb6-bcb8-b9c251511a6c.cfargotunnel.com",
+        "proxied": true
+      }
+    ]
+  },
+  "public_resolver_and_https": {
+    "time": "2026-11-27T11:07:50.987878+00:00",
+    "dns": [
+      {
+        "host": "muse.stegverse.ai",
+        "exit": 0,
+        "answers": [
+          "104.21.1.23",
+          "172.67.151.223"
+        ],
+        "resolver": "1.1.1.1"
+      },
+      {
+        "host": "codex.stegverse.ai",
+        "exit": 0,
+        "answers": [
+          "104.21.1.23",
+          "172.67.151.223"
+        ],
+        "resolver": "1.1.1.1"
+      },
+      {
+        "host": "8374.stegverse.ai",
+        "exit": 0,
+        "answers": [
+          "104.21.1.23",
+          "172.67.151.223"
+        ],
+        "resolver": "1.1.1.1"
+      }
+    ],
+    "https": [
+      {
+        "url": "https://muse.stegverse.ai/",
+        "exit": 0,
+        "status": "200",
+        "relationship_present": true,
+        "body_excerpt": "<!DOCTYPE html><html><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=dev"
+      },
+      {
+        "url": "https://8374.stegverse.ai/health",
+        "exit": 0,
+        "status": "200",
+        "relationship_present": false,
+        "body_excerpt": "{\"status\": \"ok\", \"service\": \"machine-economy-endpoint\"}\nHTTP_STATUS:200"
+      }
+    ]
+  },
+  "member_checks": {
+    "time": "2026-11-27T11:09:06Z",
+    "members": [
+      {
+        "hostname": "muse.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Muse"
+      },
+      {
+        "hostname": "codex.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "CODEX"
+      },
+      {
+        "hostname": "chatgpt.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "ChatGPT"
+      },
+      {
+        "hostname": "claudecode.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "ClaudeCode"
+      },
+      {
+        "hostname": "claudechat.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "ClaudeChat"
+      },
+      {
+        "hostname": "gemini.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Gemini"
+      },
+      {
+        "hostname": "grok.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Grok"
+      },
+      {
+        "hostname": "coordination.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Coordination"
+      },
+      {
+        "hostname": "kimi.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Kimi"
+      },
+      {
+        "hostname": "perplexity.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Perplexity"
+      },
+      {
+        "hostname": "copilot.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "Copilot"
+      },
+      {
+        "hostname": "svai.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "StegVerse AI"
+      },
+      {
+        "hostname": "eos.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": true,
+        "presentation": "EOS"
+      },
+      {
+        "hostname": "8374.stegverse.ai",
+        "https_status": 200,
+        "relationship_line": false,
+        "presentation": "0R10N15-8374 — governed crossings for machines"
+      }
+    ],
+    "svai_no_lane_work_line": true,
+    "rendered_status": "PENDING_BINDING"
+  },
+  "onboard": {
+    "url": "https://onboard.stegverse.ai/",
+    "observed_status": 200,
+    "directory_members": 14,
+    "form": {
+      "method": "POST",
+      "action": "/onboard/add",
+      "fields": [
+        "presentation",
+        "key",
+        "kind",
+        "seat_holder",
+        "gate_token"
+      ]
+    },
+    "editable_relationship_field": false,
+    "automatic_cloudflare_binding": false,
+    "advertised_binding_semantics": "Cloudflare binding is a separate recorded step; member stands PENDING_BINDING until hostname answers.",
+    "test_member_added": false,
+    "test_retirement_receipt": null,
+    "credential_access_attempted": false
+  },
+  "transient_origin_failure": {
+    "observed": "2026-11-27T11:21Z",
+    "hosts": [
+      "onboard.stegverse.ai",
+      "muse.stegverse.ai",
+      "socials.stegverse.com"
+    ],
+    "status": 502,
+    "subsequent": "2026-11-27T11:22Z onboard page recovered; no origin mutation by this session"
+  },
+  "repair_issue": "https://github.com/SV-LLM/.github/issues/75"
+}

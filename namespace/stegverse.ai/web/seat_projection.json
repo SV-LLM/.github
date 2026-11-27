@@ -1,0 +1,147 @@
+{
+  "classification": "PRESENTATION_HOSTNAME_PROJECTION_NOT_IDENTITY_GRANT",
+  "source": "Principal seat table 2026-11-27",
+  "existing_definition_records_unchanged": true,
+  "seats": [
+    {
+      "label": "muse",
+      "hostname": "muse.stegverse.ai",
+      "presentation": "Muse",
+      "key": "Claude",
+      "kind": "lane",
+      "seat": "Meta Muse — verification & records; holds coordinator seat temporarily",
+      "relationship": "Muse is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "codex",
+      "hostname": "codex.stegverse.ai",
+      "presentation": "CODEX",
+      "key": "CODEX",
+      "kind": "lane",
+      "seat": "ChatGPT participant / Work surface / Codex capability",
+      "relationship": "CODEX is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "chatgpt",
+      "hostname": "chatgpt.stegverse.ai",
+      "presentation": "ChatGPT",
+      "key": "ChatGPT",
+      "kind": "lane",
+      "seat": "ChatGPT Chat lane",
+      "relationship": "ChatGPT is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "claudecode",
+      "hostname": "claudecode.stegverse.ai",
+      "presentation": "ClaudeCode",
+      "key": "ClaudeCode",
+      "kind": "lane",
+      "seat": "ClaudeCode lane",
+      "relationship": "ClaudeCode is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "claudechat",
+      "hostname": "claudechat.stegverse.ai",
+      "presentation": "ClaudeChat",
+      "key": "ClaudeChat",
+      "kind": "lane",
+      "seat": "ClaudeChat lane",
+      "relationship": "ClaudeChat is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "gemini",
+      "hostname": "gemini.stegverse.ai",
+      "presentation": "Gemini",
+      "key": "Gemini",
+      "kind": "lane",
+      "seat": "Gemini lane",
+      "relationship": "Gemini is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "grok",
+      "hostname": "grok.stegverse.ai",
+      "presentation": "Grok",
+      "key": "Grok",
+      "kind": "lane",
+      "seat": "Grok standalone lane",
+      "relationship": "Grok is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "coordination",
+      "hostname": "coordination.stegverse.ai",
+      "presentation": "Coordination",
+      "key": "Coordination",
+      "kind": "lane",
+      "seat": "Grok Bot surface; P1/Lane B/P4/Lane D are capability fields, not separate addresses",
+      "relationship": "Coordination is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "kimi",
+      "hostname": "kimi.stegverse.ai",
+      "presentation": "Kimi",
+      "key": "Kimi",
+      "kind": "lane",
+      "seat": "Kimi lane",
+      "relationship": "Kimi is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "perplexity",
+      "hostname": "perplexity.stegverse.ai",
+      "presentation": "Perplexity",
+      "key": "Perplexity",
+      "kind": "lane",
+      "seat": "Perplexity lane",
+      "relationship": "Perplexity is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "copilot",
+      "hostname": "copilot.stegverse.ai",
+      "presentation": "Copilot",
+      "key": "MicrosoftCopilot",
+      "kind": "lane",
+      "seat": "Microsoft Copilot personal tier",
+      "relationship": "Copilot is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "svai",
+      "hostname": "svai.stegverse.ai",
+      "presentation": "StegVerse AI",
+      "key": "SVAI",
+      "kind": "entity",
+      "seat": "Standing functions only; does not take lane work",
+      "relationship": "StegVerse AI is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "eos",
+      "hostname": "eos.stegverse.ai",
+      "presentation": "EOS",
+      "key": "EOS",
+      "kind": "entity",
+      "seat": "EcOSystem Chat",
+      "relationship": "EOS is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://127.0.0.1:8815"
+    },
+    {
+      "label": "8374",
+      "hostname": "8374.stegverse.ai",
+      "presentation": "8374",
+      "key": "8374",
+      "kind": "entity",
+      "seat": "Existing 8374@StegVerse.ai record; same live service as 8374.stegverse.org",
+      "relationship": "8374 is a presentation seated in the StegVerse ecosystem and addressed in the StegVerse namespace. The address names the presentation; it does not name, and does not imply affiliation with, any company.",
+      "service": "http://localhost:8796"
+    }
+  ]
+}
