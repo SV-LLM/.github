@@ -6,7 +6,7 @@ Canonical coordination state: UNVERIFIED — no exact namespace task in G326.
 Source state: PREPARATION / PRINCIPAL-DIRECTED CLOUDFLARE WORK AUTHORIZED.
 Actor: CODEX (ChatGPT Work; capability Codex).
 Owner intake: https://github.com/StegVerse-Labs/.github/issues/3195
-Known qualifying user prompts in this conversation: 2. Session prompt count: 2.
+Known qualifying user prompts in this conversation: 2. Session prompt count: 3 (includes the initial AGENTS.md instruction prompt; qualifying namespace prompts: 2).
 This candidate does not mint an identity, COSV, admission, claim/fence or canonical transition.
 
 ## Request and boundaries
