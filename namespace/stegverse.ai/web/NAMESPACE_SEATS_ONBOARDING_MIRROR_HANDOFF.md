@@ -3,10 +3,10 @@
 Canonical Goal Task ID: UNASSIGNED — Registry-owner reconciliation required.
 COSV: UNASSIGNED.
 Canonical coordination state: UNVERIFIED — no exact namespace task in G326.
-Source state: PREPARATION / PRINCIPAL-DIRECTED CLOUDFLARE WORK AUTHORIZED.
+Source state: ROUTING_APPLIED_AND_READ_BACK / SERVING_ACCEPTANCE_PARTIAL.
 Actor: CODEX (ChatGPT Work; capability Codex).
 Owner intake: https://github.com/StegVerse-Labs/.github/issues/3195
-Known qualifying user prompts in this conversation: 2. Session prompt count: 3 (includes the initial AGENTS.md instruction prompt; qualifying namespace prompts: 2).
+Known qualifying user prompts in this conversation: 3. Session prompt count: 4 (includes the initial AGENTS.md instruction prompt).
 This candidate does not mint an identity, COSV, admission, claim/fence or canonical transition.
 
 ## Request and boundaries
@@ -21,7 +21,7 @@ The existing namespace directory is SV-LLM/.github/namespace/stegverse.ai per de
 
 ## Runtime access and next acts
 No Desktop Commander devices are connected. Existing socials service responds over public HTTPS. Its /openapi.json returns 404. No authenticated node deployment/write route has been established; do not infer one or create a second service.
-Next: apply/read back only Task A ingress and DNS additions; retain exact evidence; prepare host-aware pages and onboarding integration for the existing node owner; keep Task B live mutation after A acceptance.
+Current next act: obtain the serving-owner source and admitted invocation return described in SERVING_OWNER_RETURN.md. All fifteen namespace bindings are already applied; never replay their creates.
 Use the existing TVC/SKAP provider-operation path for onboard Cloudflare operations. Never retrieve or store the tunnel token. A public form must not grant arbitrary callers DNS mutation authority.
 
 ## Execution update — 2026-11-27
@@ -52,3 +52,14 @@ owning goal: UNASSIGNED — registration owner must bind exact scope; no adjacen
 next_attempt: Read node-owner repair and Registry-owner returns; validate live form/test add/retirement; never replay completed seat/onboard DNS or ingress creates.
 Manual principal action: None. Runtime-owner repair and Registry-owner action are filed, not delegated to the principal.
 Owner interventions this turn: 0.
+
+## Follow-up — session prompt 4 / qualifying namespace prompt 3
+
+Read #3195 through all 232 current comments and #75 through its only comment: no new Registry-owner or serving-owner return. PR #76 remains OPEN / DRAFT / NOT MERGED at the then-read 7410eb3b33fc5ae04d6b827cd846e0a860831d1a.
+Read the complete canonical aggregate again: G326, no exact namespace Goal/COSV. Read the handoff at the PR head before work.
+Read-only Cloudflare check: all 15 ingress/DNS bindings remain present at v13. No Cloudflare mutation.
+Live onboard returns 200 with the 14-entry directory and unchanged gated form. No editable relationship field; Cloudflare binding is still advertised as a separate step. 8374 root retry returns 200 with the machine page and no required relationship line.
+The default branch trees of SV-LLM/.github and StegVerse-Labs/StegSocials and scoped code searches did not locate the running namespace handler. No connected remote node or admitted node-write/gate operation was found. No form submit, test member, token retrieval, deployment, merge or completion claim.
+Exact acquisition/acceptance requirements are now in SERVING_OWNER_RETURN.md. Current observations are in followup_check_p4.json.
+Disposition: SOURCE_CUSTODY_AND_AUTHENTICATED_NODE_INVOCATION_REQUIRED; retry #75 with exact source+commit+paths, admitted node operation and gate-use reference, then implement/test the existing service. Registry #3195 identity reconciliation remains separately open.
+Manual principal action: None. Owner interventions: 0.

@@ -36,3 +36,7 @@ Three real dig @1.1.1.1 checks passed (muse, codex, 8374). Thirteen existing mem
 Remaining: 8374 member relationship line; form defaulted/editable relationship; submit-time Cloudflare binding instead of its advertised separate recorded step; binding-status readback into serving record; authenticated test-member add and retirement receipt. No test member was created. No gate credential or tunnel token was retrieved. The transient 8815 outage recovered without a CODEX node mutation.
 
 Canonical Goal/COSV/state remain unassigned. Registry owner reconciliation uses StegVerse-Labs/.github#3195; the complete aggregate G326 has no exact-scope entry. This branch is a draft evidence/handoff proposal and is not integrated or release-ready.
+
+## Follow-up check (session prompt 4)
+
+No new owner return is present. Fresh read-only check confirms all fifteen v13 bindings and the live directory/form; serving gaps remain. See [current observations](followup_check_p4.json) and [exact serving-owner return and acceptance steps](SERVING_OWNER_RETURN.md). No form submission or test-member creation occurred. No Cloudflare write was repeated.
