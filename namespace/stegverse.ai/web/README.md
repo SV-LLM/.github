@@ -40,3 +40,7 @@ Canonical Goal/COSV/state remain unassigned. Registry owner reconciliation uses 
 ## Follow-up check (session prompt 4)
 
 No new owner return is present. Fresh read-only check confirms all fifteen v13 bindings and the live directory/form; serving gaps remain. See [current observations](followup_check_p4.json) and [exact serving-owner return and acceptance steps](SERVING_OWNER_RETURN.md). No form submission or test-member creation occurred. No Cloudflare write was repeated.
+
+## Source-acquisition routing (session prompt 5)
+
+The source-return request is now an actionable QUEUED record on the Ecosystem KV coordination surface, linked in [source-return routing](SOURCE_RETURN_ROUTING.md). The registry-listed Coordination GitHub queue is at its comment cap. No unregistered replacement queue was used. Completion still requires the existing source and authenticated node operations; no test member was added. Resume on a relevant owner/source/capability return rather than another unchanged-state DNS check.

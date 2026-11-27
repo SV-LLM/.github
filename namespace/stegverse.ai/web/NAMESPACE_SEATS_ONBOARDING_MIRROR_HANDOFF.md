@@ -6,7 +6,7 @@ Canonical coordination state: UNVERIFIED — no exact namespace task in G326.
 Source state: ROUTING_APPLIED_AND_READ_BACK / SERVING_ACCEPTANCE_PARTIAL.
 Actor: CODEX (ChatGPT Work; capability Codex).
 Owner intake: https://github.com/StegVerse-Labs/.github/issues/3195
-Known qualifying user prompts in this conversation: 3. Session prompt count: 4 (includes the initial AGENTS.md instruction prompt).
+Known qualifying user prompts in this conversation: 4. Session prompt count: 5 (includes the initial AGENTS.md instruction prompt).
 This candidate does not mint an identity, COSV, admission, claim/fence or canonical transition.
 
 ## Request and boundaries
@@ -62,4 +62,18 @@ Live onboard returns 200 with the 14-entry directory and unchanged gated form. N
 The default branch trees of SV-LLM/.github and StegVerse-Labs/StegSocials and scoped code searches did not locate the running namespace handler. No connected remote node or admitted node-write/gate operation was found. No form submit, test member, token retrieval, deployment, merge or completion claim.
 Exact acquisition/acceptance requirements are now in SERVING_OWNER_RETURN.md. Current observations are in followup_check_p4.json.
 Disposition: SOURCE_CUSTODY_AND_AUTHENTICATED_NODE_INVOCATION_REQUIRED; retry #75 with exact source+commit+paths, admitted node operation and gate-use reference, then implement/test the existing service. Registry #3195 identity reconciliation remains separately open.
+Manual principal action: None. Owner interventions: 0.
+
+## Source-acquisition routing — session prompt 5 / qualifying namespace prompt 4
+
+No new owner return on #75 or #3195; G326 remains without exact namespace identity. PR head read before work was 31edd00040f45af96d5e2d754069360f4a1c0558.
+The live lane registry still resolves Coordination to #3444. Native issue metadata now shows 2500 comments, so no comment was attempted and no unregistered successor was adopted.
+Created a single actionable source-return queue record in the Ecosystem KV coordination folder: https://docs.google.com/document/d/1JdeQOa3IPnu3K2Oci8k_QLgwjBaYYEL0ztX7HEWquOY/edit?usp=drivesdk
+Title: QUEUE__WORK__NAMESPACE_SERVING_SOURCE_RETURN__CODEX__20261127.md
+State: QUEUED / UNCLAIMED / coordination-class / authority NONE.
+Parent folder read back: 1BACg5Z-uy1PgqPqAGoqwGrycPTtmsotQ.
+Native text readback matches the submitted content after whitespace/BOM normalization; not a byte-exact raw-Markdown claim. Readback text SHA-256: 6a58613760da9f5fc208e84ab5fcc9b46f51c5d3ec52ca8cc681f58100bd0776.
+This record requests the actual serving owner's source+commit+paths, admitted node mutation and gate-use references, Cloudflare composite operation and retirement contract. It does not claim delivery/acceptance by a worker.
+No Cloudflare writes, source/runtime deployment, form submit, test-member add or retirement performed in this follow-up.
+Retry is now conditional on a relevant owner/source/capability return. Do not spend another prompt repeating unchanged DNS checks or creating duplicate source requests.
 Manual principal action: None. Owner interventions: 0.
